@@ -195,9 +195,9 @@ In the Clojure project where you want AI assistance, add an nREPL connection.
 ```clojure
 {:aliases {
   ;; nREPL server for AI to connect to
-  :nrepl {:extra-paths ["test"] 
+  :nrepl {:extra-paths ["test"]
           :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
-          :jvm-opts ["-Djdk.attach.allowAttachSelf"]						 
+          :jvm-opts ["-Djdk.attach.allowAttachSelf"]
           :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}}}
 ```
 
@@ -228,7 +228,51 @@ Edit your Claude Desktop configuration file:
   - **Nix**: `/home/username/.nix-profile/bin` or `/nix/var/nix/profiles/default/bin`
   - **System default**: Often `/usr/bin:/usr/local/bin` works
 
-#### Step 4: Test the Setup
+### Optional: Setting up the project using Nix
+
+#### Step 1: Configure Your Target Project
+
+In the Clojure project where you want AI assistance, add an nREPL connection.
+
+```clojure
+{:aliases {
+  ;; nREPL server for AI to connect to
+  :nrepl {:extra-paths ["test"]
+          :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
+          :jvm-opts ["-Djdk.attach.allowAttachSelf"]
+          :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}}}
+```
+
+#### Step 2: Configure Claude Desktop
+
+> [!NOTE]
+> When restarting Claude Desktop for the first time with these changes, a loading spinner is shown while Nix downloads and builds clojure-mcp.
+
+Edit your Claude Desktop configuration file:
+- **Location**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+```json
+{
+    "mcpServers": {
+        "clojure-mcp": {
+            "command": "/bin/sh",
+            "args": [
+                "-c",
+                "PATH=/run/current-system/sw/bin:$PATH && nix run github:bhauman/clojure-mcp"
+            ]
+        }
+    }
+}
+```
+
+**Replace these paths**:
+- `/run/current-system/sw/bin` → Your `nix` binary location (try `which nix` to find it).
+
+**Override defaults**:
+- Check for available options with `nix run github:bhauman/clojure-mcp -- --help`
+- Pass options like `nix run github:bhauman/clojure-mcp -- --port 7888`
+
+### Test the Setup
 
 1. **Start nREPL** in your target project:
    ```bash
@@ -241,7 +285,7 @@ Edit your Claude Desktop configuration file:
 
 3. **Verify connection**: In Claude Desktop, click the `+` button in the chat area. You should see "Add from clojure-mcp" in the menu.
 
-#### Starting a new conversation
+### Starting a new conversation
 
 In Claude Desktop click the `+` tools and optionally add
  * resource `PROJECT_SUMMARY.md`  - (have the LLM create this) see below

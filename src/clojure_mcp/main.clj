@@ -1,6 +1,8 @@
 (ns clojure-mcp.main
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.tools.cli :as cli]
             [clojure.tools.logging :as log]
             [clojure-mcp.core :as core]
             [clojure-mcp.nrepl :as nrepl]
@@ -23,7 +25,8 @@
             [clojure-mcp.tools.dispatch-agent.tool :as dispatch-agent-tool]
             [clojure-mcp.tools.architect.tool :as architect-tool]
             [clojure-mcp.tools.code-critique.tool :as code-critique-tool]
-            [clojure-mcp.tools.project.tool :as project-tool]))
+            [clojure-mcp.tools.project.tool :as project-tool])
+  (:gen-class))
 
 ;; Define the resources you want available
 (defn my-resources [nrepl-client-map working-dir]
@@ -129,4 +132,74 @@
 ;; -Djdk.attach.allowAttachSelf is needed on the nrepl server if you want the mcp-server eval tool
 ;; to be able to interrupt long running evals
 
-;; TODO make a main fn that uses clojure.tools.cli and takes port host and tls-keys-file args
+(def cli-options
+  [["-p" "--port PORT" "Port number for nREPL connection"
+    :id :port
+    :default 7888
+    :parse-fn #(Integer/parseInt %)
+    :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
+
+   ["-h" "--host HOST" "Host for nREPL connection"
+    :id :host
+    :validate [#(seq %) "Host cannot be empty"]]
+
+   ["-t" "--tls-keys-file TLS_FILE" "TLS keys file path"
+    :id :tls-keys-file
+    :validate [#(.exists (java.io.File. %)) "TLS keys file must exist"]]
+
+   [nil "--help" "Show help"
+    :id :help]])
+
+(defn usage [options-summary]
+  (->> ["Clojure MCP nREPL Server"
+        ""
+        "USAGE: clojure-mcp [<options>]"
+        ""
+        "DESCRIPTION:"
+        "  Starts a Model Context Protocol (MCP) server that connects to an nREPL"
+        "  session for interactive Clojure development and tool integration."
+        ""
+        "OPTIONS:"
+        options-summary
+        ""
+        "EXAMPLES:"
+        "  clojure-mcp                           # Start with default settings (port 7888)"
+        "  clojure-mcp --port 8080               # Use custom port"
+        "  clojure-mcp --host 0.0.0.0 --port 9999  # Bind to all interfaces"
+        "  clojure-mcp --tls-keys-file ./keys.pem  # Use TLS encryption"
+        ""
+        "NOTES:"
+        "  • Ensure an nREPL server is running on the specified host:port"
+        "  • The MCP server will connect to nREPL and expose development tools"
+        "  • Use Ctrl+C to stop the server"]
+       (str/join \newline)))
+
+(defn error-msg [errors]
+  (str "The following errors occurred while parsing your command:\n\n"
+       (str/join \newline errors)))
+
+(defn validate-args [args]
+  (let [{:keys [options errors summary]} (cli/parse-opts args cli-options)]
+    (cond
+      (:help options)
+      {:exit-message (usage summary) :ok? true}
+
+      errors
+      {:exit-message (error-msg errors)}
+
+      :else
+      {:options options})))
+
+(defn build-nrepl-args [options]
+  (cond-> {:port (:port options)}
+    (:host options) (assoc :host (:host options))
+    (:tls-keys-file options) (assoc :tls-keys-file (:tls-keys-file options))))
+
+(defn -main [& args]
+  (let [{:keys [options exit-message ok?]} (validate-args args)]
+    (if exit-message
+      (do
+        (println exit-message)
+        (System/exit (if ok? 0 1)))
+      (let [nrepl-args (build-nrepl-args options)]
+        (start-mcp-server nrepl-args)))))

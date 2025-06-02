@@ -23,9 +23,9 @@
         dev.langchain4j/langchain4j-anthropic {:mvn/version "1.0.1-beta6"}      
         dev.langchain4j/langchain4j-google-ai-gemini {:mvn/version "1.0.1-beta6"}
 
-        ;; in order to use the stdio server you have to handle logging somehow
-        ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
-        }
+        ;; Default SLF4J implementation (no-op for production/CLI usage)
+        ;; This will be overridden by logback when present in dev aliases
+        org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
  :aliases
  {:dev-mcp
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
@@ -35,11 +35,10 @@
    :exec-args {:port 7888}}
 
   :mcp
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main/start-mcp-server
+  {:exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888}}
-  
+
   :dev-mcp-figwheel
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
    :extra-paths ["dev" "test"]
@@ -48,8 +47,7 @@
    :exec-args {:port 7888 :figwheel-build "dev"}}
 
   :mcp-figwheel
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
+  {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
    :exec-args {:port 7888 :figwheel-build "dev"}}
 
   ;; shared shadow and nrepl setup
@@ -67,12 +65,11 @@
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
-  
+
   :mcp-shadow
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
+  {:exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    :exec-args {:port 7888 :shadow-build "app"}}
-  
+
   :mcp-sse
   {:extra-deps {;; optional
                 ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
@@ -80,11 +77,10 @@
                 org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
                 org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
    :exec-fn clojure-mcp.sse-main/start-sse-mcp-server
-
    :exec-args {:port 7888 ;; the nrepl port to connect to
                ;; specify the :mcp-sse-port to listen on
                :mcp-sse-port 8078}}
-  
+
   :nrepl {:extra-paths ["test" "dev" "resources"]
           :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
           ;; See https://nrepl.org/nrepl/installation.html#jvmti
@@ -109,5 +105,3 @@
   :neil {:project {:name clojure-mcp/clojure-mcp}}
   :lint {:deps {clj-kondo/clj-kondo {:mvn/version "2025.02.20"}}
          :main-opts ["-m" "clj-kondo.main" "--lint" "src"]}}}
-
-
