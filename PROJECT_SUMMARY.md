@@ -57,6 +57,9 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/file_write/`: File writing operations
+- `/src/clojure_mcp/tools/scratch_pad/`: **New** - Persistent scratch pad for inter-tool communication
+  - `core.clj`: Core functionality for data storage and retrieval
+  - `tool.clj`: MCP integration with path-based operations (assoc_in, get_in, dissoc_in)
 
 #### Unused Tools (moved to other_tools/)
 
@@ -213,6 +216,61 @@ clojure_inspect_project:
   Output: Detailed project structure information
 ```
 
+### Scratch Pad - Persistent Data Storage
+
+**New tool for inter-tool communication and task tracking**
+
+The `scratch_pad` tool provides persistent storage for structured data between tool calls, enabling:
+- Task tracking with todo lists
+- Storing intermediate results
+- Sharing data between agents
+- Building up complex data structures incrementally
+
+```clojure
+# Basic operations
+scratch_pad:
+  Operations: assoc_in, get_in, dissoc_in, tree_view
+  Path elements: Automatically parses numbers ("0" → 0), keywords (":done" → :done)
+  Values: Automatically parses EDN, falls back to strings
+
+# Adding todo items
+scratch_pad:
+  Input: {"op": "assoc_in", "path": ["todos", "0"], "value": "{:task \"Write tests\" :done false :priority :high}", "todo": "todos", "explanation": "Adding first task"}
+  Output: Stored value at path ["todos" 0] (todo: todos)
+
+# Checking off tasks  
+scratch_pad:
+  Input: {"op": "assoc_in", "path": ["todos", "0", ":done"], "value": "true", "todo": "todos", "explanation": "Completed writing tests"}
+  Output: Stored value at path ["todos" 0 :done]
+
+# Viewing all data
+scratch_pad:
+  Input: {"op": "tree_view", "explanation": "Checking current state"}
+  Output: Tree view with formatted structure:
+    ├── todos
+    │   └── 0
+    │       ├── :task
+    │       │   "Write tests"
+    │       └── :done
+    │           true
+
+# Retrieving specific values
+scratch_pad:
+  Input: {"op": "get_in", "path": ["todos", "0", ":done"], "explanation": "Checking task status"}
+  Output: Value at ["todos" 0 :done]: true
+
+# Removing data
+scratch_pad:
+  Input: {"op": "dissoc_in", "path": ["todos", "0"], "explanation": "Removing completed task"}
+  Output: Removed value at path ["todos" 0]
+
+# Recommended todo schema:
+{:task "Description"
+ :done false  
+ :priority :high/:medium/:low (optional)
+ :context "Additional details" (optional)}
+```
+
 ## Collapsed View and Pattern-Based Code Exploration
 
 The `read_file` tool provides a powerful code exploration feature through its pattern-based collapsed view:
@@ -324,6 +382,15 @@ The implementation uses rewrite-clj to:
      - Handles path differences between `.getAbsolutePath()` and `.getCanonicalPath()` (on macOS `/var/...` vs `/private/var/...`)
      - Ensures timestamp lookups work correctly regardless of how paths are specified
 
+7. **Persistent State Management**: The `scratch_pad` tool provides:
+   - Global atom-based storage accessible across all tool invocations
+   - Path-based data structure manipulation (similar to Clojure's assoc-in/get-in)
+   - Automatic EDN parsing for values with string fallback
+   - Smart path element parsing (numbers, keywords, strings)
+   - Tree visualization for debugging and inspection
+   - Enables inter-agent communication and task tracking
+   - No need for explicit namespace management or REPL state
+
 ## Development Workflow Recommendations
 
 1. **Setup and Configuration**:
@@ -340,6 +407,11 @@ The implementation uses rewrite-clj to:
    - Use `clojure_edit_*` tools for syntax-aware code editing
    - Always read a file with `read_file` before editing if it might have been modified externally
    - After using `file_write`, you can immediately edit the file without reading it first
+   - Use `scratch_pad` for:
+     - Tracking tasks and todos across tool invocations
+     - Storing intermediate computation results
+     - Building up complex data structures incrementally
+     - Sharing context between different agents or tool calls
 
 4. **Logging System**:
    - Uses `clojure.tools.logging` with Logback backend
@@ -477,7 +549,14 @@ The unified `clojure_edit` tool uses a pattern-matching approach for finding and
 
 ## Recent Organizational Changes
 
-**Tool Reorganization (Latest)**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential. The moved tools include:
+**Scratch Pad Tool Addition (Latest)**: Added a new `scratch_pad` tool for persistent data storage across tool invocations. This tool enables:
+- Inter-agent communication through shared state
+- Task tracking with structured todo lists
+- Building complex data structures incrementally
+- Path-based data manipulation similar to Clojure's assoc-in/get-in
+- Automatic EDN parsing with intelligent path element handling (numbers, keywords, strings)
+
+**Tool Reorganization**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential. The moved tools include:
 
 - `create_directory`, `list_directory`, `move_file`: Basic file system operations
 - `namespace`, `symbol`: Advanced Clojure introspection tools
