@@ -62,7 +62,7 @@
 (defn convert-java-collections
   "Converts Java collection types to their Clojure equivalents recursively."
   [x]
-  (walk/postwalk
+  (clojure.walk/prewalk
    (fn [node]
      (cond
        (instance? java.util.Map node) (into {} node)

@@ -15,6 +15,7 @@
 
         
         ;; llm ecosystem java libs
+        org.apache.tika/tika-core {:mvn/version "3.2.0"} 
         com.fasterxml.jackson.core/jackson-databind {:mvn/version "2.15.2"}
         io.modelcontextprotocol.sdk/mcp {:mvn/version "0.10.0"}
         
@@ -27,18 +28,45 @@
         ;; This will be overridden by logback when present in dev aliases
         org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
  :aliases
- {:dev-mcp
+ 
+ {:mcp
+  {:exec-fn clojure-mcp.main/start-mcp-server
+   ;; it needs an nrepl port to talk to
+   :exec-args {:port 7888}}
+
+  :mcp-sse
+  {:extra-deps {jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
+                org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
+                org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
+   :exec-fn clojure-mcp.sse-main/start-sse-mcp-server
+   :exec-args {:port 7888 ;; the nrepl port to connect to
+               ;; specify the :mcp-sse-port to listen on
+               :mcp-sse-port 8078}}
+  
+  :mcp-figwheel
+  {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
+   :exec-args {:port 7888 :figwheel-build "dev"}}
+
+  :mcp-shadow
+  {:exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
+   :exec-args {:port 7888 :shadow-build "app"}}
+
+  ;; dual shadow and project nrepl setup
+  :mcp-shadow-dual
+  {:extra-paths ["dev" "test"]
+   :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
+   ;; it needs an nrepl port to talk to
+   :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
+
+  ;; below are dev set ups that need a logback.xml file
+  :dev-mcp
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
    :extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888}}
-
-  :mcp
-  {:exec-fn clojure-mcp.main/start-mcp-server
-   ;; it needs an nrepl port to talk to
-   :exec-args {:port 7888}}
-
+  
+  ;; DEV setup needs logback.xml
   :dev-mcp-figwheel
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
    :extra-paths ["dev" "test"]
@@ -46,40 +74,20 @@
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :figwheel-build "dev"}}
 
-  :mcp-figwheel
-  {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
-   :exec-args {:port 7888 :figwheel-build "dev"}}
-
-  ;; shared shadow and nrepl setup
+  ;; DEV setup needs logback.xml
   :dev-mcp-shadow
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
    :extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app"}}
-
-  ;; dual shadow and project nrepl setup
+  
   :dev-mcp-shadow-dual
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
    :extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
-
-  :mcp-shadow
-  {:exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
-   :exec-args {:port 7888 :shadow-build "app"}}
-
-  :mcp-sse
-  {:extra-deps {;; optional
-                ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
-                jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
-                org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
-                org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
-   :exec-fn clojure-mcp.sse-main/start-sse-mcp-server
-   :exec-args {:port 7888 ;; the nrepl port to connect to
-               ;; specify the :mcp-sse-port to listen on
-               :mcp-sse-port 8078}}
 
   :nrepl {:extra-paths ["test" "dev" "resources"]
           :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}

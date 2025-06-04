@@ -24,7 +24,7 @@
 ;; --- Prompt Definitions ---
 
 (defn create-project-summary [working-dir]
-  {:name "create-project-summary"
+  {:name "create-update-project-summary"
    :description "Generates a prompt instructing the LLM to create a summary of a project."
    :arguments []
    :prompt-fn (fn [_ _ clj-result-k]
@@ -144,3 +144,11 @@ If the file get's *edited* outside and must be read to see the changes, you shou
    :prompt-fn (simple-content-prompt-fn
                "Incremental File Creation for Clojure"
                (load-prompt-from-resource "clojure-mcp/prompts/system/incremental_file_creation.md"))})
+
+(def scratch-pad-guide
+  {:name "use-scratch-pad"
+   :description "Guide for using the scratch pad tool for persistent storage and task tracking"
+   :arguments []
+   :prompt-fn (simple-content-prompt-fn
+               "Use Scratch Pad"
+               "Let's use the scratch_pad tool.\n\nThe scratch_pad tool is your persistent storage for data between tool calls. Use it to:\n\n1. **Track Tasks**: Create todo lists to manage complex workflows\n2. **Store Intermediate Results**: Save computation results for later use\n3. **Share Context**: Pass data between different agents or tool sequences\n4. **Build Complex Data**: Incrementally construct data structures\n\nExample todo workflow:\n```clojure\n;; Add tasks\nscratch_pad(op: assoc_in, path: [\"todos\"], \n  value: {0: {task: \"Analyze code\", done: false},\n          1: {task: \"Write tests\", done: false}})\n\n;; Check off completed\nscratch_pad(op: assoc_in, path: [\"todos\" 0 \"done\"], value: true)\n\n;; View progress\nscratch_pad(op: tree_view)\n```\n\nBest practices:\n- Use descriptive keys for organization\n- Store results you'll need later\n- Track progress on multi-step tasks\n- Clean up completed items when done")})

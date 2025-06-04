@@ -154,7 +154,7 @@ Set it up as git dep in a local `deps.edn` or global `.clojure/deps.edn` like:
   {:mcp 
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
             com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
-                                     :git/sha "latest-main-branch-sha"}}
+                                     :git/sha "FILL THIS WITH LATEST SHA"}}
      :exec-fn clojure-mcp.main/start-mcp-server
      :exec-args {:port 7888}}}}
 ```

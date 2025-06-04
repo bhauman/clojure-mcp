@@ -2,9 +2,11 @@
   (:require [clojure.data.json :as json]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure-mcp.nrepl :as nrepl]
-            [clojure-mcp.config :as config])
+            [clojure-mcp.config :as config]
+            [clojure-mcp.file-content :as file-content])
   (:import [io.modelcontextprotocol.server.transport
             StdioServerTransportProvider]
            [io.modelcontextprotocol.server McpServer McpServerFeatures
@@ -15,6 +17,7 @@
             McpSchema$Tool
             McpSchema$CallToolResult
             McpSchema$TextContent
+            McpSchema$ImageContent
             McpSchema$Prompt
             McpSchema$PromptArgument
             McpSchema$GetPromptRequest
@@ -50,10 +53,15 @@
           (fn [result]
             (.success sink result))))))))
 
-(defn ^McpSchema$CallToolResult adapt-result [list-str error?]
-  (McpSchema$CallToolResult.
-   (mapv #(McpSchema$TextContent. %) list-str)
-   error?))
+(defn- adapt-result [result]
+  (cond
+    (string? result) (McpSchema$TextContent. result)
+    (file-content/file-response? result)
+    (file-content/file-response->file-content result)
+    :else nil))
+
+(defn ^McpSchema$CallToolResult adapt-results [list-str error?]
+  (McpSchema$CallToolResult. (vec (keep adapt-result list-str)) error?))
 
 (defn create-async-tool
   "Creates an AsyncToolSpecification with the given parameters.
@@ -75,7 +83,7 @@
                  (fn [exchange arg-map mono-fill-k]
                    (let [clj-result-k
                          (fn [res-list error?]
-                           (mono-fill-k (adapt-result res-list error?)))]
+                           (mono-fill-k (adapt-results res-list error?)))]
                      (tool-fn exchange arg-map clj-result-k))))]
     (McpServerFeatures$AsyncToolSpecification.
      (McpSchema$Tool. name description schema-json)

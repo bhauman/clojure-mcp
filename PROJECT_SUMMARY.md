@@ -230,45 +230,70 @@ The `scratch_pad` tool provides persistent storage for structured data between t
 # Basic operations
 scratch_pad:
   Operations: assoc_in, get_in, dissoc_in, tree_view
-  Path elements: Automatically parses numbers ("0" → 0), keywords (":done" → :done)
-  Values: Automatically parses EDN, falls back to strings
+  Path elements: Array of strings or numbers (no parsing needed)
+  Values: Any JSON-compatible value (objects, arrays, strings, numbers, booleans, null)
 
 # Adding todo items
 scratch_pad:
-  Input: {"op": "assoc_in", "path": ["todos", "0"], "value": "{:task \"Write tests\" :done false :priority :high}", "todo": "todos", "explanation": "Adding first task"}
+  op: assoc_in
+  path: ["todos" 0]
+  value: {task: "Write tests", done: false}
+  todo: "todos"
+  explanation: Adding first task
   Output: Stored value at path ["todos" 0] (todo: todos)
 
-# Checking off tasks  
+# Adding multiple todo items at once
 scratch_pad:
-  Input: {"op": "assoc_in", "path": ["todos", "0", ":done"], "value": "true", "todo": "todos", "explanation": "Completed writing tests"}
-  Output: Stored value at path ["todos" 0 :done]
+  op: assoc_in
+  path: ["todos"]
+  value: {
+    0: {task: "Write tests", done: false, priority: "high"},
+    1: {task: "Review PR", done: false, priority: "high"},
+    2: {task: "Update docs", done: false, priority: "medium"}
+  }
+  todo: "todos"
+  explanation: Adding multiple todos at once
+
+# Checking off tasks
+scratch_pad:
+  op: assoc_in
+  path: ["todos" 0 "done"]
+  value: true
+  todo: "todos"
+  explanation: Completed writing tests
+  Output: Stored value at path ["todos" 0 "done"] (todo: todos)
 
 # Viewing all data
 scratch_pad:
-  Input: {"op": "tree_view", "explanation": "Checking current state"}
+  op: tree_view
+  explanation: Checking current state
   Output: Tree view with formatted structure:
-    ├── todos
-    │   └── 0
-    │       ├── :task
-    │       │   "Write tests"
-    │       └── :done
-    │           true
+    {"todos"
+     {0
+      {"task" "Write tests",
+       "done" true}}}
 
 # Retrieving specific values
 scratch_pad:
-  Input: {"op": "get_in", "path": ["todos", "0", ":done"], "explanation": "Checking task status"}
-  Output: Value at ["todos" 0 :done]: true
+  op: get_in
+  path: ["todos" 0]
+  explanation: Checking first task details
+  Output: Value at ["todos" 0]: {task: "Write tests", done: true}
 
 # Removing data
 scratch_pad:
-  Input: {"op": "dissoc_in", "path": ["todos", "0"], "explanation": "Removing completed task"}
+  op: dissoc_in
+  path: [todos 0]
+  explanation: Removing completed task
   Output: Removed value at path ["todos" 0]
 
 # Recommended todo schema:
-{:task "Description"
- :done false  
- :priority :high/:medium/:low (optional)
- :context "Additional details" (optional)}
+{
+  task: "Description",
+  done: false,
+  priority: "high", // optional: "high", "medium", "low"
+  context: "Additional details" // optional
+}
 ```
 
 ## Collapsed View and Pattern-Based Code Exploration
@@ -385,8 +410,8 @@ The implementation uses rewrite-clj to:
 7. **Persistent State Management**: The `scratch_pad` tool provides:
    - Global atom-based storage accessible across all tool invocations
    - Path-based data structure manipulation (similar to Clojure's assoc-in/get-in)
-   - Automatic EDN parsing for values with string fallback
-   - Smart path element parsing (numbers, keywords, strings)
+   - Direct storage of JSON-compatible values without parsing
+   - Path elements as arrays of strings and numbers
    - Tree visualization for debugging and inspection
    - Enables inter-agent communication and task tracking
    - No need for explicit namespace management or REPL state
@@ -554,7 +579,8 @@ The unified `clojure_edit` tool uses a pattern-matching approach for finding and
 - Task tracking with structured todo lists
 - Building complex data structures incrementally
 - Path-based data manipulation similar to Clojure's assoc-in/get-in
-- Automatic EDN parsing with intelligent path element handling (numbers, keywords, strings)
+- Direct storage of JSON-compatible values (objects, arrays, strings, numbers, booleans, null)
+- Path elements specified as arrays of strings and numbers
 
 **Tool Reorganization**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential. The moved tools include:
 

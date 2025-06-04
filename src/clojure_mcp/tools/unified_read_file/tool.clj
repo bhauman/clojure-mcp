@@ -8,11 +8,11 @@
    [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.utils.valid-paths :as valid-paths]
+   [clojure-mcp.tools.unified-read-file.pattern-core :as pattern-core]
+   [clojure-mcp.file-content :as file-content]
+   [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [clojure.string :as str]))
-
- ;; Import our pattern-based functionality
-(require '[clojure-mcp.tools.unified-read-file.pattern-core :as pattern-core])
 
 ;; Factory function to create the tool configuration
 (defn create-unified-read-file-tool
@@ -150,6 +150,16 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
           {:error true
            :message (.getMessage e)}))
 
+      (file-content/should-be-file-response? path)
+      (try
+        (assoc (file-content/->file-response path)
+               :mode :file-response)
+        (catch Exception e
+          (let [message (str "Error: creating file response for " path)]
+            (log/error e message)
+            {:error true
+             :message message})))
+      
       :else
       (let [result (file-timestamps/read-file-with-timestamp
                     nrepl-client-atom path line_offset limit-val :max-line-length max-line-length)]
@@ -213,7 +223,9 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
       :raw
       {:result (format-raw-file result max-lines)
        :error false}
-
+      :file-response
+      {:result [result]
+       :error false}
       {:result ["Unknown result mode"]
        :error true})))
 
