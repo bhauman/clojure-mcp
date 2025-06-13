@@ -1,5 +1,5 @@
 (ns clojure-mcp.main-examples.shadow-main
-  (:require 
+  (:require
    [clojure-mcp.core :as core]
    [clojure-mcp.config :as config]
    [clojure-mcp.nrepl :as nrepl]
@@ -78,6 +78,7 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
 ;; start the server
 (defn start-mcp-server [nrepl-args]
   ;; the nrepl-args are a map with :port :host :figwheel-build
+  ;; can also include :user-dir-override for Docker setups
   (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
         resources (main/my-resources nrepl-client-map working-dir)

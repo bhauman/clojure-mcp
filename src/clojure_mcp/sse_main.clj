@@ -10,6 +10,7 @@
 
 (defn start-sse-mcp-server [args]
   ;; the nrepl-args are a map with :port :host
+  ;; can also include :user-dir-override for Docker setups
   ;; we also need an :mcp-sse-port so we'll default to 8078??
   (let [mcp-port (:mcp-sse-port args 8078)
         nrepl-client-map (core/create-and-start-nrepl-connection args)
@@ -18,7 +19,7 @@
         _ (reset! nrepl-client-atom nrepl-client-map)
         tools (main/my-tools nrepl-client-atom)
         prompts (main/my-prompts working-dir)
-        {:keys [mcp-server provider-servlet] } (sse-core/mcp-sse-server)]
+        {:keys [mcp-server provider-servlet]} (sse-core/mcp-sse-server)]
     (doseq [tool tools]
       (core/add-tool mcp-server tool))
     (doseq [resource resources]

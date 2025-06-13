@@ -240,8 +240,10 @@
    - Loading required namespaces and helpers
    - Setting up the working directory
    - Loading remote configuration
-   
+
    Takes initial-config map with :port and optional :host.
+   Can include :user-dir-override to specify a different working directory than the nREPL's user.dir.
+   This is useful when the nREPL runs in Docker but the MCP server runs on the host.
    Returns the configured nrepl-client-map with ::config/config attached."
   [initial-config]
   (log/info "Creating nREPL connection with config:" initial-config)
@@ -261,14 +263,16 @@
       (nrepl/tool-eval-code nrepl-client-map "(in-ns 'user)")
       (log/debug "Required namespaces loaded")
 
-      (let [user-dir (try
-                       (edn/read-string
-                        (nrepl/tool-eval-code
-                         nrepl-client-map
-                         "(System/getProperty \"user.dir\")"))
-                       (catch Exception e
-                         (log/warn e "Failed to get user.dir")
-                         nil))]
+      (let [user-dir (if-let [override (:user-dir-override initial-config)]
+                       override
+                       (try
+                         (edn/read-string
+                          (nrepl/tool-eval-code
+                           nrepl-client-map
+                           "(System/getProperty \"user.dir\")"))
+                         (catch Exception e
+                           (log/warn e "Failed to get user.dir from nREPL")
+                           nil)))]
         (if user-dir
           (log/info "Working directory set to:" user-dir)
           (do

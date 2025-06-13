@@ -266,6 +266,7 @@ If you see output other than JSON-RPC messages, it's likely due to `clojure-mcp`
 
 - **Location Independence**: The MCP server can run from any directory—it doesn't need to be in your project directory. It uses the nREPL connection for context.
 - **Shared Filesystem**: Currently, the nREPL and MCP servers must run on the same machine as they assume a shared filesystem.
+- **Docker Support**: If your nREPL runs in Docker but MCP server runs on the host, use the `:user-dir-override` parameter to specify the host filesystem path. See [DOCKER_USAGE.md](DOCKER_USAGE.md) for detailed setup instructions.
 - **Dependency Isolation**: Don't include `clojure-mcp` in your project's dependencies. It should run separately with its own deps. Always use `:deps` (not `:extra-deps`) in its alias.
 
 ## Step 3: Configure Claude Desktop

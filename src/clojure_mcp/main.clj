@@ -121,7 +121,9 @@
 
 ;; start the server
 (defn start-mcp-server [nrepl-args]
-  ;; the nrepl-args are a map with :port :host :tls-keys-file]
+  ;; the nrepl-args are a map with :port :host :tls-keys-file
+  ;; can also include :user-dir-override for Docker setups where nREPL runs in container
+  ;; but MCP server runs on host
   (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
         resources (my-resources nrepl-client-map working-dir)
