@@ -13,29 +13,35 @@
         clj-kondo/clj-kondo {:mvn/version "2024.03.13"}
         org.clojars.oakes/parinfer {:mvn/version "0.4.0"}
 
-        
+
         ;; llm ecosystem java libs
-        org.apache.tika/tika-core {:mvn/version "3.2.0"} 
+        org.apache.tika/tika-core {:mvn/version "3.2.0"}
         io.modelcontextprotocol.sdk/mcp {:mvn/version "0.10.0"}
-        
+
         dev.langchain4j/langchain4j {:mvn/version "1.0.1"}
         dev.langchain4j/langchain4j-open-ai {:mvn/version "1.0.1"}
-        dev.langchain4j/langchain4j-anthropic {:mvn/version "1.0.1-beta6"}      
+        dev.langchain4j/langchain4j-anthropic {:mvn/version "1.0.1-beta6"}
         dev.langchain4j/langchain4j-google-ai-gemini {:mvn/version "1.0.1-beta6"}
 
         ;; in order to use the stdio server you have to handle logging somehow
         ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
         }
  :aliases
- 
+
  {:mcp
   {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
    :exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888}}
 
+  :mcp-basilisp
+  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
+   :exec-fn clojure-mcp.main-examples.basilisp-main/start-mcp-server
+   :exec-args {:port 7888 :basilisp-host "localhost" :basilisp-port 7890}}
+
+
   :mcp-sse
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; optional 
+  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; optional
                 jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
                 org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
                 org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
@@ -44,7 +50,7 @@
    :exec-args {:port 7888 ;; the nrepl port to connect to
                ;; specify the :mcp-sse-port to listen on
                :mcp-sse-port 8078}}
-  
+
   :mcp-figwheel
   {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
    :exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
@@ -70,7 +76,7 @@
    :exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888}}
-  
+
   ;; DEV setup needs logback.xml
   :dev-mcp-figwheel
   {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
@@ -93,7 +99,7 @@
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
-  
+
   :nrepl {:extra-paths ["test" "dev"]
           :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
           ;; See https://nrepl.org/nrepl/installation.html#jvmti
@@ -101,7 +107,7 @@
           :main-opts ["-m" "nrepl.cmdline" "--port" "7888"
                       ;; for Docker
                       "--bind" "0.0.0.0"]}
-  
+
   :dkr-nrepl {:extra-paths ["test" "dev"]
               :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
               ;; See https://nrepl.org/nrepl/installation.html#jvmti
@@ -127,5 +133,3 @@
   :neil {:project {:name clojure-mcp/clojure-mcp}}
   :lint {:deps {clj-kondo/clj-kondo {:mvn/version "2025.02.20"}}
          :main-opts ["-m" "clj-kondo.main" "--lint" "src"]}}}
-
-
