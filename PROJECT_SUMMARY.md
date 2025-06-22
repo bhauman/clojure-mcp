@@ -8,7 +8,7 @@
 
 Clojure MCP is a Model Context Protocol (MCP) server that enables AI assistants (like Claude) to interact directly with a Clojure REPL. It provides a collaborative, REPL-driven development workflow between humans and LLMs. The core philosophy is "tiny steps with high quality rich feedback" for effective development.
 
-**Recent Major Refactoring**: The project has been refactored to separate the core MCP API from its consumption, enabling easier customization and reuse.
+**Recent Major Refactoring**: The project has been refactored to separate the core MCP API from its consumption, enabling easier customization and reuse. The new pattern uses factory functions (`make-tools`, `make-prompts`, `make-resources`) and a single entry point (`core/build-and-start-mcp-server`) for creating custom MCP servers.
 
 The project allows AI assistants to:
 - Evaluate Clojure code and see immediate results
@@ -22,31 +22,31 @@ The project allows AI assistants to:
 
 ### Core System Files
 
-- `/src/clojure_mcp/core.clj`: **Refactored** - Now provides the reusable API for building MCP servers with convenience higher-level functions
-- `/src/clojure_mcp/main.clj`: **New** - Example implementation showing how to consume the core API to build the actual Clojure MCP server
+- `/src/clojure_mcp/core.clj`: **Refactored** - Provides the reusable API for building MCP servers with the main `build-and-start-mcp-server` function
+- `/src/clojure_mcp/main.clj`: **Refactored** - Example implementation showing how to consume the core API with factory functions
 - `/src/clojure_mcp/nrepl.clj`: nREPL client implementation for connecting to Clojure REPL
 - `/src/clojure_mcp/tool_system.clj`: Defines the multimethod-based architecture for tools
-- `/src/clojure_mcp/repl_tools.clj`: Central registry for all available tools
 - `/src/clojure_mcp/prompts.clj`: Manages system prompts for AI assistants
 - `/src/clojure_mcp/resources.clj`: Manages resources to be exposed to AI assistants
 - `/src/clojure_mcp/config.clj`: **Enhanced** - Configuration system supporting `.clojure-mcp/config.edn` files
 - `/src/clojure_mcp/linting.clj`: Code quality and formatting utilities
+- `/src/clojure_mcp/sse_core.clj`: Server-Sent Events transport implementation
+- `/src/clojure_mcp/sse_main.clj`: Example SSE server using the new pattern
 
 ### Tool Implementations
 
 #### Active Tools (used in main.clj)
 
 - `/src/clojure_mcp/tools/eval/`: Code evaluation tools
-- `/src/clojure_mcp/tools/read_file/`: File reading utilities
-  - `core.clj`: Core file reading functionality
-  - `tool.clj`: Tool implementation with MCP integration
-  - `file_timestamps.clj`: Track file read/modification timestamps for safety
-- `/src/clojure_mcp/tools/form_edit/`: Structure-aware Clojure code editing
-- `/src/clojure_mcp/tools/file_edit/`: Basic file editing operations
-- `/src/clojure_mcp/tools/unified_file_edit/`: Combined file editing capabilities
 - `/src/clojure_mcp/tools/unified_read_file/`: Enhanced file reading with pattern-based code exploration
   - `tool.clj`: Main tool implementation with MCP integration
   - `pattern_core.clj`: Core pattern matching functionality for Clojure code analysis
+  - `file_timestamps.clj`: Track file read/modification timestamps for safety
+- `/src/clojure_mcp/tools/form_edit/`: Structure-aware Clojure code editing
+  - `combined_edit_tool.clj`: Unified form editing tool
+  - `tool.clj`: S-expression replacement tool
+- `/src/clojure_mcp/tools/file_edit/`: Basic file editing operations
+- `/src/clojure_mcp/tools/file_write/`: File writing operations
 - `/src/clojure_mcp/tools/directory_tree/`: Filesystem navigation
 - `/src/clojure_mcp/tools/grep/`: Content searching in files
 - `/src/clojure_mcp/tools/glob_files/`: Pattern-based file finding
@@ -56,10 +56,10 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
-- `/src/clojure_mcp/tools/file_write/`: File writing operations
-- `/src/clojure_mcp/tools/scratch_pad/`: **New** - Persistent scratch pad for inter-tool communication
+- `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
   - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path)
+  - `truncate.clj`: Pretty-printing with depth truncation
 
 #### Unused Tools (moved to other_tools/)
 
@@ -75,6 +75,11 @@ The project allows AI assistants to:
 
 All unused tools have corresponding test files moved to `/test/clojure_mcp/other_tools/` with updated namespace declarations.
 
+### Example Main Files
+
+- `/src/clojure_mcp/main_examples/shadow_main.clj`: Example custom server for Shadow CLJS support
+- `/src/clojure_mcp/main_examples/figwheel_main.clj`: Example custom server for Figwheel Main support
+
 ### Resource Directories
 
 - `/resources/prompts/`: System prompts for AI assistants
@@ -87,8 +92,8 @@ All unused tools have corresponding test files moved to `/test/clojure_mcp/other
 
 ### Core Dependencies
 
-- `org.clojure/clojure` (1.11.1): The Clojure language
-- `io.modelcontextprotocol.sdk/mcp` (0.9.0): Model Context Protocol SDK
+- `org.clojure/clojure` (1.12.1): The Clojure language
+- `io.modelcontextprotocol.sdk/mcp` (0.10.0): Model Context Protocol SDK
 - `nrepl/nrepl` (1.3.1): Network REPL server for Clojure
 - `rewrite-clj/rewrite-clj` (1.1.47): Library for parsing and transforming Clojure code
 - `dev.weavejester/cljfmt` (0.13.1): Clojure code formatting
@@ -98,9 +103,18 @@ All unused tools have corresponding test files moved to `/test/clojure_mcp/other
 
 ### AI Integration Dependencies
 
-- `dev.langchain4j/langchain4j` (1.0.0-beta3): Java library for LLM integration
-- `dev.langchain4j/langchain4j-anthropic` (1.0.0-beta3): Anthropic-specific integration
+- `dev.langchain4j/langchain4j` (1.0.1): Java library for LLM integration
+- `dev.langchain4j/langchain4j-anthropic` (1.0.1-beta6): Anthropic-specific integration
+- `dev.langchain4j/langchain4j-google-ai-gemini` (1.0.1-beta6): Google Gemini integration
+- `dev.langchain4j/langchain4j-open-ai` (1.0.1): OpenAI integration
 - `pogonos/pogonos` (0.2.1): Mustache templating for prompts
+
+### Additional Dependencies
+
+- `org.clojars.oakes/parinfer` (0.4.0): Parenthesis inference for Clojure
+- `org.apache.tika/tika-core` (3.2.0): Content detection and extraction
+- `org.clojure/data.json` (2.5.1): JSON parsing and generation
+- `org.clojure/tools.cli` (1.1.230): Command line argument parsing
 
 ## Configuration System
 
@@ -140,7 +154,57 @@ your-project/
 - All file operations validated against allowed directories
 - Project root automatically included in allowed directories
 
-## Available Tools and Examples
+## Available Tools
+
+The following tools are available in the default configuration (`main.clj`):
+
+### Read-Only Tools
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `LS` | Returns a recursive tree view of files and directories | Exploring project structure |
+| `read_file` | Smart file reader with pattern-based exploration for Clojure files | Reading files with collapsed view, pattern matching |
+| `grep` | Fast content search tool that works with any codebase size | Finding files containing specific patterns |
+| `glob_files` | Fast file pattern matching tool that works with any codebase size | Finding files by name patterns like `*.clj` |
+| `think` | Use the tool to think about something | Planning approaches, organizing thoughts |
+
+### Code Evaluation
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `clojure_eval` | Takes a Clojure Expression and evaluates it in the current namespace | Testing expressions, REPL-driven development |
+| `bash` | Execute bash shell commands on the host system | Running tests, git commands, file operations |
+
+### File Editing Tools
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `clojure_edit` | Edits a top-level form in a Clojure file using the specified operation | Replacing/inserting functions, handling defmethod |
+| `clojure_edit_replace_sexp` | Edits a file by finding and replacing specific s-expressions | Changing specific s-expressions within functions |
+| `file_edit` | Edit a file by replacing a specific text string with a new one | Simple text replacements |
+| `file_write` | Write a file to the local filesystem | Creating new files, overwriting with validation |
+
+### Introspection
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `clojure_inspect_project` | Analyzes and provides detailed information about a Clojure project's structure | Understanding project organization, dependencies |
+
+### Agent Tools (Require API Keys)
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `dispatch_agent` | Launch a new agent that has access to read-only tools | Multi-step file exploration and analysis |
+| `architect` | Your go-to tool for any technical or coding task | System design, architecture decisions |
+
+### Experimental Tools
+
+| Tool Name | Description | Example Usage |
+|-----------|-------------|---------------|
+| `scratch_pad` | A persistent scratch pad for storing structured data between tool calls | Task tracking, intermediate results, inter-agent communication |
+| `code_critique` | Starts an interactive code review conversation that provides constructive feedback on your Clojure code | Iterative code quality improvement |
+
+## Tool Examples
 
 ### Code Evaluation
 
@@ -157,207 +221,49 @@ read_file:
   Input: {:path "/path/to/file.clj", 
           :collapsed true,
           :name_pattern "validate.*", 
-          :content_pattern "try|catch",
-          :include_comments false}
+          :content_pattern "try|catch"}
   Output: File contents with pattern-based collapsed view
   
-edit_file:
-  Input: {:file_path "/path/to/file.clj", :old_string "(defn old", :new_string "(defn new"}
+file_edit:
+  Input: {:file_path "/path/to/file.clj", 
+          :old_string "(defn old", 
+          :new_string "(defn new"}
   Output: Diff showing changes made
 ```
 
 ### Clojure-Specific Editing
 
-The project has transitioned to using a unified `clojure_edit` tool which provides more powerful pattern-based editing capabilities while simplifying the interface. The older form-specific tools are still available for compatibility with other LLMs.
-
 ```clojure
 clojure_edit:
   Input: {:file_path "/path/to/file.clj", 
-          :sexp_pattern "(defn my-func _*)", 
-          :raw_content "(defn my-func [x] (* x 2))", 
+          :form_identifier "my-func",
+          :form_type "defn",
+          :content "(defn my-func [x] (* x 2))", 
           :operation "replace"}
   Output: Diff showing syntax-aware function replacement
-  
-clojure_edit:
+
+clojure_edit_replace_sexp:
   Input: {:file_path "/path/to/file.clj", 
-          :sexp_pattern "(defn my-func _*)", 
-          :raw_content "(def magic-multiplier 2)", 
-          :operation "insert_before"}
-  Output: Diff showing insertion before the matched pattern
-  
-clojure_edit:
-  Input: {:file_path "/path/to/file.clj", 
-          :sexp_pattern "(defn my-func _*)", 
-          :raw_content "(deftest my-func-test (is (= 4 (my-func 2))))", 
-          :operation "insert_after"}
-  Output: Diff showing insertion after the matched pattern
-
-# Examples with namespace-qualified forms and defmethod
-
-clojure_edit:
-  Input: {:file_path "/path/to/file.clj", 
-          :sexp_pattern "(defmethod tool-system/validate-inputs :clojure-eval _*)", 
-          :raw_content "(defmethod tool-system/validate-inputs :clojure-eval [_ inputs]\n  (validate-clojure-eval-inputs inputs))", 
-          :operation "replace"}
-  Output: Diff showing replacement of a specific multimethod implementation
-```
-
-### Code Search and Navigation
-
-```clojure
-glob_files:
-  Input: {:pattern "**/*.clj"}
-  Output: List of matching file paths
-  
-grep:
-  Input: {:pattern "defn my-func"}
-  Output: List of files containing the pattern
-
-# Note: symbol_search tool has been moved to other_tools/ and is not actively used
-# but remains available for specialized namespace/symbol exploration if needed
-```
-
-### Project Information
-
-```clojure
-clojure_inspect_project:
-  Input: {}
-  Output: Detailed project structure information
+          :match_form "(+ x 2)", 
+          :new_form "(+ x 10)"}
+  Output: Diff showing s-expression replacement
 ```
 
 ### Scratch Pad - Persistent Data Storage
 
-**New tool for inter-tool communication and task tracking**
-
-The `scratch_pad` tool provides persistent storage for structured data between tool calls, enabling:
-- Task tracking with todo lists
-- Storing intermediate results
-- Sharing data between agents
-- Building up complex data structures incrementally
-
 ```clojure
-# Basic operations
-scratch_pad:
-  Operations: set_path, get_path, delete_path, tree_view
-  Path elements: Array of strings or numbers (no parsing needed)
-  Values: Any JSON-compatible value (objects, arrays, strings, numbers, booleans, null)
-
-# Adding todo items
 scratch_pad:
   op: set_path
-  path: ["todos" 0]
+  path: ["todos", 0]
   value: {task: "Write tests", done: false}
-  todo: "todos"
   explanation: Adding first task
-  Output: Stored value at path ["todos" 0] (todo: todos)
+  Output: Stored value at path ["todos", 0]
 
-# Adding multiple todo items at once
-scratch_pad:
-  op: set_path
-  path: ["todos"]
-  value: {
-    0: {task: "Write tests", done: false, priority: "high"},
-    1: {task: "Review PR", done: false, priority: "high"},
-    2: {task: "Update docs", done: false, priority: "medium"}
-  }
-  todo: "todos"
-  explanation: Adding multiple todos at once
-
-# Checking off tasks
-scratch_pad:
-  op: set_path
-  path: ["todos" 0 "done"]
-  value: true
-  todo: "todos"
-  explanation: Completed writing tests
-  Output: Stored value at path ["todos" 0 "done"] (todo: todos)
-
-# Viewing all data
-scratch_pad:
-  op: tree_view
-  explanation: Checking current state
-  Output: Tree view with formatted structure:
-    {"todos"
-     {0
-      {"task" "Write tests",
-       "done" true}}}
-
-# Retrieving specific values
 scratch_pad:
   op: get_path
-  path: ["todos" 0]
-  explanation: Checking first task details
-  Output: Value at ["todos" 0]: {task: "Write tests", done: true}
-
-# Removing data
-scratch_pad:
-  op: delete_path
-  path: [todos 0]
-  explanation: Removing completed task
-  Output: Removed value at path ["todos" 0]
-
-# Recommended todo schema:
-{
-  task: "Description",
-  done: false,
-  priority: "high", // optional: "high", "medium", "low"
-  context: "Additional details" // optional
-}
-```
-
-## Collapsed View and Pattern-Based Code Exploration
-
-The `read_file` tool provides a powerful code exploration feature through its pattern-based collapsed view:
-
-### Key Features
-
-1. **Collapsed View**: Shows only function signatures by default, making large files navigable
-2. **Pattern Matching**: Expands functions matching specific patterns
-   - `name_pattern`: Regex to match function names (e.g., "validate.*")
-   - `content_pattern`: Regex to match function content (e.g., "try|catch")
-3. **Comment Control**: Option to include/exclude comments with `include_comments`
-4. **Markdown Formatting**: Results are formatted in markdown with:
-   - File header and pattern information
-   - Syntax-highlighted code blocks
-   - Usage tips for further exploration
-
-### Implementation
-
-The implementation uses rewrite-clj to:
-1. Parse Clojure code into zipper structures
-2. Collect top-level forms with metadata
-3. Apply regex pattern matching to function names and content
-4. Generate a collapsed view with selected expansions
-5. Support defmethod forms with special handling for:
-   - Keyword dispatch values (e.g., `:rectangle`)
-   - Vector dispatch values (e.g., `[:feet :inches]`)
-   - Namespace-qualified multimethod names (e.g., `tool-system/validate-inputs`)
-
-### Usage Examples
-
-```clojure
-;; Basic collapsed view of a file
-{:path "/path/to/file.clj", :collapsed true}
-
-;; Find all functions with 'validate' in their names
-{:path "/path/to/file.clj", :name_pattern "validate"}
-
-;; Find all error handling code
-{:path "/path/to/file.clj", :content_pattern "try|catch|throw"}
-
-;; Combined patterns - find validation functions that handle errors
-{:path "/path/to/file.clj", :name_pattern "validate", :content_pattern "try|catch"}
-
-;; Include comments in search
-{:path "/path/to/file.clj", :content_pattern "TODO", :include_comments true}
-
-;; View entire file without collapsing
-{:path "/path/to/file.clj", :collapsed false}
-
-;; Working with defmethod forms
-{:path "/path/to/file.clj", :name_pattern "area :rectangle"}                   ;; Find specific dispatch value
-{:path "/path/to/file.clj", :name_pattern "dispatch-with-vector \\[:feet :inches\\]"} ;; Find vector dispatch value
-{:path "/path/to/file.clj", :name_pattern "tool-system/validate-inputs"}       ;; Find namespaced multimethods
+  path: ["todos", 0]
+  explanation: Checking first task
+  Output: Value at ["todos", 0]: {task: "Write tests", done: false}
 ```
 
 ## Architecture and Design Patterns
@@ -368,10 +274,17 @@ The implementation uses rewrite-clj to:
 2. **nREPL Client**: Connects to the Clojure REPL for code evaluation
 3. **Tool System**: Extensible multimethod-based architecture for defining tools
 4. **Prompt System**: Provides context and guidance to AI assistants
+5. **Factory Pattern**: New pattern using factory functions for tools, prompts, and resources
 
 ### Key Implementation Patterns
 
-1. **Multimethod Dispatch**: The tool system uses multimethods for extensibility:
+1. **Factory Function Pattern**: The refactored architecture uses factory functions:
+   - `make-tools`: `(fn [nrepl-client-atom working-directory] ...)` returns seq of tools
+   - `make-prompts`: `(fn [nrepl-client-atom working-directory] ...)` returns seq of prompts
+   - `make-resources`: `(fn [nrepl-client-atom working-directory] ...)` returns seq of resources
+   - All components created through `core/build-and-start-mcp-server`
+
+2. **Multimethod Dispatch**: The tool system uses multimethods for extensibility:
    - `tool-name`: Determines the name of a tool
    - `tool-description`: Provides human-readable description
    - `tool-schema`: Defines the input/output schema
@@ -379,56 +292,46 @@ The implementation uses rewrite-clj to:
    - `execute-tool`: Performs the actual operation
    - `format-results`: Formats the results for the AI
 
-2. **Core/Tool Separation**: Each tool follows a pattern:
+3. **Core/Tool Separation**: Each tool follows a pattern:
    - `core.clj`: Pure functionality without MCP dependencies
    - `tool.clj`: MCP integration layer using the tool system
 
-3. **Structured Clojure Code Editing**: Uses rewrite-clj to:
+4. **Structured Clojure Code Editing**: Uses rewrite-clj to:
    - Parse Clojure code into zipper structure
    - Perform structure-aware transformations
    - Maintain proper formatting and whitespace
    - Key advantages over generic text editing:
-     - Pattern-based matching with wildcard symbols (`_?` for single form, `_*` for multiple forms)
-     - Targets forms by pattern rather than requiring exact text matching
-     - Structure-aware matching ignores troublesome whitespace differences
+     - Pattern-based matching with form identifiers
+     - Targets forms by type and name rather than text matching
+     - Structure-aware matching ignores whitespace differences
      - Provides early syntax validation for parenthesis balancing
-     - Validates that patterns match exactly one form to prevent ambiguous edits
-     - Gives specific error messages for easier troubleshooting
      - Handles special forms like defmethod with dispatch values correctly
 
-4. **REPL-Driven Development**: All tools designed to support:
+5. **REPL-Driven Development**: All tools designed to support:
    - Incremental development
    - Immediate feedback
    - Step-by-step verification
 
-5. **Pattern-Based Code Exploration**: The `read_file` tool supports:
+6. **Pattern-Based Code Exploration**: The `read_file` tool supports:
    - Regular expression matching for function names with `name_pattern`
    - Content-based pattern matching with `content_pattern`
    - Focused code reading with collapsed view and selective expansion
    - Markdown-formatted output with usage hints
 
-6. **File Timestamp Tracking**: Ensures file operation safety:
+7. **File Timestamp Tracking**: Ensures file operation safety:
    - Tracks when files are last read or modified
    - Prevents editing files that have been externally modified
    - Automatically updates timestamps after write operations
    - Enables multiple sequential edits after a single read
-   - Uses canonical paths consistently for reliable file identification:
-     - Handles path differences between `.getAbsolutePath()` and `.getCanonicalPath()` (on macOS `/var/...` vs `/private/var/...`)
-     - Ensures timestamp lookups work correctly regardless of how paths are specified
+   - Uses canonical paths consistently for reliable file identification
 
-7. **Persistent State Management**: The `scratch_pad` tool provides:
+8. **Persistent State Management**: The `scratch_pad` tool provides:
    - Global atom-based storage accessible across all tool invocations
    - Path-based data structure manipulation using `set_path`/`get_path`/`delete_path` operations
    - Direct storage of JSON-compatible values without parsing
    - Path elements as arrays of strings and numbers
    - Tree visualization for debugging and inspection
    - Pretty-printed output with truncation at depth 3 for readability
-   - Symbol-based truncation indicators for cleaner output:
-     - Arrays: `['... '... '... '...50_elements]`
-     - Maps: `{key '... '... '...20_entries}`
-     - Sets: `#{...15_items '...}`
-   - Enables inter-agent communication and task tracking
-   - No need for explicit namespace management or REPL state
 
 ## Development Workflow Recommendations
 
@@ -443,7 +346,7 @@ The implementation uses rewrite-clj to:
 
 3. **Tool Usage Best Practices**:
    - Use `clojure_eval` for testing code snippets
-   - Use `clojure_edit_*` tools for syntax-aware code editing
+   - Use `clojure_edit` and `clojure_edit_replace_sexp` for syntax-aware code editing
    - Always read a file with `read_file` before editing if it might have been modified externally
    - After using `file_write`, you can immediately edit the file without reading it first
    - Use `scratch_pad` for:
@@ -457,17 +360,6 @@ The implementation uses rewrite-clj to:
    - Logs are written to `logs/clojure-mcp.log` with daily rotation
    - Configure log levels in `resources/logback.xml`
    - Server startup/shutdown and errors are logged automatically
-   - Add logging in your code with:
-     ```clojure
-     (ns your.namespace
-       (:require [clojure.tools.logging :as log]))
-       
-     (log/debug "Debug message")
-     (log/info "Info message")
-     (log/warn "Warning message")
-     (log/error "Error message")
-     (log/error exception "Error with exception")
-     ```
 
 5. **Project Maintenance**:
    - Run tests with `clojure -X:test`
@@ -477,12 +369,7 @@ The implementation uses rewrite-clj to:
    - Use the provided test utilities in `clojure-mcp.tools.test-utils`
    - Always use canonical paths (`.getCanonicalPath()`) when working with file operations
    - Register files with the timestamp tracker before attempting to modify them in tests
-   - The `create-and-register-test-file` and `read-and-register-test-file` helpers handle this automatically
    - Include small delays between timestamp operations to ensure different timestamps
-   - Key test files for reference:
-     - `/test/clojure_mcp/tools/form_edit/tool_test.clj`: Main form editing tests with canonical path handling
-     - `/test/clojure_mcp/tools/form_edit/sexp_replace_test.clj`: S-expression replacement tests
-     - `/test/clojure_mcp/tools/test_utils.clj`: Shared test utilities
 
 7. **Pattern-Based Code Exploration**:
    - Use the enhanced `read_file` tool for efficient codebase navigation
@@ -493,120 +380,80 @@ The implementation uses rewrite-clj to:
      - Find error handling: `{:content_pattern "try|catch|throw"}`
      - Find where a specific function is used: `{:content_pattern "some-important-function"}`
      - Find a specific defmethod: `{:name_pattern "area :rectangle"}`
-     - Find defmethod with vector dispatch: `{:name_pattern "dispatch-with-vector \\[:feet :inches\\]"}`
-   - Markdown-formatted output includes useful tips and pattern match information
 
-## Pattern-Based Code Editing
+## Creating Custom MCP Servers
 
-The unified `clojure_edit` tool uses a pattern-matching approach for finding and editing Clojure code:
+The refactored architecture makes it simple to create custom MCP servers:
 
-### Key Features
-
-1. **Wildcard Patterns**: 
-   - `_?` matches exactly one form (e.g., a symbol, list, vector)
-   - `_*` matches zero or more forms
-
-2. **Pattern Validation**:
-   - Ensures patterns are valid S-expressions
-   - Blocks comment matching (use `file_edit` for comments)
-   - Prevents overly general patterns like lone wildcards
-   - Validates that patterns match exactly one form in the file
-
-3. **Error Handling**:
-   - Provides detailed error messages with context
-   - For duplicate matches, shows both matches to help refine patterns
-
-### Usage Examples
+### Minimal Example
 
 ```clojure
-;; Match a specific function definition
-(clojure_edit
-  {:file_path "/path/to/file.clj",
-   :sexp_pattern "(defn specific-function _*)",
-   :raw_content "(defn specific-function [x] (println x) x)",
-   :operation "replace"})
+(ns my-company.mcp-server
+  (:require [clojure-mcp.core :as core]
+            [clojure-mcp.main :as main]))
 
-;; Match functions with a specific argument pattern
-(clojure_edit
-  {:file_path "/path/to/file.clj",
-   :sexp_pattern "(defn _? [x y] _*)",
-   :raw_content "(defn helper-function [x y] (+ x y))",
-   :operation "insert_after"})
-
-;; Match a specific multimethod implementation
-(clojure_edit
-  {:file_path "/path/to/file.clj",
-   :sexp_pattern "(defmethod area :rectangle _*)",
-   :raw_content "(defmethod area :rectangle [{:keys [width height]}] (* width height))",
-   :operation "replace"})
-
-;; Match a vector dispatch multimethod
-(clojure_edit
-  {:file_path "/path/to/file.clj",
-   :sexp_pattern "(defmethod convert-units [:feet :inches] _*)",
-   :raw_content "(defmethod convert-units [:feet :inches] [_ value] (* value 12))",
-   :operation "replace"})
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn main/make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
+
+### Custom Tools Example
+
+```clojure
+(defn make-tools [nrepl-client-atom working-directory]
+  (concat
+   (main/make-tools nrepl-client-atom working-directory)
+   [(my-custom-tool/create-tool nrepl-client-atom)]))
+```
+
+See `/doc/custom-mcp-server.md` for comprehensive documentation on creating custom servers.
 
 ## Extension Points
 
 1. **Adding New Tools**:
    - Create a new tool namespace in `/src/clojure_mcp/tools/` for active tools
    - Implement the required multimethods from `tool-system`
-   - Register the tool in `main.clj` within the `my-tools` function
+   - Register the tool in `main.clj` within the `make-tools` function
    - Note: Tools in `/src/clojure_mcp/other_tools/` are not automatically registered
 
-2. **Enhancing Existing Tools**:
+2. **Creating Custom Servers**:
+   - Define factory functions for tools, prompts, and resources
+   - Call `core/build-and-start-mcp-server` with your factories
+   - See example implementations in `main_examples/`
+
+3. **Enhancing Existing Tools**:
    - Most tools follow a pipeline architecture that can be modified by adding new steps
-   - Example: We added a `check_for_duplicate_matches` step to the `unified_clojure_edit` pipeline
-     to validate that patterns match exactly one form, preventing ambiguous edits
    - Pipeline steps follow a thread-first pattern with error short-circuiting
 
-3. **Re-activating Unused Tools**:
+4. **Re-activating Unused Tools**:
    - Tools in `/src/clojure_mcp/other_tools/` can be re-activated by:
      - Moving them back to `/src/clojure_mcp/tools/`
      - Updating namespace declarations
-     - Adding them to the imports and `my-tools` function in `main.clj`
+     - Adding them to the imports and `make-tools` function in `main.clj`
    - Alternatively, create custom MCP servers using these tools via the core API
 
-4. **Enhancing Prompt System**:
-   - Add new prompts in `/resources/prompts/`
-   - Register them in `prompts.clj`
-
-5. **Improving Code Editing**:
-   - Extend form editing capabilities in `tools/form_edit/core.clj`
-   - Add specialized tools for common editing patterns
-   - Extend pattern matching in `sexp/match.clj`
-
-6. **Language Model Integration**:
-   - Explore langchain4j integration for more advanced AI capabilities
-   - Implement feedback mechanisms for model improvements
-
-7. **IDE Integration**:
-   - Extend `/src/clojure_mcp/utils/emacs_integration.clj` for better editor support
-   - Add support for VS Code or other editors
+5. **Alternative Transports**:
+   - Use `sse-core/build-and-start-mcp-server` for SSE transport
+   - See `sse-main.clj` for an example implementation
 
 ## Recent Organizational Changes
 
-**Scratch Pad Tool Addition (Latest)**: Added a new `scratch_pad` tool for persistent data storage across tool invocations. This tool enables:
+**New Factory Function Pattern**: The project has been refactored to use a cleaner pattern for creating custom MCP servers:
+- Factory functions (`make-tools`, `make-prompts`, `make-resources`) with consistent signatures
+- Single entry point via `core/build-and-start-mcp-server`
+- Simplified custom server creation
+- Example implementations in `main_examples/` directory
+
+**Scratch Pad Tool Addition**: Added a new `scratch_pad` tool for persistent data storage across tool invocations. This tool enables:
 - Inter-agent communication through shared state
 - Task tracking with structured todo lists
 - Building complex data structures incrementally
-- Path-based data manipulation using `set_path`/`get_path`/`delete_path` operations (renamed from assoc_in/get_in/dissoc_in)
-- Direct storage of JSON-compatible values (objects, arrays, strings, numbers, booleans)
-- Path elements specified as arrays of strings and numbers
-- Pretty-printed output with symbol-based truncation at depth 3 for improved readability
-- Truncation algorithm that shows collection sizes with clean symbols:
-  - `'...50_elements` for sequences
-  - `'...20_entries` for maps  
-  - `'...15_items` for sets
-- Truncation utility in `/src/clojure_mcp/tools/scratch_pad/truncate.clj` for reuse
+- Path-based data manipulation using `set_path`/`get_path`/`delete_path` operations
+- Direct storage of JSON-compatible values
 
-**Tool Reorganization**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential. The moved tools include:
+**Tool Reorganization**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential.
 
-- `create_directory`, `list_directory`, `move_file`: Basic file system operations
-- `namespace`, `symbol`: Advanced Clojure introspection tools
-
-All moved tools retain full functionality with passing tests and can be easily re-activated if needed. This organizational approach helps maintain focus on the core tool set while preserving additional capabilities for specialized use cases.
-
-This project summary is designed to provide AI assistants with a quick understanding of the Clojure MCP project structure and capabilities, enabling more effective assistance with minimal additional context. The project continues to evolve with improvements such as the unified clojure_edit tool with pattern-based matching and validation to ensure safer, more precise code editing operations while maintaining compatibility with a wide range of LLMs.
+This project summary is designed to provide AI assistants with a quick understanding of the Clojure MCP project structure and capabilities, enabling more effective assistance with minimal additional context. The project continues to evolve with improvements focused on making it easier to create custom MCP servers while maintaining compatibility with a wide range of LLMs.

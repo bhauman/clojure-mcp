@@ -5,189 +5,290 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure-mcp.nrepl :as mcp-nrepl]
-   [clojure-mcp.config :as config]))
+   [clojure-mcp.config :as config]
+   [clojure-mcp.tools.glob-files.core :as glob])
+  (:import [java.io File]
+           [java.nio.file Paths]))
+
+(defn to-relative-path
+  "Converts an absolute file path to a relative path from the working directory.
+   Uses Java NIO Path utilities for proper path handling.
+   
+   Arguments:
+   - working-dir: The base directory (working directory)
+   - file-path: The absolute file path to make relative
+   
+   Returns the relative path as a string, or the original path if relativization fails."
+  [working-dir file-path]
+  (try
+    (let [base-path (Paths/get working-dir (into-array String []))
+          target-path (Paths/get file-path (into-array String []))
+          relative-path (.relativize base-path target-path)]
+      (.toString relative-path))
+    (catch Exception _
+      ;; Fallback to original path if relativization fails
+      file-path)))
 
 (defn inspect-project-code
-  "REPL expression to gather project information including paths, dependencies, and source files.
-   Returns a map with project details that can be evaluated in the project's context."
+  "Minimal REPL expression to gather only essential runtime information.
+   All file reading and parsing is now done locally."
   []
-  '(let [deps (when (.exists (clojure.java.io/file "deps.edn"))
-                (-> "deps.edn" slurp clojure.edn/read-string))
-         project-clj (when (.exists (clojure.java.io/file "project.clj"))
-                       (-> "project.clj" slurp read-string))
-         lein-project? (boolean project-clj)
-         deps-project? (boolean deps)
-         ;; Parse Leiningen project.clj structure
-         lein-config (when lein-project?
-                       (->> project-clj
-                            (drop 3) ; skip defproject, name, version
-                            (partition 2)
-                            (map (fn [[k v]] [k v]))
-                            (into {})))
-         source-files (fn [dir]
-                        (when (.exists (clojure.java.io/file dir))
-                          (->> (clojure.java.io/file dir)
-                               file-seq
-                               (filter #(.isFile %))
-                               (filter #(let [name (.getName %)]
-                                          (or (.endsWith name ".clj")
-                                              (.endsWith name ".cljs")
-                                              (.endsWith name ".cljc")
-                                              (.endsWith name ".bb")
-                                              (.endsWith name ".edn"))))
-                               (map #(.getPath %))
-                               sort)))
-         ;; Extract paths from deps.edn or project.clj
-         source-paths (cond
-                        deps (or (:paths deps) ["src"])
-                        lein-project? (or (:source-paths lein-config) ["src"])
-                        :else ["src"])
-         test-paths (cond
-                      deps (get-in deps [:aliases :test :extra-paths] ["test"])
-                      lein-project? (or (:test-paths lein-config) ["test"])
-                      :else ["test"])
-         all-paths (concat source-paths test-paths)
-         sources (mapcat source-files all-paths)
-         java-version (System/getProperty "java.version")
-         clojure-version-info (clojure-version)]
+  '(try
      {:working-dir (System/getProperty "user.dir")
-      :project-type (cond
-                      (and deps-project? lein-project?) "deps.edn + Leiningen"
-                      deps-project? "deps.edn"
-                      lein-project? "Leiningen"
-                      :else "Unknown")
-      :java-version java-version
-      :clj-version clojure-version-info
-      :deps deps
-      :project-clj (when lein-project?
-                     {:name (nth project-clj 1)
-                      :version (nth project-clj 2)
-                      :dependencies (:dependencies lein-config)
-                      :profiles (:profiles lein-config)})
-      :source-paths source-paths
-      :test-paths test-paths
-      :sources sources}))
+      :java-version (System/getProperty "java.version")
+      :clojure-version (try (clojure-version)
+                            (catch Exception _ nil))}
+     (catch Exception e
+       {:error (str "Failed to gather runtime info: " (.getMessage e))
+        :working-dir "."
+        :java-version "Unknown"
+        :clojure-version "Unknown"})))
+
+(defn read-deps-edn
+  "Safely reads and parses deps.edn from the working directory.
+   Returns the parsed EDN data or nil if file doesn't exist or parsing fails."
+  [working-dir]
+  (let [deps-file (File. working-dir "deps.edn")]
+    (when (.exists deps-file)
+      (try
+        (-> deps-file slurp edn/read-string)
+        (catch Exception e
+          (println "Warning: Failed to read/parse deps.edn:" (.getMessage e))
+          nil)))))
+
+(defn read-project-clj
+  "Safely reads and parses project.clj from the working directory.
+   Returns the parsed Clojure data or nil if file doesn't exist or parsing fails."
+  [working-dir]
+  (let [project-file (File. working-dir "project.clj")]
+    (when (.exists project-file)
+      (try
+        (-> project-file slurp read-string)
+        (catch Exception e
+          (println "Warning: Failed to read/parse project.clj:" (.getMessage e))
+          nil)))))
+
+(defn parse-lein-config
+  "Extracts configuration map from a parsed project.clj structure.
+   Returns a map of configuration keys/values or empty map if parsing fails."
+  [project-clj]
+  (try
+    (when (and (sequential? project-clj) (>= (count project-clj) 3))
+      (let [remaining (drop 3 project-clj)]
+        (when (even? (count remaining))
+          (->> remaining
+               (partition 2)
+               (map (fn [[k v]] [k v]))
+               (into {})))))
+    (catch Exception e
+      (println "Warning: Failed to parse project.clj config:" (.getMessage e))
+      {})))
+
+(defn extract-lein-project-info
+  "Extracts basic project information from parsed project.clj.
+   Returns a map with :name, :version, :dependencies, :profiles."
+  [project-clj lein-config]
+  (try
+    (when (and (sequential? project-clj) (>= (count project-clj) 3))
+      {:name (nth project-clj 1 "Unknown")
+       :version (nth project-clj 2 "Unknown")
+       :dependencies (get lein-config :dependencies [])
+       :profiles (get lein-config :profiles {})})
+    (catch Exception e
+      (println "Warning: Failed to extract project.clj details:" (.getMessage e))
+      {:name "Unknown" :version "Unknown" :dependencies [] :profiles {}})))
+
+(defn extract-source-paths
+  "Extracts source paths from deps.edn or leiningen config.
+   Returns a vector of valid string paths, defaulting to [\"src\"]."
+  [deps lein-config]
+  (try
+    (cond
+      deps (let [paths (:paths deps)]
+             (if (and paths (sequential? paths) (every? string? paths))
+               paths
+               ["src"]))
+      lein-config (let [paths (:source-paths lein-config)]
+                    (if (and paths (sequential? paths) (every? string? paths))
+                      paths
+                      ["src"]))
+      :else ["src"])
+    (catch Exception e
+      (println "Warning: Failed to extract source paths:" (.getMessage e))
+      ["src"])))
+
+(defn extract-test-paths
+  "Extracts test paths from deps.edn or leiningen config.
+   Returns a vector of valid string paths, defaulting to [\"test\"]."
+  [deps lein-config]
+  (try
+    (cond
+      deps (let [paths (get-in deps [:aliases :test :extra-paths])]
+             (if (and paths (sequential? paths) (every? string? paths))
+               paths
+               ["test"]))
+      lein-config (let [paths (:test-paths lein-config)]
+                    (if (and paths (sequential? paths) (every? string? paths))
+                      paths
+                      ["test"]))
+      :else ["test"])
+    (catch Exception e
+      (println "Warning: Failed to extract test paths:" (.getMessage e))
+      ["test"])))
+
+(defn determine-project-type
+  "Determines the project type based on presence of deps.edn and project.clj."
+  [deps project-clj]
+  (cond
+    (and deps project-clj) "deps.edn + Leiningen"
+    deps "deps.edn"
+    project-clj "Leiningen"
+    :else "Unknown"))
 
 (defn format-project-info
   "Formats the project information into a readable string.
+   Now reads project files locally and uses helper functions for parsing.
 
    Arguments:
-   - insp-data: The project inspection data as an EDN string
+   - runtime-data: The minimal runtime data from nREPL as an EDN string
    - allowed-directories: Optional list of allowed directories
 
    Returns a formatted string with project details"
-  [insp-data & [allowed-directories]]
-  (when insp-data
-    (when-let [{:keys [working-dir
-                       project-type
-                       clj-version
-                       java-version
-                       deps
-                       project-clj
-                       source-paths
-                       test-paths
-                       sources]}
+  [runtime-data & [allowed-directories]]
+  (when runtime-data
+    (when-let [{:keys [working-dir java-version clojure-version error]}
                (try
-                 (edn/read-string insp-data)
+                 (edn/read-string runtime-data)
                  (catch Throwable e
-                   (println "Error parsing data:" (ex-message e))
+                   (println "Error parsing runtime data:" (ex-message e))
                    nil))]
-      (with-out-str
-        (println "\nClojure Project Information:")
-        (println "==============================")
+      (when error
+        (println "Runtime error:" error))
 
-        (println "\nEnvironment:")
-        (println "• Working Directory:" working-dir)
-        (println "• Project Type:" project-type)
-        (println "• Clojure Version:" clj-version)
-        (println "• Java Version:" java-version)
+      ;; Read and parse project files locally
+      (let [deps (read-deps-edn working-dir)
+            project-clj (read-project-clj working-dir)
+            lein-config (when project-clj (parse-lein-config project-clj))
+            project-type (determine-project-type deps project-clj)
+            source-paths (extract-source-paths deps lein-config)
+            test-paths (extract-test-paths deps lein-config)
+            all-paths (concat source-paths test-paths)
+            ;; Collect source files locally using glob-files
+            source-files (->> (mapcat (fn [path]
+                                        (let [clj-files (glob/glob-files working-dir (str path "/**/*.clj") :max-results 1000)
+                                              cljs-files (glob/glob-files working-dir (str path "/**/*.cljs") :max-results 1000)
+                                              cljc-files (glob/glob-files working-dir (str path "/**/*.cljc") :max-results 1000)
+                                              bb-files (glob/glob-files working-dir (str path "/**/*.bb") :max-results 1000)
+                                              edn-files (glob/glob-files working-dir (str path "/**/*.edn") :max-results 1000)]
+                                          (concat (or (:filenames clj-files) [])
+                                                  (or (:filenames cljs-files) [])
+                                                  (or (:filenames cljc-files) [])
+                                                  (or (:filenames bb-files) [])
+                                                  (or (:filenames edn-files) []))))
+                                      all-paths)
+                               ;; Convert absolute paths to relative paths
+                              (map #(to-relative-path working-dir %))
+                               ;; Sort alphabetically for better browsability
+                              sort)]
+        (with-out-str
+          (println "\nClojure Project Information:")
+          (println "==============================")
 
-        (println "\nSource Paths:")
-        (doseq [path source-paths]
-          (println "•" path))
+          (println "\nEnvironment:")
+          (println "• Working Directory:" working-dir)
+          (println "• Project Type:" project-type)
+          (println "• Clojure Version:" clojure-version)
+          (println "• Java Version:" java-version)
 
-        (println "\nTest Paths:")
-        (doseq [path test-paths]
-          (println "•" path))
+          (println "\nSource Paths:")
+          (doseq [path source-paths]
+            (println "•" path))
 
-        (when allowed-directories
-          (println "\nOther Relevant Accessible Directories:")
-          (doseq [dir allowed-directories]
-            (println "•" dir)))
+          (println "\nTest Paths:")
+          (doseq [path test-paths]
+            (println "•" path))
 
-        (when deps
-          (println "\nDependencies:")
-          (doseq [[dep coord] (sort-by key (:deps deps))]
-            (println "•" dep "=>" coord)))
+          (when allowed-directories
+            (println "\nOther Relevant Accessible Directories:")
+            (doseq [dir allowed-directories]
+              (println "•" dir)))
 
-        (when-let [aliases (:aliases deps)]
-          (println "\nAliases:")
-          (doseq [[alias config] (sort-by key aliases)]
-            (println "•" alias ":" (pr-str config))))
+          (when deps
+            (println "\nDependencies:")
+            (doseq [[dep coord] (sort-by key (:deps deps))]
+              (println "•" dep "=>" coord)))
 
-        (when project-clj
-          (println "\nLeiningen Project:")
-          (println "• Name:" (:name project-clj))
-          (println "• Version:" (:version project-clj))
-          (when-let [deps (:dependencies project-clj)]
-            (println "\nLeiningen Dependencies:")
-            (doseq [[dep version] deps]
-              (println "•" dep "=>" version)))
-          (when-let [profiles (:profiles project-clj)]
-            (println "\nLeiningen Profiles:")
-            (doseq [[profile config] (sort-by key profiles)]
-              (println "•" profile ":" (pr-str config)))))
+          (when-let [aliases (:aliases deps)]
+            (println "\nAliases:")
+            (doseq [[alias config] (sort-by key aliases)]
+              (println "•" alias ":" (pr-str config))))
 
-        (let [limit 50
-              all-paths (concat source-paths test-paths)
-              ;; Process raw file paths into proper namespace names
-              processed-namespaces (->> sources
-                                        (filter #(or (.endsWith % ".clj")
-                                                     (.endsWith % ".cljs")
-                                                     (.endsWith % ".cljc")))
-                                        (map (fn [file-path]
-                                               ;; Remove source path prefix from file path
-                                               (let [relative-path (reduce (fn [path src-path]
-                                                                             (if (.startsWith path (str src-path "/"))
-                                                                               (.substring path (inc (count src-path)))
-                                                                               path))
-                                                                           file-path
-                                                                           all-paths)]
-                                                 (-> relative-path
-                                                     (.replace "/" ".")
-                                                     (.replace "_" "-")
-                                                     (str/replace #"\.(clj|cljs|cljc)$" "")))))
-                                        (into []))]
-          (println "\nNamespaces (" (count processed-namespaces) "):")
-          (doseq [ns-name (take limit processed-namespaces)]
-            (println "•" ns-name))
-          (when (> (count processed-namespaces) limit)
-            (println "• ... and" (- (count processed-namespaces) limit) "more"))
+          (when project-clj
+            (let [project-info (extract-lein-project-info project-clj lein-config)]
+              (println "\nLeiningen Project:")
+              (println "• Name:" (:name project-info))
+              (println "• Version:" (:version project-info))
+              (when-let [deps (:dependencies project-info)]
+                (println "\nLeiningen Dependencies:")
+                (doseq [[dep version] deps]
+                  (println "•" dep "=>" version)))
+              (when-let [profiles (:profiles project-info)]
+                (println "\nLeiningen Profiles:")
+                (doseq [[profile config] (sort-by key profiles)]
+                  (println "•" profile ":" (pr-str config))))))
 
-          (println "\nProject Structure (" (count sources) " files):")
-          (doseq [source-file (take limit sources)]
-            (println "•" source-file))
-          (when (> (count sources) limit)
-            (println "• ... and" (- (count sources) limit) "more")))))))
+          (let [limit 50
+                ;; Process raw file paths into proper namespace names
+                processed-namespaces (->> source-files
+                                          (filter #(or (.endsWith % ".clj")
+                                                       (.endsWith % ".cljs")
+                                                       (.endsWith % ".cljc")))
+                                          (map (fn [file-path]
+                                                 ;; Remove source path prefix from file path
+                                                 (let [relative-path (reduce (fn [path src-path]
+                                                                               (if (.startsWith path (str src-path "/"))
+                                                                                 (.substring path (inc (count src-path)))
+                                                                                 path))
+                                                                             file-path
+                                                                             all-paths)]
+                                                   (-> relative-path
+                                                       (.replace "/" ".")
+                                                       (.replace "_" "-")
+                                                       (str/replace #"\.(clj|cljs|cljc)$" "")))))
+                                          ;; Sort namespaces alphabetically
+                                          sort
+                                          (into []))]
+            (println "\nNamespaces (" (count processed-namespaces) "):")
+            (doseq [ns-name (take limit processed-namespaces)]
+              (println "•" ns-name))
+            (when (> (count processed-namespaces) limit)
+              (println "• ... and" (- (count processed-namespaces) limit) "more"))
+
+            (println "\nProject Structure (" (count source-files) " files):")
+            (doseq [source-file (take limit source-files)]
+              (println "•" source-file))
+            (when (> (count source-files) limit)
+              (println "• ... and" (- (count source-files) limit) "more"))))))))
 
 (defn inspect-project
   "Core function to inspect a Clojure project and return formatted information.
+   Now uses minimal nREPL calls and does all file processing locally.
 
    Arguments:
    - nrepl-client: The nREPL client connection
 
    Returns a map with :outputs (containing the formatted project info) and :error (boolean)"
   [nrepl-client]
-  (let [insp-code (str (inspect-project-code))
+  (let [runtime-code (str (inspect-project-code))
         result-promise (promise)
         allowed-directories (config/get-allowed-directories nrepl-client)]
     (try
-      (let [edn-result (mcp-nrepl/tool-eval-code nrepl-client insp-code)]
-        (if (or (nil? edn-result) (.startsWith edn-result "Error"))
+      (let [runtime-result (mcp-nrepl/tool-eval-code nrepl-client runtime-code)]
+        (if (or (nil? runtime-result) (.startsWith runtime-result "Error"))
           (deliver result-promise
-                   {:outputs [(or edn-result "Error during project inspection")]
+                   {:outputs [(or runtime-result "Error during runtime info gathering")]
                     :error true})
-          (let [formatted-info (format-project-info edn-result allowed-directories)]
+          (let [formatted-info (format-project-info runtime-result allowed-directories)]
             (deliver result-promise
                      {:outputs [formatted-info]
                       :error false}))))

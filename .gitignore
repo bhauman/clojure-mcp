@@ -5,6 +5,7 @@
 .cpcache
 .eastwood
 .factorypath
+.lsp
 .hg/
 .hgignore
 .java-version

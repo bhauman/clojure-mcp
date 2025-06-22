@@ -1,7 +1,16 @@
 (ns clojure-mcp.main-examples.shadow-main
-  (:require 
+  "Example of a custom MCP server that adds ClojureScript evaluation via Shadow CLJS.
+   
+   This demonstrates the new pattern for creating custom MCP servers:
+   1. Define a make-tools function that extends the base tools
+   2. Optionally define make-prompts and make-resources functions
+   3. Call core/build-and-start-mcp-server with factory functions
+   
+   Shadow CLJS support can work in two modes:
+   - Single connection: Share the Clojure nREPL for both CLJ and CLJS
+   - Dual connection: Connect to a separate Shadow CLJS nREPL server"
+  (:require
    [clojure-mcp.core :as core]
-   [clojure-mcp.config :as config]
    [clojure-mcp.nrepl :as nrepl]
    [clojure.tools.logging :as log]
    [clojure-mcp.main :as main]
@@ -65,31 +74,17 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
 ;; 2. or the user starts two processes one for clojure and then we connect to shadow
 ;;    as a secondary connection
 
-(defn my-tools [nrepl-client-atom {:keys [port shadow-port shadow-build shadow-watch] :as config}]
+(defn make-tools [nrepl-client-atom working-directory & [{:keys [port shadow-port shadow-build shadow-watch] :as config}]]
   (if (and port shadow-port (not= port shadow-port))
-    (conj (main/my-tools nrepl-client-atom)
+    (conj (main/make-tools nrepl-client-atom working-directory)
           (shadow-eval-tool-secondary-connection-tool nrepl-client-atom config))
-    (conj (main/my-tools nrepl-client-atom)
+    (conj (main/make-tools nrepl-client-atom working-directory)
           (shadow-eval-tool nrepl-client-atom config))))
 
-;; not sure if this is even needed
-(def nrepl-client-atom (atom nil))
-
-;; start the server
-(defn start-mcp-server [nrepl-args]
-  ;; the nrepl-args are a map with :port :host :figwheel-build
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        resources (main/my-resources nrepl-client-map working-dir)
-        _ (reset! nrepl-client-atom nrepl-client-map)
-        tools (my-tools nrepl-client-atom nrepl-args)
-        prompts (main/my-prompts working-dir)
-        mcp (core/mcp-server)]
-    (doseq [tool tools]
-      (core/add-tool mcp tool))
-    (doseq [resource resources]
-      (core/add-resource mcp resource))
-    (doseq [prompt prompts]
-      (core/add-prompt mcp prompt))
-    (swap! nrepl-client-atom assoc :mcp-server mcp)
-    nil))
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn (fn [nrepl-client-atom working-directory]
+                     (make-tools nrepl-client-atom working-directory opts))
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))

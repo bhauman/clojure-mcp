@@ -1,5 +1,49 @@
 # Changelog
 
+## [v0.1.5-alpha] - 2025-06-22
+
+### Major Refactoring: Simplified Custom MCP Server Creation
+
+The project has undergone a significant refactor to make creating custom MCP servers dramatically easier. The new pattern uses factory functions and a single entry point, reducing custom server creation to just a few lines of code.
+
+### Added
+- **Factory function pattern** for creating custom MCP servers with `make-tools`, `make-prompts`, and `make-resources` functions
+- **Code indexer tool** (`clojure -X:index`) for creating condensed codebase maps showing function signatures
+- **Reader conditional support** in collapsed view for `.cljc` files with platform-specific code
+- **Multi-tool support** in `glob_files` with intelligent fallback (ripgrep → find → Java NIO)
+- **Add-dir prompt** allowing you to add directories to allowed paths
+
+### Changed
+- **Project inspection tool** completely refactored for 97% reduction in nREPL payload by moving file operations to local execution
+- **Unified read_file tool** replacing legacy implementations with pattern-based code exploration
+- **Main entry point** simplified to use `core/build-and-start-mcp-server` with factory functions
+- **glob_files** enhanced with better truncation messages and cross-platform compatibility
+- File collection in project tool now uses local glob operations instead of remote nREPL
+- Documentation updated throughout to reflect new patterns and accurate tool information
+
+### Fixed
+- **Issue #43**: grep tool now correctly handles patterns starting with `-` character
+- Path existence validation in file operations
+- MCP server closing behavior when client atom is not set
+
+### Removed
+- Legacy `read_file` tool implementations
+- Unused collapsed file view code
+- Complex manual setup patterns in favor of simplified factory approach
+
+### Configuration
+- Added `:cljfmt` option to `.clojure-mcp/config.edn` to disable code formatting when set to `false`
+
+### Documentation
+- PROJECT_SUMMARY.md updated with accurate tool names and descriptions
+- Custom server guide rewritten for new simplified pattern
+- Added examples for SSE transport and pattern variations
+
+### Internal
+- File timestamp behavior improved with better logging
+- Code organization enhanced with docstrings for core functions
+- Examples updated to use new interface patterns
+
 ## [v0.1.4-alpha] - 2025-06-11
 
 ### The scratch_pad Tool: Persistent AI Workspace

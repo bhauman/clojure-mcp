@@ -1,7 +1,15 @@
 (ns clojure-mcp.main-examples.figwheel-main
-  (:require 
+  "Example of a custom MCP server that adds ClojureScript evaluation via Figwheel Main.
+   
+   This demonstrates the new pattern for creating custom MCP servers:
+   1. Define a make-tools function that extends the base tools
+   2. Call core/build-and-start-mcp-server with factory functions
+   3. Reuse the standard make-prompts and make-resources from main
+   
+   Note: Piggieback must be configured in your nREPL middleware for this to work.
+   See the comments below for the required deps.edn configuration."
+  (:require
    [clojure-mcp.core :as core]
-   [clojure-mcp.config :as config]
    [clojure-mcp.main :as main]
    [clojure-mcp.tools.figwheel.tool :as figwheel-tool]))
 
@@ -23,28 +31,14 @@
 ;;                   :main-opts ["-m" "nrepl.cmdline" "--port" "7888"
 ;;                               "--middleware" "[cider.piggieback/wrap-cljs-repl]"]}}
 
-(defn my-tools [nrepl-client-atom figwheel-build]
-  (conj (main/my-tools nrepl-client-atom)
-        (figwheel-tool/figwheel-eval nrepl-client-atom {:figwheel-build figwheel-build})))
+(defn make-tools [nrepl-client-atom working-directory & [{figwheel-build :figwheel-build}]]
+  (conj (main/make-tools nrepl-client-atom working-directory)
+        (figwheel-tool/figwheel-eval nrepl-client-atom {:figwheel-build (or figwheel-build "dev")})))
 
-;; not sure if this is even needed
-(def nrepl-client-atom (atom nil))
-
-;; start the server
-(defn start-mcp-server [nrepl-args]
-  ;; the nrepl-args are a map with :port :host :figwheel-build
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        resources (main/my-resources nrepl-client-map working-dir)
-        _ (reset! nrepl-client-atom nrepl-client-map)
-        tools (my-tools nrepl-client-atom (:figwheel-build nrepl-args "dev"))
-        prompts (main/my-prompts working-dir)
-        mcp (core/mcp-server)]
-    (doseq [tool tools]
-      (core/add-tool mcp tool))
-    (doseq [resource resources]
-      (core/add-resource mcp resource))
-    (doseq [prompt prompts]
-      (core/add-prompt mcp prompt))
-    (swap! nrepl-client-atom assoc :mcp-server mcp)
-    nil))
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn (fn [nrepl-client-atom working-directory]
+                     (make-tools nrepl-client-atom working-directory opts))
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))

@@ -52,9 +52,34 @@
     (println (str "Clojure tooling SSE MCP server started on port " port "."))
     (.join server)))
 
-(defn build-and-start-mcp-server [args {:keys [make-tools-fn
-                                               make-resources-fn
-                                               make-prompts-fn]}]
+(defn build-and-start-mcp-server
+  "Builds and starts an MCP server with SSE (Server-Sent Events) transport.
+   
+   Similar to core/build-and-start-mcp-server but uses SSE transport instead
+   of stdio, allowing web-based clients to connect over HTTP.
+   
+   Args:
+   - args: Map with connection and server settings
+     - :port (required) - nREPL server port
+     - :host (optional) - nREPL server host (defaults to localhost)
+     - :mcp-sse-port (optional) - HTTP port for SSE server (defaults to 8078)
+   
+   - config: Map with factory functions
+     - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
+     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts  
+     - :make-resources-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of resources
+   
+   All factory functions are optional. If not provided, that category won't be populated.
+   
+   Side effects:
+   - Stores the nREPL client in core/nrepl-client-atom
+   - Starts the MCP server with SSE transport
+   - Starts a Jetty HTTP server on the specified port
+   
+   Returns: nil"
+  [args {:keys [make-tools-fn
+                make-resources-fn
+                make-prompts-fn]}]
   ;; the args are a map with :port :host
   ;; we also need an :mcp-sse-port so we'll default to 8078??
   (let [mcp-port (:mcp-sse-port args 8078)

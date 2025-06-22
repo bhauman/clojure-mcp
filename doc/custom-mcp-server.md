@@ -15,13 +15,13 @@ Think of it as building your own personalized AI development companion. Want onl
 - **Safety Controls**: Choose between read-only exploration or full editing capabilities
 - **Performance**: Smaller tool sets mean faster startup and less cognitive overhead
 
-## The Basic Pattern
+## The New Simplified Pattern (as of v0.5.0)
 
-The beauty of clojure-mcp is that you can leverage all the existing infrastructure. Here's the pattern:
+The beauty of the refactored clojure-mcp is that creating custom servers is now incredibly simple. The new pattern uses factory functions that create tools, prompts, and resources. Here's how it works:
 
-1. **Require** `clojure-mcp.main` to access pre-built functions
-2. **Customize** by adding, removing, or modifying components
-3. **Start** your server with your custom configuration
+1. **Define factory functions** for tools, prompts, and/or resources
+2. **Call** `core/build-and-start-mcp-server` with your factories
+3. **That's it!** The core handles all the complex setup
 
 ## Minimal Custom Server Example
 
@@ -30,41 +30,33 @@ Let's start with the simplest possible custom server that reuses everything from
 ```clojure
 (ns my-company.mcp-server
   (:require [clojure-mcp.core :as core]
-            [clojure-mcp.config :as config]
             [clojure-mcp.main :as main]))
 
-(defn start-mcp-server [nrepl-args]
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        resources (main/my-resources nrepl-client-map working-dir)
-        tools (main/my-tools (atom nrepl-client-map))
-        prompts (main/my-prompts working-dir)
-        mcp (core/mcp-server)]
-    
-    ;; Register everything with the MCP server
-    (doseq [resource resources] (core/add-resource mcp resource))
-    (doseq [tool tools] (core/add-tool mcp tool))
-    (doseq [prompt prompts] (core/add-prompt mcp prompt))
-    
-    nil))
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn main/make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
+
+That's it! You now have a fully functional MCP server using all the standard components.
 
 ## Customizing Resources
 
-Want to add your own documentation? Override the `my-resources` function:
+Want to add your own documentation? Create your own `make-resources` function:
 
 ```clojure
 (ns my-company.mcp-server
   (:require [clojure-mcp.core :as core]
-            [clojure-mcp.config :as config]
             [clojure-mcp.main :as main]
             [clojure-mcp.resources :as resources]
             [clojure.java.io :as io]))
 
-(defn my-resources [nrepl-client-map working-dir]
+(defn make-resources [nrepl-client-atom working-dir]
   ;; Start with the default resources
   (concat
-   (main/my-resources nrepl-client-map working-dir)
+   (main/make-resources nrepl-client-atom working-dir)
    ;; Add your custom resources
    [(resources/create-file-resource
      "custom://architecture"
@@ -79,6 +71,13 @@ Want to add your own documentation? Override the `my-resources` function:
      "Our team's Clojure coding standards"
      "text/markdown"
      "# Team Coding Standards\n\n- Always use kebab-case\n- Prefer threading macros\n- Write tests first")]))
+
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn main/make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn make-resources}))  ; Use our custom resources
 ```
 
 ## Customizing Tools
@@ -88,7 +87,19 @@ Want to add your own documentation? Override the `my-resources` function:
 Maybe you want a read-only server for safer exploration:
 
 ```clojure
-(defn my-read-only-tools [nrepl-client-atom]
+(ns my-company.read-only-server
+  (:require [clojure-mcp.core :as core]
+            [clojure-mcp.main :as main]
+            ;; Import only the tools you need
+            [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
+            [clojure-mcp.tools.unified-read-file.tool :as unified-read-file-tool]
+            [clojure-mcp.tools.grep.tool :as new-grep-tool]
+            [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
+            [clojure-mcp.tools.think.tool :as think-tool]
+            [clojure-mcp.tools.eval.tool :as eval-tool]
+            [clojure-mcp.tools.project.tool :as project-tool]))
+
+(defn make-read-only-tools [nrepl-client-atom working-directory]
   ;; Only include read-only and evaluation tools
   [(directory-tree-tool/directory-tree-tool nrepl-client-atom)
    (unified-read-file-tool/unified-read-file-tool nrepl-client-atom)
@@ -97,6 +108,13 @@ Maybe you want a read-only server for safer exploration:
    (think-tool/think-tool nrepl-client-atom)
    (eval-tool/eval-code nrepl-client-atom)
    (project-tool/inspect-project-tool nrepl-client-atom)])
+
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn make-read-only-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
 
 ### Adding Custom Tools
@@ -105,54 +123,21 @@ Have a custom tool? Add it to the mix:
 
 ```clojure
 (ns my-company.mcp-server
-  (:require ;; ... other requires ...
+  (:require [clojure-mcp.core :as core]
             [clojure-mcp.main :as main]
             [my-company.database-tool :as db-tool]))
 
-(defn my-tools [nrepl-client-atom]
+(defn make-tools [nrepl-client-atom working-directory]
   ;; Start with main tools and add your own
-  (conj (main/my-tools nrepl-client-atom)
+  (conj (main/make-tools nrepl-client-atom working-directory)
         (db-tool/database-query-tool nrepl-client-atom)))
-```
 
-### Complete Tool Customization
-
-Or build your tool list from scratch:
-
-```clojure
-(ns my-company.mcp-server
-  (:require ;; Core tools
-            [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
-            [clojure-mcp.tools.eval.tool :as eval-tool]
-            [clojure-mcp.tools.unified-read-file.tool :as unified-read-file-tool]
-            [clojure-mcp.tools.grep.tool :as new-grep-tool]
-            [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
-            [clojure-mcp.tools.think.tool :as think-tool]
-            [clojure-mcp.tools.bash.tool :as bash-tool]
-            ;; Editing tools
-            [clojure-mcp.tools.form-edit.combined-edit-tool :as combined-edit-tool]
-            [clojure-mcp.tools.file-write.tool :as file-write-tool]
-            ;; Project tools
-            [clojure-mcp.tools.project.tool :as project-tool]))
-
-(defn my-tools [nrepl-client-atom]
-  [;; Exploration
-   (directory-tree-tool/directory-tree-tool nrepl-client-atom)
-   (unified-read-file-tool/unified-read-file-tool nrepl-client-atom)
-   (new-grep-tool/grep-tool nrepl-client-atom)
-   (glob-files-tool/glob-files-tool nrepl-client-atom)
-   
-   ;; Thinking and evaluation
-   (think-tool/think-tool nrepl-client-atom)
-   (eval-tool/eval-code nrepl-client-atom)
-   (bash-tool/bash-tool nrepl-client-atom)
-   
-   ;; Editing (only the safe ones!)
-   (combined-edit-tool/unified-form-edit-tool nrepl-client-atom)
-   (file-write-tool/file-write-tool nrepl-client-atom)
-   
-   ;; Project understanding
-   (project-tool/inspect-project-tool nrepl-client-atom)])
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
 
 ## Custom Prompts
@@ -160,10 +145,10 @@ Or build your tool list from scratch:
 Add project-specific prompts to guide your AI assistant:
 
 ```clojure
-(defn my-prompts [working-dir]
+(defn make-prompts [nrepl-client-atom working-dir]
   ;; Start with default prompts
   (concat
-   (main/my-prompts working-dir)
+   (main/make-prompts nrepl-client-atom working-dir)
    ;; Add custom prompts
    [{:name "database-migration"
      :description "Generate database migration code"
@@ -209,11 +194,11 @@ Sometimes you need to modify existing components rather than creating new ones. 
 
 ### Modifying Tool Names and Descriptions
 
-Tools are just maps, so you can modify them before registering:
+Tools are just maps, so you can modify them in your factory function:
 
 ```clojure
-(defn my-tools [nrepl-client-atom]
-  (let [standard-tools (main/my-tools nrepl-client-atom)]
+(defn make-tools [nrepl-client-atom working-directory]
+  (let [standard-tools (main/make-tools nrepl-client-atom working-directory)]
     ;; Find and modify specific tools
     (map (fn [tool]
            (case (:name tool)
@@ -243,23 +228,48 @@ If you're combining tools from multiple sources:
 (defn prefix-tool-names [prefix tools]
   (map #(update % :name (fn [n] (str prefix "_" n))) tools))
 
-(defn my-tools [nrepl-client-atom]
+(defn make-tools [nrepl-client-atom working-directory]
   (concat
    ;; Standard tools with prefix
-   (prefix-tool-names "core" (main/my-tools nrepl-client-atom))
+   (prefix-tool-names "core" (main/make-tools nrepl-client-atom working-directory))
    
    ;; Your custom tools with different prefix
    (prefix-tool-names "custom" 
                       [(my-special-tool/special-tool nrepl-client-atom)])))
 ```
 
-### Modifying Resources
+### Complete Example: Customizing Everything
 
-Resources can be modified the same way:
+Here's how to selectively modify components while keeping what you want:
 
 ```clojure
-(defn my-resources [nrepl-client-map working-dir]
-  (let [standard-resources (main/my-resources nrepl-client-map working-dir)]
+(ns my-company.custom-mcp-server
+  (:require [clojure-mcp.core :as core]
+            [clojure-mcp.main :as main]
+            [clojure-mcp.resources :as resources]
+            [clojure.string :as str]))
+
+(defn customize-for-safety [tool]
+  ;; Make all editing tools warn about safety
+  (if (str/includes? (:name tool) "edit")
+    (update tool :description 
+            #(str "⚠️ CAUTION: This modifies files! " %))
+    tool))
+
+(defn make-tools [nrepl-client-atom working-directory]
+  (->> (main/make-tools nrepl-client-atom working-directory)
+       ;; Remove tools we don't want
+       (remove #(= (:name %) "bash"))  ; Too dangerous
+       ;; Modify remaining tools
+       (map customize-for-safety)
+       ;; Rename potential conflicts
+       (map (fn [tool]
+              (case (:name tool)
+                "think" (assoc tool :name "reflect")  ; Avoid conflict with other system
+                tool)))))
+
+(defn make-resources [nrepl-client-atom working-dir]
+  (let [standard-resources (main/make-resources nrepl-client-atom working-dir)]
     (concat
      ;; Modify existing resources
      (map (fn [resource]
@@ -275,80 +285,20 @@ Resources can be modified the same way:
           standard-resources)
      
      ;; Add your own
-     [(resources/create-file-resource ...)])))
+     [(resources/create-file-resource
+       "custom://runbook"
+       "RUNBOOK.md"
+       "Emergency procedures and runbook"
+       "text/markdown"
+       (str working-dir "/docs/RUNBOOK.md"))])))
+
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn make-resources}))
 ```
-
-### Modifying Prompts
-
-Prompts can be enhanced or modified:
-
-```clojure
-(defn my-prompts [working-dir]
-  (let [standard-prompts (main/my-prompts working-dir)]
-    (map (fn [prompt]
-           (case (:name prompt)
-             ;; Enhance the system prompt
-             "clojure_repl_system_prompt"
-             (update prompt :prompt-fn 
-                     (fn [original-fn]
-                       (fn [exchange request-args callback]
-                         ;; Call original
-                         (original-fn exchange request-args
-                                    (fn [result]
-                                      ;; Modify the result
-                                      (callback
-                                       (update-in result [:messages 0 :content]
-                                                 str "\n\nREMEMBER: Always use our company style guide!")))))))
-             
-             ;; Keep others unchanged
-             prompt))
-         standard-prompts)))
-```
-
-### Complete Example: Customizing Everything
-
-Here's how to selectively modify components while keeping what you want:
-
-```clojure
-(ns my-company.custom-mcp-server
-  (:require [clojure-mcp.core :as core]
-            [clojure-mcp.config :as config]
-            [clojure-mcp.main :as main]
-            [clojure.string :as str]))
-
-(defn customize-for-safety [tool]
-  ;; Make all editing tools warn about safety
-  (if (str/includes? (:name tool) "edit")
-    (update tool :description 
-            #(str "⚠️ CAUTION: This modifies files! " %))
-    tool))
-
-(defn my-tools [nrepl-client-atom]
-  (->> (main/my-tools nrepl-client-atom)
-       ;; Remove tools we don't want
-       (remove #(= (:name %) "bash"))  ; Too dangerous
-       ;; Modify remaining tools
-       (map customize-for-safety)
-       ;; Rename potential conflicts
-       (map (fn [tool]
-              (case (:name tool)
-                "think" (assoc tool :name "reflect")  ; Avoid conflict with other system
-                tool)))))
-
-(defn start-mcp-server [nrepl-args]
-  ;; ... standard setup ...
-  )
-```
-
-### Tips for Modifying Components
-
-1. **Test modifications**: Always test that your modifications work as expected
-2. **Document changes**: Add comments explaining why you modified components
-3. **Be consistent**: If you rename tools, update any documentation that references them
-4. **Consider AI behavior**: Remember that descriptions heavily influence how AI assistants use tools
-5. **Preserve schemas**: Be careful not to accidentally remove required fields like `:schema` for tools
-
-This flexibility lets you fine-tune exactly how AI assistants interact with your development environment!
 
 ## Real-World Example: Shadow-cljs Server
 
@@ -357,36 +307,27 @@ Here's how the Shadow-cljs example extends the main server:
 ```clojure
 (ns my-company.shadow-mcp
   (:require [clojure-mcp.core :as core]
-            [clojure-mcp.config :as config]
             [clojure-mcp.main :as main]
-            [clojure-mcp.tools.eval.tool :as eval-tool]))
+            [clojure-mcp.tools.eval.tool :as eval-tool]
+            [clojure-mcp.nrepl :as nrepl]
+            [clojure.tools.logging :as log]))
 
-(defn shadow-eval-tool [nrepl-client-atom config]
-  ;; Create a customized eval tool for ClojureScript
-  (-> (eval-tool/eval-code nrepl-client-atom)
-      (assoc :name "clojurescript_eval")
-      (assoc :description "Evaluates ClojureScript code in Shadow-cljs REPL")))
+;; ... shadow-specific tool implementation ...
 
-(defn my-tools [nrepl-client-atom config]
-  ;; Add the shadow tool to the standard tools
-  (conj (main/my-tools nrepl-client-atom)
-        (shadow-eval-tool nrepl-client-atom config)))
+(defn make-tools [nrepl-client-atom working-directory & [{:keys [port shadow-port shadow-build shadow-watch] :as config}]]
+  (if (and port shadow-port (not= port shadow-port))
+    (conj (main/make-tools nrepl-client-atom working-directory)
+          (shadow-eval-tool-secondary-connection-tool nrepl-client-atom config))
+    (conj (main/make-tools nrepl-client-atom working-directory)
+          (shadow-eval-tool nrepl-client-atom config))))
 
-(defn start-mcp-server [nrepl-args]
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        atom-client (atom nrepl-client-map)
-        mcp (core/mcp-server)]
-    
-    ;; Use customized tools, but standard resources and prompts
-    (doseq [resource (main/my-resources nrepl-client-map working-dir)]
-      (core/add-resource mcp resource))
-    (doseq [tool (my-tools atom-client nrepl-args)]
-      (core/add-tool mcp tool))
-    (doseq [prompt (main/my-prompts working-dir)]
-      (core/add-prompt mcp prompt))
-    
-    nil))
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn (fn [nrepl-client-atom working-directory]
+                     (make-tools nrepl-client-atom working-directory opts))
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
 
 ## Complete Custom Server Template
@@ -397,7 +338,6 @@ Here's a full template you can use as a starting point:
 (ns my-company.custom-mcp-server
   "Custom MCP server tailored for our team's Clojure development"
   (:require [clojure-mcp.core :as core]
-            [clojure-mcp.config :as config]
             [clojure-mcp.main :as main]
             [clojure-mcp.resources :as resources]
             [clojure-mcp.prompts :as prompts]
@@ -406,12 +346,12 @@ Here's a full template you can use as a starting point:
             [clojure-mcp.tools.unified-read-file.tool :as read-tool]
             [clojure.java.io :as io]))
 
-(defn my-resources
+(defn make-resources
   "Custom resources including our team documentation"
-  [nrepl-client-map working-dir]
+  [nrepl-client-atom working-dir]
   (concat
    ;; Include some defaults
-   [(first (main/my-resources nrepl-client-map working-dir))] ; PROJECT_SUMMARY
+   [(first (main/make-resources nrepl-client-atom working-dir))] ; PROJECT_SUMMARY
    ;; Add our custom resources
    [(resources/create-file-resource
      "custom://style-guide"
@@ -420,9 +360,9 @@ Here's a full template you can use as a starting point:
      "text/markdown"
      (.getCanonicalPath (io/file working-dir "docs/STYLE_GUIDE.md")))]))
 
-(defn my-prompts
+(defn make-prompts
   "Custom prompts for our workflow"
-  [working-dir]
+  [nrepl-client-atom working-dir]
   [{:name "pr-review"
     :description "Review code changes for a pull request"
     :arguments []
@@ -434,36 +374,23 @@ Here's a full template you can use as a starting point:
                  3. Performance implications
                  4. API compatibility")}])
 
-(defn my-tools
+(defn make-tools
   "Curated tool selection for our team"
-  [nrepl-client-atom]
+  [nrepl-client-atom working-directory]
   ;; Mix and match from main tools or add your own
   [(eval-tool/eval-code nrepl-client-atom)
    (read-tool/unified-read-file-tool nrepl-client-atom)
    ;; ... add more tools as needed
    ])
 
-(def nrepl-client-atom (atom nil))
-
 (defn start-mcp-server
   "Start our custom MCP server"
-  [nrepl-args]
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        _ (reset! nrepl-client-atom nrepl-client-map)
-        mcp (core/mcp-server)]
-    
-    ;; Register our custom components
-    (doseq [resource (my-resources nrepl-client-map working-dir)]
-      (core/add-resource mcp resource))
-    (doseq [tool (my-tools nrepl-client-atom)]
-      (core/add-tool mcp tool))
-    (doseq [prompt (my-prompts working-dir)]
-      (core/add-prompt mcp prompt))
-    
-    ;; Store server reference
-    (swap! nrepl-client-atom assoc :mcp-server mcp)
-    nil))
+  [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn make-tools
+    :make-prompts-fn make-prompts
+    :make-resources-fn make-resources}))
 ```
 
 ## Configuring deps.edn
@@ -482,51 +409,79 @@ Point your deps.edn to your custom server:
 
 ## Tips for Success
 
-1. **Start Simple**: Begin by reusing main's functions, then gradually customize
+1. **Start Simple**: Begin by reusing main's factory functions, then gradually customize
 2. **Test Incrementally**: Add one customization at a time and test
 3. **Document Your Choices**: Comment why you included/excluded specific tools
 4. **Version Control**: Keep your custom server in version control
 5. **Team Sharing**: Share your server configuration with your team
+6. **Factory Function Signatures**: Always use `[nrepl-client-atom working-directory]` for your factory functions
 
 ## Common Patterns
 
 ### Development vs Production Servers
 
 ```clojure
-(defn dev-tools [nrepl-client-atom]
+(defn make-dev-tools [nrepl-client-atom working-directory]
   ;; All tools including editing
-  (main/my-tools nrepl-client-atom))
+  (main/make-tools nrepl-client-atom working-directory))
 
-(defn prod-tools [nrepl-client-atom]
+(defn make-prod-tools [nrepl-client-atom working-directory]
   ;; Read-only tools for production debugging
   [(read-tool/unified-read-file-tool nrepl-client-atom)
    (eval-tool/eval-code nrepl-client-atom)])
 
-(defn start-mcp-server [{:keys [env] :as nrepl-args}]
-  (let [tools-fn (if (= env "production") prod-tools dev-tools)
-        ;; ... rest of setup
-        ])
-  ;; ...)
+(defn start-mcp-server [{:keys [env] :as opts}]
+  (let [tools-fn (if (= env "production") make-prod-tools make-dev-tools)]
+    (core/build-and-start-mcp-server
+     opts
+     {:make-tools-fn tools-fn
+      :make-prompts-fn main/make-prompts
+      :make-resources-fn main/make-resources})))
 ```
 
 ### Project-Type Specific Servers
 
 ```clojure
-(defn web-app-tools [nrepl-client-atom]
+(defn make-web-app-tools [nrepl-client-atom working-directory]
   ;; Tools for web development
-  ;; ... include HTTP testing tools, etc.
-  )
+  (concat
+   (main/make-tools nrepl-client-atom working-directory)
+   [(http-tool/http-client-tool nrepl-client-atom)]))
 
-(defn library-tools [nrepl-client-atom]
-  ;; Tools for library development
-  ;; ... focus on documentation, API design tools
-  )
+(defn make-library-tools [nrepl-client-atom working-directory]
+  ;; Tools for library development - focus on docs and API design
+  (concat
+   [(doc-tool/documentation-tool nrepl-client-atom)]
+   (main/make-tools nrepl-client-atom working-directory)))
+```
+
+### Using Alternative Transports
+
+The new pattern also supports different transport mechanisms. For example, using SSE (Server-Sent Events):
+
+```clojure
+(ns my-company.sse-server
+  (:require [clojure-mcp.main :as main]
+            [clojure-mcp.sse-core :as sse-core]))
+
+(defn start-sse-mcp-server [opts]
+  ;; Use SSE transport instead of stdio
+  (sse-core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn main/make-tools
+    :make-prompts-fn main/make-prompts
+    :make-resources-fn main/make-resources}))
 ```
 
 ## Conclusion
 
-Creating your own custom MCP server is where the real magic happens. It's not just configuration—it's crafting your perfect AI-powered development environment. Whether you need a minimal read-only explorer, a full-featured development powerhouse, or something specialized for your unique workflow, the power is in your hands.
+Creating your own custom MCP server with the new pattern is simpler than ever. The factory function approach means you can:
 
-Remember: during the alpha phase, this IS the way to configure clojure-mcp. Embrace it, experiment with it, and make it yours. Your custom server is your AI assistant's personality—make it reflect how YOU want to work!
+1. Start with a one-function server that reuses everything
+2. Gradually customize by replacing individual factory functions
+3. Mix and match components from different sources
+4. Easily maintain and share your configuration
+
+Remember: during the alpha phase, this IS the way to configure clojure-mcp. The new pattern makes it so easy there's no reason not to create your perfect development environment!
 
 Happy customizing! 🚀

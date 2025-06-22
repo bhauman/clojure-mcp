@@ -46,7 +46,7 @@
                    (if include
                      (concat args ["--glob" include])
                      args)
-                   (concat args [pattern path]))
+                   (concat args ["-e" pattern path]))
         result (apply shell/sh cmd-args)
         exit-code (:exit result)]
     (if (or (zero? exit-code) (= exit-code 1)) ;; 1 means no matches, which is not an error

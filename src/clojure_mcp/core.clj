@@ -324,9 +324,35 @@
 
 (def nrepl-client-atom (atom nil))
 
-(defn build-and-start-mcp-server [nrepl-args {:keys [make-tools-fn
-                                                     make-prompts-fn
-                                                     make-resources-fn]}]
+(defn build-and-start-mcp-server
+  "Builds and starts an MCP server with the provided configuration.
+   
+   This is the main entry point for creating custom MCP servers. It handles:
+   - Creating and starting the nREPL connection
+   - Setting up the working directory
+   - Calling factory functions to create tools, prompts, and resources
+   - Registering everything with the MCP server
+   
+   Args:
+   - nrepl-args: Map with connection settings
+     - :port (required) - nREPL server port
+     - :host (optional) - nREPL server host (defaults to localhost)
+   
+   - config: Map with factory functions
+     - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
+     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts  
+     - :make-resources-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of resources
+   
+   All factory functions are optional. If not provided, that category won't be populated.
+   
+   Side effects:
+   - Stores the nREPL client in core/nrepl-client-atom
+   - Starts the MCP server on stdio
+   
+   Returns: nil"
+  [nrepl-args {:keys [make-tools-fn
+                      make-prompts-fn
+                      make-resources-fn]}]
   ;; the nrepl-args are a map with :port and optional :host
   (let [nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
