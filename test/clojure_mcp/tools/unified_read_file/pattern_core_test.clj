@@ -1,264 +1,343 @@
 (ns clojure-mcp.tools.unified-read-file.pattern-core-test
-  (:require
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [clojure-mcp.tools.unified-read-file.pattern-core :as pattern-core]
-   [rewrite-clj.zip :as z]
-   [clojure.java.io :as io]
-   [clojure.string :as str]))
+  (:require [clojure.test :refer [deftest testing is]]
+            [clojure-mcp.tools.unified-read-file.pattern-core :as collapsed]))
 
-;; Test fixture setup
-(def ^:dynamic *test-dir* nil)
-(def ^:dynamic *test-file* nil)
+;; Test data
+(def basic-source
+  "(ns test.example)
 
-(def test-file-content
-  "(ns test.example
-  \"Test namespace for pattern matching\"
-  (:require [clojure.string :as str]))
+(defn simple-function
+  \"A simple function\"
+  [x y]
+  (+ x y))
 
-;; Test validation function
-(defn validate-input
-  \"Validates user input\"
-  [input]
-  (when (empty? input)
-    (throw (ex-info \"Input cannot be empty\" {:input input})))
-  input)
+(defn complex-function
+  ([x] (complex-function x 1))
+  ([x y] (* x y)))
 
-;; Function with error handling
-(defn process-data
-  \"Processes data with error handling\"
-  [data]
-  (try
-    (validate-input data)
-    (str/upper-case data)
-    (catch Exception e
-      (str \"Error: \" (.getMessage e)))))
+(def configuration
+  {:port 8080
+   :host \"localhost\"})
 
-;; TODO: Add more validation functions
+(defmacro with-timing
+  [& body]
+  `(time (do ~@body)))")
 
-(def config {:max-retries 3})
+(def defmethod-source
+  "(ns test.methods)
 
-(defmulti area :shape)
+(defmulti process :type)
+
+(defmethod process :type-a
+  [m]
+  (assoc m :processed true))
+
+(defmethod process :type-b
+  [m]
+  (update m :count inc))
 
 (defmethod area :rectangle
   [{:keys [width height]}]
   (* width height))
 
-(defmethod area :circle
-  [{:keys [radius]}]
-  (* Math/PI radius radius))
+(defmethod tool-system/validate :my-tool
+  [_ inputs]
+  {:valid? true})")
 
-(defmulti conversion-factor identity)
+(def reader-conditional-source
+  "(ns test.cljc)
 
-(defmethod conversion-factor [:feet :inches]
-  [_]
-  12)
+(defn common-fn [x] (inc x))
 
-(defmethod conversion-factor [:meters :feet]
-  [_]
-  3.28084)
+#?(:clj
+   (defn server-fn
+     \"Server-side function\"
+     []
+     :server))
 
-(defmethod handle-request :json
-  [request]
-  (println \"Handling JSON request\")
-  {:status 200})
+#?(:cljs
+   (defn client-fn
+     \"Client-side function\"
+     []
+     :client))
 
-(defmulti example.helpers/process-input (fn [type _] type))
+#?@(:clj
+    [(def server-port 8080)
+     (defn start-server []
+       (println \"Starting server\"))]
+    :cljs
+    [(def client-endpoint \"http://localhost:8080\")
+     (defn connect-to-server []
+       (println \"Connecting\"))])")
 
-(defmethod example.helpers/process-input :xml
-  [_ data]
-  (str \"<result>\" data \"</result>\"))
+(def spec-source
+  "(ns test.specs
+  (:require [clojure.spec.alpha :as s]))
 
-(comment
-  \"This is a test comment block\"
-  (validate-input \"test\")
-  (process-data \"\")
-  (+ 1 2))
-")
+(s/def ::email string?)
+(s/def ::age (s/and int? #(>= % 0)))
+(s/def ::user
+  (s/keys :req-un [::email]
+          :opt-un [::age]))
 
-(defn setup-test-files-fixture [f]
-  (let [test-dir (io/file (System/getProperty "java.io.tmpdir") "clojure-mcp-pattern-test")
-        test-file (io/file test-dir "test-file.clj")]
+(s/def :domain.user/id uuid?)
+(s/def :domain.user/name string?)
 
-    ;; Create test directory and files
-    (.mkdirs test-dir)
+(s/fdef process-user
+  :args (s/cat :user ::user)
+  :ret map?)
 
-    ;; Create Clojure test file with functions matching different patterns
-    (spit test-file test-file-content)
+(defn process-user [user]
+  (assoc user :processed true))")
 
-    ;; Run test with fixtures bound
-    (binding [*test-dir* test-dir
-              *test-file* test-file]
-      (try
-        (f)
-        (finally
-          ;; Clean up
-          (when (.exists test-file)
-            (.delete test-file))
-          (when (.exists test-dir)
-            (.delete test-dir)))))))
+(def metadata-source
+  "(ns test.metadata)
 
-(use-fixtures :each setup-test-files-fixture)
+(defn ^:deprecated old-function
+  \"This function is deprecated\"
+  [x]
+  (* x 2))
 
-(deftest test-valid-form-to-include
-  (testing "Valid forms are included"
-    (let [zloc (z/of-string "(defn example [x] x)")]
-      (is (pattern-core/valid-form-to-include? zloc false)))))
+(defn ^{:author \"John Doe\"
+        :version \"1.0\"} 
+  documented-fn
+  [x y]
+  (+ x y))
 
-(deftest test-extract-form-name
-  (testing "Extract name from defn"
-    (is (= "example" (pattern-core/extract-form-name '(defn example [x] x)))))
+(defn ^:private helper-fn [] :helper)
 
-  (testing "Extract name from def"
-    (is (= "config" (pattern-core/extract-form-name '(def config {:a 1})))))
+(def ^:const ^{:doc \"The answer\"} answer 42)
 
-  (testing "Extract name from defmethod with keyword dispatch"
-    (is (= "handle-request :json" (pattern-core/extract-form-name '(defmethod handle-request :json [x] x)))))
+(defmethod ^:deprecated process :old-type
+  [x]
+  {:old x})")
 
-  (testing "Extract name from defmethod with vector dispatch"
-    (is (= "conversion-factor [:feet :inches]" (pattern-core/extract-form-name '(defmethod conversion-factor [:feet :inches] [_] 12)))))
+;; Tests
 
-  (testing "Extract name from defmethod with namespaced multimethod"
-    (is (= "example.helpers/process-input :xml" (pattern-core/extract-form-name '(defmethod example.helpers/process-input :xml [_ data] data)))))
+(deftest test-basic-collapsed-view
+  (testing "Basic collapsed view without patterns"
+    (let [result (collapsed/generate-collapsed-view* basic-source nil nil)]
+      (is (map? result))
+      (is (string? (:view result)))
+      (is (= 5 (get-in result [:pattern-info :total-forms])))
+      (is (= 0 (get-in result [:pattern-info :expanded-forms])))
+      (is (= 5 (get-in result [:pattern-info :collapsed-forms])))
 
-  (testing "Extract name from ns"
-    (is (= "test.namespace" (pattern-core/extract-form-name '(ns test.namespace)))))
+      ;; Check collapsed representations
+      (is (re-find #"\(defn simple-function \[x y\] \.\.\.\)" (:view result)))
+      (is (re-find #"\(defn complex-function \[\.\.\.\] \.\.\.\)" (:view result)))
+      (is (re-find #"\(def configuration \.\.\.\)" (:view result)))
+      (is (re-find #"\(defmacro with-timing \[& body\] \.\.\.\)" (:view result)))
 
-  (testing "Returns nil for non-forms"
-    (is (nil? (pattern-core/extract-form-name '(+ 1 2)))))
+      ;; Namespace should be shown in full
+      (is (re-find #"\(ns test\.example\)" (:view result))))))
 
-  (testing "Handles edge cases"
-    (is (nil? (pattern-core/extract-form-name nil)))
-    (is (nil? (pattern-core/extract-form-name '())))
-    (is (nil? (pattern-core/extract-form-name '(defn))))))
+(deftest test-name-pattern-matching
+  (testing "Pattern matching on form names"
+    (let [result (collapsed/generate-collapsed-view* basic-source "simple" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (= 4 (get-in result [:pattern-info :collapsed-forms])))
+      (is (re-find #"\"A simple function\"" (:view result)))
+      (is (re-find #"\(defn complex-function \[\.\.\.\] \.\.\.\)" (:view result)))))
 
-(deftest test-collect-top-level-forms
-  (testing "Collects all forms excluding comments"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)]
-      (is (>= (count forms) 12)) ;; Increased from 5 to account for all forms
-      (is (contains? (set (map :name forms)) "validate-input"))
-      (is (contains? (set (map :name forms)) "process-data"))
-      (is (contains? (set (map :name forms)) "area"))
-      (is (contains? (set (map :name forms)) "area :rectangle"))
-      (is (contains? (set (map :name forms)) "area :circle"))
-      (is (contains? (set (map :name forms)) "conversion-factor"))
-      (is (contains? (set (map :name forms)) "conversion-factor [:feet :inches]"))
-      (is (contains? (set (map :name forms)) "conversion-factor [:meters :feet]"))
-      (is (contains? (set (map :name forms)) "handle-request :json"))
-      ;; No need to check for multimethods without dispatch values
-      ;;(is (contains? (set (map :name forms)) "example.helpers/process-input"))
-      (is (contains? (set (map :name forms)) "example.helpers/process-input :xml"))
-      (is (contains? (frequencies (map :type forms)) "defn"))
-      (is (contains? (frequencies (map :type forms)) "defmethod")))))
+  (testing "Multiple name matches"
+    (let [result (collapsed/generate-collapsed-view* basic-source "function" nil)]
+      (is (= 2 (get-in result [:pattern-info :expanded-forms])))
+      (is (= 3 (get-in result [:pattern-info :collapsed-forms]))))))
 
-(deftest test-filter-forms-by-pattern
-  (testing "Filter by name pattern"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "validate.*" nil)]
-      (is (= ["validate-input"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+(deftest test-content-pattern-matching
+  (testing "Pattern matching on form content"
+    (let [result (collapsed/generate-collapsed-view* basic-source nil "time")]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"`\(time" (:view result)))))
 
-  (testing "Filter by content pattern"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms nil "throw")]
-      (is (= ["validate-input"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+  (testing "Content pattern with special characters"
+    (let [result (collapsed/generate-collapsed-view* basic-source nil "\\+ x y")]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms]))))))
 
-  (testing "Filter by both patterns"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "process-data" "catch")]
-      (is (= ["process-data"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+(deftest test-combined-patterns
+  (testing "Both name and content patterns"
+    (let [result (collapsed/generate-collapsed-view* basic-source "simple-function" "\\+")]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"simple-function" (:view result)))
+      (is (not (re-find #"complex-function\s+\[x\]" (:view result)))))))
 
-  (testing "No matches returns empty result"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "nonexistent" nil)]
-      (is (empty? (:matches result)))
-      (is (= 0 (get-in result [:pattern-info :match-count])))))
+(deftest test-defmethod-forms
+  (testing "Defmethod collapsed view"
+    (let [result (collapsed/generate-collapsed-view* defmethod-source nil nil)]
+      (is (re-find #"\(defmethod process :type-a \[m\] \.\.\.\)" (:view result)))
+      (is (re-find #"\(defmethod area :rectangle \[\{:keys" (:view result)))))
 
-  (testing "Multiple matches return all matching forms"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms ".*data.*" nil)]
-      (is (= ["process-data"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+  (testing "Defmethod pattern matching by dispatch value"
+    (let [result (collapsed/generate-collapsed-view* defmethod-source "process :type-a" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"assoc m :processed true" (:view result)))))
 
-  (testing "Match by form type"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms nil "defmethod")]
-      (is (some #{"handle-request :json"} (:matches result)))
-      (is (some #{"area :rectangle"} (:matches result)))
-      (is (some #{"area :circle"} (:matches result)))
-      (is (> (get-in result [:pattern-info :match-count]) 1))))
+  (testing "Namespaced defmethod"
+    (let [result (collapsed/generate-collapsed-view* defmethod-source "tool-system/validate" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms]))))))
 
-  (testing "Match defmethod with specific dispatch value"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "area :rectangle" nil)]
-      (is (= ["area :rectangle"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+(deftest test-reader-conditionals
+  (testing "Reader conditionals collapsed view"
+    (let [result (collapsed/generate-collapsed-view* reader-conditional-source nil nil)]
+      (is (re-find #"#\?\(:clj\n   \(defn server-fn \[\] \.\.\.\)\)" (:view result)))
+      (is (re-find #"#\?\(:cljs\n   \(defn client-fn \[\] \.\.\.\)\)" (:view result)))
+      (is (re-find #"#\?\(:clj\n   \(def server-port \.\.\.\)\)" (:view result)))))
 
-  (testing "Match defmethod with vector dispatch value"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "conversion-factor \\[:feet :inches\\]" nil)]
-      (is (= ["conversion-factor [:feet :inches]"] (:matches result)))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+  (testing "Expanding reader conditional forms"
+    (let [result (collapsed/generate-collapsed-view* reader-conditional-source "server-fn|start-server" nil)]
+      (is (= 2 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"\"Server-side function\"" (:view result)))
+      (is (re-find #"println \"Starting server\"" (:view result))))))
 
-  (testing "Match defmethod with namespaced multimethod"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "example.helpers/process-input" nil)]
-      (is (contains? (set (:matches result)) "example.helpers/process-input :xml"))
-      (is (= 1 (get-in result [:pattern-info :match-count])))))
+(deftest test-spec-forms
+  (testing "Spec forms with keywords"
+    (let [result (collapsed/generate-collapsed-view* spec-source nil nil)]
+      ;; Auto-resolved keywords should show as ::keyword
+      (is (re-find #"\(s/def ::email \.\.\.\)" (:view result)))
+      (is (re-find #"\(s/def ::age \.\.\.\)" (:view result)))
+      ;; Qualified keywords should show as :ns/name
+      (is (re-find #"\(s/def :domain\.user/id \.\.\.\)" (:view result)))
+      ;; Function specs
+      (is (re-find #"\(s/fdef process-user \.\.\.\)" (:view result)))))
 
-  (testing "Empty pattern returns no matches"
-    (let [forms (pattern-core/collect-top-level-forms (.getAbsolutePath *test-file*) false)
-          result (pattern-core/filter-forms-by-pattern forms "" nil)]
-      (is (empty? (:matches result)))
-      (is (= 0 (get-in result [:pattern-info :match-count]))))))
+  (testing "Spec pattern matching"
+    (let [result (collapsed/generate-collapsed-view* spec-source "::age" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"s/and int\?" (:view result)))))
 
-(deftest test-generate-pattern-based-file-view
-  (testing "Generate collapsed view with name pattern"
-    (let [result (pattern-core/generate-pattern-based-file-view
-                  (.getAbsolutePath *test-file*) "validate.*" nil)]
-      (is (sequential? (:matches result)))
-      (is (map? (:pattern-info result)))
-      (is (= "validate.*" (get-in result [:pattern-info :name-pattern])))))
+  (testing "Qualified keyword pattern matching"
+    (let [result (collapsed/generate-collapsed-view* spec-source ":domain\\.user/id" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"uuid\\?" (:view result))))))
 
-  (testing "Generate collapsed view with content pattern"
-    (let [result (pattern-core/generate-pattern-based-file-view
-                  (.getAbsolutePath *test-file*) nil "try|catch")]
-      (is (sequential? (:matches result)))
-      (is (= "try|catch" (get-in result [:pattern-info :content-pattern]))))))
+(deftest test-metadata-handling
+  (testing "Functions with metadata"
+    (let [result (collapsed/generate-collapsed-view* metadata-source nil nil)]
+      ;; Metadata doesn't interfere with collapsed view
+      (is (re-find #"\(defn old-function \[x\] \.\.\.\)" (:view result)))
+      (is (re-find #"\(defn documented-fn \[x y\] \.\.\.\)" (:view result)))
+      (is (re-find #"\(def answer \.\.\.\)" (:view result)))))
 
-(deftest test-error-handling
-  (testing "Invalid name pattern regex throws meaningful exception"
-    (let [forms [{:name "example" :content "(defn example [x] x)"}]]
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Invalid name pattern regex"
-           (pattern-core/filter-forms-by-pattern forms "[" nil)))))
+  (testing "Expanding functions with metadata preserves metadata"
+    (let [result (collapsed/generate-collapsed-view* metadata-source "old-function" nil)]
+      (is (re-find #"\^:deprecated" (:view result)))
+      (is (re-find #"\"This function is deprecated\"" (:view result)))))
 
-  (testing "Invalid content pattern regex throws meaningful exception"
-    (let [forms [{:name "example" :content "(defn example [x] x)"}]]
-      (is (thrown-with-msg?
-           clojure.lang.ExceptionInfo
-           #"Invalid content pattern regex"
-           (pattern-core/filter-forms-by-pattern forms nil "("))))))
+  (testing "Defmethod with metadata"
+    (let [result (collapsed/generate-collapsed-view* metadata-source "process :old-type" nil)]
+      (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+      (is (re-find #"\^:deprecated" (:view result))))))
 
 (deftest test-edge-cases
-  (testing "Empty file handling"
-    (let [empty-file-path (.getAbsolutePath (io/file *test-dir* "empty.clj"))]
-      (try
-        (spit empty-file-path "")
-        (let [forms (pattern-core/collect-top-level-forms empty-file-path false)]
-          (is (empty? forms)))
-        (finally
-          (io/delete-file empty-file-path true)))))
+  (testing "Empty source"
+    (let [result (collapsed/generate-collapsed-view* "" nil nil)]
+      (is (= "" (:view result)))
+      (is (= 0 (get-in result [:pattern-info :total-forms])))))
 
-  (testing "Malformed Clojure code throws exception"
-    (let [malformed-file-path (.getAbsolutePath (io/file *test-dir* "malformed.clj"))]
-      (try
-        (spit malformed-file-path "(defn broken [")
-        (is (thrown? Exception
-                     (pattern-core/collect-top-level-forms malformed-file-path false)))
-        (finally
-          (io/delete-file malformed-file-path true))))))
+  (testing "Source with only namespace"
+    (let [result (collapsed/generate-collapsed-view* "(ns test.only)" nil nil)]
+      (is (= "(ns test.only)" (:view result)))
+      (is (= 1 (get-in result [:pattern-info :total-forms])))))
 
+  (testing "Invalid regex patterns"
+    (is (thrown-with-msg? Exception #"Invalid name pattern regex"
+                          (collapsed/generate-collapsed-view* basic-source "[invalid" nil)))
+    (is (thrown-with-msg? Exception #"Invalid content pattern regex"
+                          (collapsed/generate-collapsed-view* basic-source nil "[invalid")))))
 
+(deftest test-form-collection
+  (testing "collect-top-level-forms* extracts correct metadata"
+    (let [forms (collapsed/collect-top-level-forms* basic-source false)]
+      (is (= 5 (count forms)))
+      (is (= ["test.example" "simple-function" "complex-function" "configuration" "with-timing"]
+             (map :name forms)))
+      (is (= ["ns" "defn" "defn" "def" "defmacro"]
+             (map :type forms)))))
+
+  (testing "Forms in reader conditionals have platform info"
+    (let [forms (collapsed/collect-top-level-forms* reader-conditional-source false)]
+      (is (some #(and (= "server-fn" (:name %))
+                      (= :clj (:platform %))) forms))
+      (is (some #(and (= "client-fn" (:name %))
+                      (= :cljs (:platform %))) forms)))))
+
+(deftest test-pattern-based-file-view
+  (testing "generate-pattern-based-file-view* returns matches only"
+    (let [result (collapsed/generate-pattern-based-file-view* basic-source "function" nil)]
+      (is (= 2 (count (:matches result))))
+      (is (= #{"simple-function" "complex-function"}
+             (set (map :name (:matches result)))))
+      (is (= 2 (get-in result [:pattern-info :match-count])))))
+
+  (testing "Pattern matching with platform info"
+    (let [result (collapsed/generate-pattern-based-file-view* reader-conditional-source "^server-" nil)]
+      (is (= 2 (count (:matches result))))
+      (is (every? #(= :clj (:platform %)) (:matches result))))))
+
+(deftest test-special-forms-and-edge-cases
+  (testing "Protocol and record forms"
+    (let [source "(ns test.proto)
+                  
+                  (defprotocol MyProtocol
+                    \"A protocol\"
+                    (my-method [this] [this x]))
+                  
+                  (defrecord MyRecord [a b]
+                    MyProtocol
+                    (my-method [this] :one-arg)
+                    (my-method [this x] :two-args))"]
+      (let [result (collapsed/generate-collapsed-view* source nil nil)]
+        (is (re-find #"\(defprotocol MyProtocol \.\.\.\)" (:view result)))
+        (is (re-find #"\(defrecord MyRecord \.\.\.\)" (:view result))))))
+
+  (testing "Multiline strings in forms"
+    (let [source "(ns test.multi)
+                  
+                  (def long-string
+                    \"This is a very long
+                     multiline string that
+                     spans several lines\")
+                  
+                  (defn process-text
+                    \"Process multiline text\"
+                    [text]
+                    (str/replace text #\"\\n\" \" \"))"]
+      (let [result (collapsed/generate-collapsed-view* source "long-string" nil)]
+        (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+        (is (re-find #"multiline string" (:view result))))))
+
+  (testing "Complex nested forms"
+    (let [source "(ns test.nested)
+                  
+                  (defn deeply-nested
+                    [x]
+                    (let [a (+ x 1)
+                          b (* a 2)]
+                      (if (> b 10)
+                        (do
+                          (println \"Large value:\" b)
+                          (reduce + (map #(* % %) (range b))))
+                        b)))"]
+      (let [result (collapsed/generate-collapsed-view* source nil "reduce")]
+        (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+        (is (re-find #"reduce \+" (:view result))))))
+
+  (testing "Anonymous functions and special characters"
+    (let [source "(ns test.anon)
+                  
+                  (def handlers
+                    {:click #(println \"Clicked:\" %)
+                     :hover (fn [e] (println \"Hovered:\" e))})
+                  
+                  (defn process->result
+                    \"Process with special chars in name\"
+                    [data]
+                    (-> data
+                        (update :value inc)
+                        (assoc :processed? true)))"]
+      (let [result (collapsed/generate-collapsed-view* source "process->result" nil)]
+        (is (= 1 (get-in result [:pattern-info :expanded-forms])))
+        (is (re-find #"Process with special chars" (:view result)))))))
+
+;; Run tests with: clojure -X:test :nses '[clojure-mcp.tools.unified-read-file.pattern-core-enhanced-with-collapsed-test]

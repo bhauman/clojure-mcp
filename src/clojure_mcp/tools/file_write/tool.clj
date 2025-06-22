@@ -3,7 +3,7 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.file-write.core :as core]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config]
    [clojure.java.io :as io]))

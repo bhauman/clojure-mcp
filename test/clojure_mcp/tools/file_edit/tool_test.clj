@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure-mcp.tools.file-edit.tool :as tool]
             [clojure-mcp.tool-system :as tool-system]
-            [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+            [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
             [clojure-mcp.config :as config] ; Added config require
             [clojure.java.io :as io]
             [clojure.string :as str]))

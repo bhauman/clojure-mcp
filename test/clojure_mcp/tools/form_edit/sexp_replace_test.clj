@@ -6,7 +6,7 @@
    [clojure-mcp.tools.form-edit.core :as core]
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.config :as config] ; Added config require
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure.java.io :as io]
    [clojure.string :as str]))
 
@@ -107,7 +107,7 @@
 (deftest sexp-replace-tool-test
   (let [client-atom *client-atom*
         sexp-tool (sut/create-edit-replace-sexp-tool client-atom)]
-    
+
     (testing "Basic S-Expression replacement"
       (let [file-path (get-file-path)
             _ (register-file-timestamp) ;; Register file before editing
@@ -169,7 +169,7 @@
             result (tool-system/execute-tool sexp-tool validated)
             formatted (tool-system/format-results sexp-tool result)
             file-content (slurp file-path)]
-       
+
         ;; Skip detailed diff pattern validation since format has changed
         (is (map? formatted) "Response should be a map")
         (is (contains? formatted :result) "Response should contain :result key")

@@ -298,14 +298,6 @@
           summary (sut/get-form-summary zloc)]
       (is (= "(ns test.core)" summary)))))
 
-(deftest generate-collapsed-file-view-test
-  (testing "generate-collapsed-file-view creates collapsed view"
-    (let [path (.getAbsolutePath *test-file*)
-          result (sut/generate-collapsed-file-view path [])]
-      (is (str/includes? result "(ns test.core)"))
-      (is (str/includes? result "(defn example-fn [x y] ...)"))
-      (is (str/includes? result "(def a ...)")))))
-
 (deftest format-source-string-test
   (testing "format-source-string correctly formats source code"
     (let [unformatted "(defn   example-fn[x y]  (+ x  y)   )"

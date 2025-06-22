@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing use-fixtures]]
    [clojure-mcp.tools.file-write.tool :as file-write-tool]
    [clojure-mcp.tools.file-write.core :as file-write-core]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.config :as config] ; Added config require
    [clojure-mcp.tool-system :as tool-system]
    [clojure.java.io :as io]

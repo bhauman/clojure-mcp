@@ -554,69 +554,6 @@
     (catch Exception _
       nil)))
 
-(defn generate-collapsed-file-view
-  "Generates a collapsed view of all top-level forms in a Clojure file.
-   
-   Arguments:
-   - file-path: Path to the Clojure file
-   - expand-symbols: Optional sequence of symbol names to show in expanded form
-   
-   Returns:
-   - A string containing the collapsed representation of the file"
-  [file-path expand-symbols]
-  (try
-    (let [file-content (slurp file-path)
-          zloc (z/of-string file-content)
-          ;; Convert expand-symbols to a set for easier lookup
-          expand-set (set (map name expand-symbols))]
-
-      (loop [loc zloc
-             forms []]
-        (if (nil? loc)
-          ;; Return the final string with all forms
-          (str/join "\n\n" forms)
-
-          ;; Process current form
-          (let [next-loc (try (z/right loc) (catch Exception _ nil))]
-            (if (valid-form-to-include? loc)
-              ;; Process includable forms
-              (let [current-sexpr (try (z/sexpr loc) (catch Exception _ nil))
-                    form-name (extract-form-name current-sexpr)
-                    ;; Special handling for defmethod forms
-                    should-expand (if (and (seq? current-sexpr)
-                                           (= (name (first current-sexpr)) "defmethod"))
-                                    ;; For defmethod, try multiple matching strategies
-                                    (let [method-sym (second current-sexpr)
-                                          method-name (if (and (symbol? method-sym) (namespace method-sym))
-                                                        (str (namespace method-sym) "/" (name method-sym))
-                                                        (name method-sym))
-                                          dispatch-val (nth current-sexpr 2)
-                                          dispatch-str (pr-str dispatch-val)
-                                          combined (str method-name " " dispatch-str)]
-                                      (or
-                                       ;; Try direct match with form name (works for simple defmethods)
-                                       (contains? expand-set form-name)
-                                       ;; Try match with qualified method name
-                                       (contains? expand-set method-name)
-                                       ;; Try match with qualified method name and dispatch value
-                                       (contains? expand-set combined)))
-                                    ;; For non-defmethod forms, use regular matching
-                                    (contains? expand-set form-name))
-                    ;; For collapsed view, use pr-str for displaying forms with namespaced keywords
-                    form-str (if should-expand
-                               (z/string loc)
-                               (or (get-form-summary loc)
-                                   (z/string loc)))]
-                (if form-str
-                  (recur next-loc (conj forms form-str))
-                  (recur next-loc forms)))
-              ;; Skip excluded forms
-              (recur next-loc forms))))))
-    (catch java.io.FileNotFoundException _
-      (throw (ex-info (str "Error: File not found: " file-path) {:file-path file-path})))
-    (catch Exception e
-      (throw (ex-info (str "Error generating file view: " (.getMessage e)) {} e)))))
-
 ;; Source code formatting
 
 (def default-formatting-options

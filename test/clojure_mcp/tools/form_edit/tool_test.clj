@@ -4,7 +4,7 @@
    [clojure-mcp.tools.form-edit.tool :as sut]
    [clojure-mcp.tools.form-edit.pipeline :as pipeline]
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.tools.test-utils :as test-utils]
    [clojure-mcp.config :as config] ; Added config require
    [clojure.java.io :as io]
@@ -112,8 +112,7 @@
           before-tool (sut/create-edit-insert-before-form-tool client-atom)
           after-tool (sut/create-edit-insert-after-form-tool client-atom)
           docstring-tool (sut/create-edit-docstring-tool client-atom)
-          comment-tool (sut/create-edit-comment-block-tool client-atom)
-          structure-tool (sut/create-file-structure-tool client-atom)]
+          comment-tool (sut/create-edit-comment-block-tool client-atom)]
 
       (testing "Replace form tool has correct configuration"
         (is (= :clojure-edit-replace-form (:tool-type replace-tool)))
@@ -133,11 +132,7 @@
 
       (testing "Comment block tool has correct configuration"
         (is (= :clojure-edit-comment-block (:tool-type comment-tool)))
-        (is (= client-atom (:nrepl-client-atom comment-tool))))
-
-      (testing "File structure tool has correct configuration"
-        (is (= :clojure-file-structure (:tool-type structure-tool)))
-        (is (= client-atom (:nrepl-client-atom structure-tool)))))))
+        (is (= client-atom (:nrepl-client-atom comment-tool)))))))
 
 ;; Tests for multimethod implementations
 (deftest tool-multimethod-test
@@ -146,15 +141,13 @@
           replace-tool (sut/create-edit-replace-form-tool client-atom)
           before-tool (sut/create-edit-insert-before-form-tool client-atom)
           docstring-tool (sut/create-edit-docstring-tool client-atom)
-          comment-tool (sut/create-edit-comment-block-tool client-atom)
-          structure-tool (sut/create-file-structure-tool client-atom)]
+          comment-tool (sut/create-edit-comment-block-tool client-atom)]
 
       (testing "Tool names are correct"
         (is (= "clojure_edit_replace_definition" (tool-system/tool-name replace-tool)))
         (is (= "clojure_edit_insert_before_definition" (tool-system/tool-name before-tool)))
         (is (= "clojure_edit_replace_docstring" (tool-system/tool-name docstring-tool)))
-        (is (= "clojure_edit_replace_comment_block" (tool-system/tool-name comment-tool)))
-        (is (= "clojure_read_file" (tool-system/tool-name structure-tool))))
+        (is (= "clojure_edit_replace_comment_block" (tool-system/tool-name comment-tool))))
 
       (testing "Tool descriptions are not empty"
         (is (string? (tool-system/tool-description replace-tool)))
@@ -165,8 +158,7 @@
       (testing "Tool schemas are correctly defined"
         (let [replace-schema (tool-system/tool-schema replace-tool)
               docstring-schema (tool-system/tool-schema docstring-tool)
-              comment-schema (tool-system/tool-schema comment-tool)
-              structure-schema (tool-system/tool-schema structure-tool)]
+              comment-schema (tool-system/tool-schema comment-tool)]
           (is (map? replace-schema))
           (is (= :object (:type replace-schema)))
           (is (contains? (:properties replace-schema) :file_path))
@@ -181,12 +173,7 @@
           (is (map? comment-schema))
           (is (= :object (:type comment-schema)))
           (is (contains? (:properties comment-schema) :comment_substring))
-          (is (contains? (:properties comment-schema) :new_content))
-
-          (is (map? structure-schema))
-          (is (= :object (:type structure-schema)))
-          (is (contains? (:properties structure-schema) :file_path))
-          (is (contains? (:properties structure-schema) :expand_symbols)))))))
+          (is (contains? (:properties comment-schema) :new_content)))))))
 
 ;; Tests for validation
 (deftest validation-test
@@ -194,8 +181,7 @@
     (let [client-atom *client-atom*
           replace-tool (sut/create-edit-replace-form-tool client-atom)
           docstring-tool (sut/create-edit-docstring-tool client-atom)
-          comment-tool (sut/create-edit-comment-block-tool client-atom)
-          structure-tool (sut/create-file-structure-tool client-atom)]
+          comment-tool (sut/create-edit-comment-block-tool client-atom)]
 
       (testing "Replace form validation checks required parameters"
         (let [valid-inputs {:file_path (get-file-path)
@@ -259,22 +245,7 @@
                      (tool-system/validate-inputs comment-tool
                                                   {:file_path (get-file-path)
                                                    :new_content ";; Updated comment"}))
-            "Should throw exception when comment_substring is missing"))
-
-      (testing "File structure validation handles optional parameters"
-        (let [valid-inputs-1 {:file_path (get-file-path)}
-              valid-inputs-2 {:file_path (get-file-path)
-                              :expand_symbols ["example-fn"]}
-              validated-1 (tool-system/validate-inputs structure-tool valid-inputs-1)
-              validated-2 (tool-system/validate-inputs structure-tool valid-inputs-2)]
-          ;; Only check that we have a valid file path, not the exact value
-          ;; since validate-path-with-client may normalize/canonicalize the path
-          (is (string? (:file_path validated-1)))
-          (is (= [] (:expand_symbols validated-1)))
-          ;; Only check that we have a valid file path, not the exact value
-          ;; since validate-path-with-client may normalize/canonicalize the path
-          (is (string? (:file_path validated-2)))
-          (is (= ["example-fn"] (:expand_symbols validated-2))))))))
+            "Should throw exception when comment_substring is missing")))))
 
 (deftest sexp-replace-validation-test
   (testing "Sexp replace validation checks for multiple forms in match_form"
@@ -304,8 +275,7 @@
           before-reg (sut/top-level-form-insert-before-tool client-atom)
           after-reg (sut/top-level-form-insert-after-tool client-atom)
           docstring-reg (sut/docstring-edit-tool client-atom)
-          comment-reg (sut/comment-block-edit-tool client-atom)
-          structure-reg (sut/clojure-file-outline-tool client-atom)]
+          comment-reg (sut/comment-block-edit-tool client-atom)]
 
       (testing "Registration maps have correct structure"
         (is (string? (:name replace-reg)))
@@ -328,8 +298,7 @@
   (let [client-atom test-utils/*nrepl-client-atom*
         replace-tool (sut/create-edit-replace-form-tool client-atom)
         docstring-tool (sut/create-edit-docstring-tool client-atom)
-        comment-tool (sut/create-edit-comment-block-tool client-atom)
-        structure-tool (sut/create-file-structure-tool client-atom)]
+        comment-tool (sut/create-edit-comment-block-tool client-atom)]
 
     (testing "Replace form tool can modify files"
       (let [file-path (get-file-path)
@@ -409,96 +378,7 @@
         ;; Validate file was actually modified
         (is (str/includes? file-content "Updated test comment") "New comment should be in the file")
         (is (str/includes? file-content "with multiple lines") "Comment should have multiple lines")
-        (is (not (str/includes? file-content "Test comment\n;; spans multiple")) "Old comment should be removed")))
-
-    (testing "File structure tool can generate outlines"
-      (let [file-path (get-file-path)
-            ;; Register file as read so we can read its structure
-            _ (test-utils/read-and-register-test-file client-atom file-path)
-            inputs {:file_path file-path}
-            validated (tool-system/validate-inputs structure-tool inputs)
-            result (tool-system/execute-tool structure-tool validated)
-            formatted (tool-system/format-results structure-tool result)
-            outline (first (:result formatted))]
-
-        ;; Validate MCP result format
-        (validate-mcp-result formatted false #(and (str/includes? % "(ns test.core)")
-                                                   (str/includes? % "example-fn")))
-
-        ;; Specific test for this tool
-        (is (= (:result formatted) (:result result)) "Result should match expected structure")
-        (is (string? outline) "Outline should be a string")
-
-        ;; Validate outline content
-        (is (str/includes? outline "(ns test.core)") "Namespace should be included")
-        ;; The outline function display format has been simplified to just [x]
-        (is (str/includes? outline "(defn example-fn [x]") "Function signature should be included")
-        (is (str/includes? outline "(def a ...)") "Vars should be collapsed")
-        (is (str/includes? outline "(comment") "Comments should be included")
-        (is (not (str/includes? outline "(+ x y)")) "Function body should be collapsed")
-
-        ;; Validate uneval forms are handled properly
-        (is (not (str/includes? outline "#_(println \"debug value:\"")) "Uneval form in function should be excluded")
-        (is (not (str/includes? outline "unused-value")) "Top-level uneval form should be excluded")))
-
-    (testing "File structure tool handles existing but invalid paths correctly"
-      (let [test-dir *test-dir*
-            ;; Using a file path that exists but is not a valid Clojure file
-            invalid-file-content "This is not a valid Clojure file { syntax error )"
-            invalid-file-path (test-utils/create-and-register-test-file
-                               client-atom
-                               test-dir
-                               "invalid_clojure.clj"
-                               invalid-file-content)
-            inputs {:file_path invalid-file-path}
-            validated (tool-system/validate-inputs structure-tool inputs)
-            result (tool-system/execute-tool structure-tool validated)
-            formatted (tool-system/format-results structure-tool result)]
-
-        ;; Validate MCP result format - should return an error
-        (validate-mcp-result formatted true #(str/includes? % "Error"))))
-
-    (testing "File structure tool handles files that cause unsupported operations"
-      ;; Create a file that will trigger an "unsupported operation" error when processed
-      (let [test-dir *test-dir*
-            ;; This content is similar to core.clj which causes the unsupported operation error
-            problem_file_content "(ns problematic.core
-  (:import [java.util.concurrent Executors ThreadFactory]
-           [java.util.function Function Consumer]
-           [javax.swing JFrame JLabel ImageIcon]
-           [javax.swing.text StyleContext]))
-
-(def unmatched-delim \"
-  This string has a curly brace { without a matching one
-  and also includes some unicode: 🔥 💻 🚀
-\")
-
-;; Include various kinds of problematic forms
-#_(defn will-never-be-defined [x]
-   (this would cause a reader error if not disabled))
-
-#_#_nested-uneval forms are extra tricky
-(they might cause problems if not handled properly)
-
-(defmethod some-multimethod :default [x]
-  ;; Deliberately introduce syntax issues
-  (loop [a 1
-         b 2
-    (let [c (+ a b)]
-      c))))"
-            test-file-path (test-utils/create-and-register-test-file
-                            client-atom
-                            test-dir
-                            "unsupported.clj"
-                            problem_file_content)
-            inputs {:file_path test-file-path}
-            validated (tool-system/validate-inputs structure-tool inputs)
-            result (tool-system/execute-tool structure-tool validated)
-            formatted (tool-system/format-results structure-tool result)]
-
-        ;; Validate MCP result format - should be a properly formatted error
-        (validate-mcp-result formatted true #(or (str/includes? % "unsupported operation")
-                                                 (str/includes? % "Error generating")))))))
+        (is (not (str/includes? file-content "Test comment\n;; spans multiple")) "Old comment should be removed")))))
 
 (deftest defmethod-handling-test
   (testing "Tool correctly handles defmethod forms"
@@ -589,11 +469,7 @@
 
               comment-reg (sut/comment-block-edit-tool client-atom)
               comment-fn (:tool-fn comment-reg)
-              [p2 cb2] (make-callback)
-
-              structure-reg (sut/clojure-file-outline-tool client-atom)
-              structure-fn (:tool-fn structure-reg)
-              [p3 cb3] (make-callback)]
+              [p2 cb2] (make-callback)]
 
           (testing "Replace form tool works via callback"
             ;; Register file as read so we can modify it
@@ -624,19 +500,4 @@
               (validate-mcp-result result)
               ;; Verify the actual file modification
               (is (str/includes? (slurp (get-file-path)) "(example-fn 10 20)")
-                  "The file should contain the updated comment")))
-
-          (testing "Structure tool works via callback"
-            ;; Register file as read so we can read its structure
-            (test-utils/read-and-register-test-file client-atom (get-file-path))
-            (structure-fn nil
-                          {"file_path" (get-file-path)}
-                          cb3)
-            (let [result @p3
-                  outline (first (:result result))]
-              ;; Validate MCP response format
-              (validate-mcp-result result)
-              ;; Verify the outline content
-              (is (string? outline) "The outline should be a string")
-              (is (str/includes? outline "(ns test.core)") "The outline should include the namespace")
-              (is (str/includes? outline "(defn example-fn") "The outline should include function signatures"))))))))
+                  "The file should contain the updated comment"))))))))

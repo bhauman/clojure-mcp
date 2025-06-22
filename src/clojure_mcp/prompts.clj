@@ -72,12 +72,12 @@
                (load-prompt-from-resource "clojure-mcp/prompts/test_modifier.md"))})
 
 #_(def incremental-file-creation
-  {:name "incremental_file_creation"
-   :description "Guide for creating Clojure files incrementally to maximize success."
-   :arguments [] ;; No arguments needed for this prompt
-   :prompt-fn (simple-content-prompt-fn
-               "Incremental File Creation for Clojure"
-               (load-prompt-from-resource "clojure-mcp/prompts/system/incremental_file_creation.md"))})
+    {:name "incremental_file_creation"
+     :description "Guide for creating Clojure files incrementally to maximize success."
+     :arguments [] ;; No arguments needed for this prompt
+     :prompt-fn (simple-content-prompt-fn
+                 "Incremental File Creation for Clojure"
+                 (load-prompt-from-resource "clojure-mcp/prompts/system/incremental_file_creation.md"))})
 
 (def scratch-pad-guide
   {:name "use-scratch-pad"
@@ -141,3 +141,50 @@ Also we stored information about our last conversation in the scratch_pad [\"%s\
 After doing this provide a very brief (8 lines) summary of where we are and then wait for my instructions."
                                                  session-key
                                                  session-key)}]})))})
+
+(defn add-dir [nrepl-client-atom]
+  {:name "add-dir"
+   :description "Adds a directory to the allowed-directories list, giving the LLM access to it"
+   :arguments [{:name "directory"
+                :description "Directory path to add (can be relative or absolute)"
+                :required? true}]
+   :prompt-fn (fn [_ request-args clj-result-k]
+                (let [dir-path (get request-args "directory")
+                      user-dir (config/get-nrepl-user-dir @nrepl-client-atom)
+                      ;; Normalize path similar to config/relative-to
+                      normalized-path (try
+                                        (let [f (io/file dir-path)]
+                                          (if (.isAbsolute f)
+                                            (.getCanonicalPath f)
+                                            (.getCanonicalPath (io/file user-dir dir-path))))
+                                        (catch Exception _
+                                          nil))]
+                  (if normalized-path
+                    (let [dir-file (io/file normalized-path)]
+                      (if (.exists dir-file)
+                        (if (.isDirectory dir-file)
+                          (let [current-dirs (config/get-allowed-directories @nrepl-client-atom)
+                                new-dirs (-> (concat current-dirs [normalized-path])
+                                             distinct
+                                             vec)]
+                            (config/set-config! nrepl-client-atom :allowed-directories new-dirs)
+                            (clj-result-k
+                             {:description (str "Added directory: " normalized-path)
+                              :messages [{:role :assistant
+                                          :content (format "Directory '%s' has been added to allowed directories. You now have access to read and write files in this directory and its subdirectories."
+                                                           normalized-path)}]}))
+                          (clj-result-k
+                           {:description (str "Path is not a directory: " normalized-path)
+                            :messages [{:role :assistant
+                                        :content (format "The path '%s' exists but is not a directory. Please provide a valid directory path."
+                                                         normalized-path)}]}))
+                        (clj-result-k
+                         {:description (str "Directory does not exist: " normalized-path)
+                          :messages [{:role :assistant
+                                      :content (format "The directory '%s' does not exist. Please provide a valid existing directory path."
+                                                       normalized-path)}]})))
+                    (clj-result-k
+                     {:description "Failed to normalize path"
+                      :messages [{:role :assistant
+                                  :content (format "Failed to normalize the path '%s'. Please check the path and try again."
+                                                   dir-path)}]}))))})

@@ -7,7 +7,7 @@
    [clojure-mcp.tools.form-edit.pipeline :as form-pipeline]
    [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.tools.file-write.core :as file-write-core]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.utils.emacs-integration :as emacs]
    [clojure-mcp.config :as config]
    [clojure-mcp.linting :as linting]

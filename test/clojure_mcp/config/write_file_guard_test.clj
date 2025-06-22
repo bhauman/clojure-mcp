@@ -6,7 +6,7 @@
    [clojure-mcp.tools.file-write.tool :as file-write-tool]
    [clojure-mcp.tools.unified-read-file.tool :as unified-read-file-tool]
    [clojure-mcp.tools.file-edit.tool :as file-edit-tool]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.tool-system :as tool-system]
    [clojure.java.io :as io]
    [clojure.string :as str]))

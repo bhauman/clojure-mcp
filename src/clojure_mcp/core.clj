@@ -322,4 +322,27 @@
       (log/error e "Error during server shutdown")
       (throw e))))
 
+(def nrepl-client-atom (atom nil))
 
+(defn build-and-start-mcp-server [nrepl-args {:keys [make-tools-fn
+                                                     make-prompts-fn
+                                                     make-resources-fn]}]
+  ;; the nrepl-args are a map with :port and optional :host
+  (let [nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
+        working-dir (config/get-nrepl-user-dir nrepl-client-map)
+        _ (reset! nrepl-client-atom nrepl-client-map)
+        resources (when make-resources-fn
+                    (doall (make-resources-fn nrepl-client-atom working-dir)))
+        tools (when make-tools-fn
+                (doall (make-tools-fn nrepl-client-atom working-dir)))
+        prompts (when make-prompts-fn
+                  (doall (make-prompts-fn nrepl-client-atom working-dir)))
+        mcp (mcp-server)]
+    (doseq [tool tools]
+      (add-tool mcp tool))
+    (doseq [resource resources]
+      (add-resource mcp resource))
+    (doseq [prompt prompts]
+      (add-prompt mcp prompt))
+    (swap! nrepl-client-atom assoc :mcp-server mcp)
+    nil))

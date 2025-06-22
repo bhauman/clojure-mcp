@@ -454,18 +454,3 @@
       (is (not (.contains file-content "End of file comment"))
           "Original EOF comment should be replaced"))))
 
-(deftest file-outline-pipeline-test
-  (testing "file-outline-pipeline generates file outline"
-    (let [file-path (get-file-path)
-          pipeline-result (sut/file-outline-pipeline file-path [])
-          result (sut/format-result pipeline-result)
-          outline (first (:result result))]
-      (is (false? (:error result))
-          (str "Pipeline error: " (:message result)))
-      (is (string? outline))
-      (is (str/includes? outline "(ns test.core)"))
-      (is (str/includes? outline "(defn example-fn"))
-      (is (str/includes? outline "(def a ...)"))
-      ;; Check that function body is collapsed
-      (is (str/includes? outline "...)"))
-      (is (not (str/includes? outline "(+ x y)"))))))

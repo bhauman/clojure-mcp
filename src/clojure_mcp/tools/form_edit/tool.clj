@@ -67,16 +67,6 @@
      :nrepl-client-atom nrepl-client-atom
      :enable-emacs-notifications emacs-notify}))
 
-(defn create-file-structure-tool
-  "Creates the tool configuration for generating file outlines.
-   Automatically inherits emacs notification preferences from the client."
-  [nrepl-client-atom]
-  (let [client @nrepl-client-atom
-        emacs-notify (config/get-emacs-notify client)]
-    {:tool-type :clojure-file-structure
-     :nrepl-client-atom nrepl-client-atom
-     :enable-emacs-notifications emacs-notify}))
-
 ;; Common validation functions
 
 (defn validate-file-path
@@ -493,62 +483,6 @@ For reliable results, use a unique substring that appears in only one comment bl
     {:result [diff]
      :error false}))
 
-;; Implement the required multimethods for file structure tool
-
-(defmethod tool-system/tool-name :clojure-file-structure [_]
-  "clojure_read_file")
-
-(defmethod tool-system/tool-description :clojure-file-structure [_]
-  "Reads Clojure files with intelligent code structure awareness. The primary tool for exploring Clojure code.
-
-This tool offers two viewing modes:
-- Default: Shows a collapsed view with function signatures only
-- Expanded: Shows complete implementations of selected functions
-
-Benefits over fs_read_file:
-- More readable for Clojure code exploration
-- Reduces token usage significantly
-- Helps you understand code structure before diving into details
-
-Examples:
-- Basic view: {\"file_path\": \"/path/to/my_ns.clj\"}
-- Examine specific functions: {\"file_path\": \"/path/to/my_ns.clj\", 
-  \"expand_symbols\": [\"process-data\", \"validate-input\"]}
-
-Recommended workflow:
-1. First use with no parameters to see all available functions
-2. Then expand specific functions of interest
-3. Only use fs_read_file for non-Clojure files or when you need raw file content")
-
-(defmethod tool-system/tool-schema :clojure-file-structure [_]
-  {:type :object
-   :properties {:file_path {:type :string
-                            :description "Path to the Clojure file"}
-                :expand_symbols {:type :array
-                                 :items {:type :string}
-                                 :description "Optional list of symbol names to show in expanded form"}}
-   :required [:file_path]})
-
-(defmethod tool-system/validate-inputs :clojure-file-structure [{:keys [nrepl-client-atom]} inputs]
-  (let [file-path (validate-file-path inputs nrepl-client-atom)
-        expand-symbols (get inputs :expand_symbols [])]
-    ;; Return validated inputs
-    {:file_path file-path
-     :expand_symbols expand-symbols}))
-
-(defmethod tool-system/execute-tool :clojure-file-structure [config inputs]
-  (let [{:keys [file_path expand_symbols]} inputs
-        result (pipeline/file-outline-pipeline file_path expand_symbols config)
-        formatted-result (pipeline/format-result result)]
-    formatted-result))
-
-(defmethod tool-system/format-results :clojure-file-structure [_ {:keys [error message result]}]
-  (if error
-    {:result [message]
-     :error true}
-    {:result result
-     :error false}))
-
 ;; Backward compatibility functions
 
 (defn top-level-form-edit-tool [nrepl-client-atom]
@@ -565,9 +499,6 @@ Recommended workflow:
 
 (defn comment-block-edit-tool [nrepl-client-atom]
   (tool-system/registration-map (create-edit-comment-block-tool nrepl-client-atom)))
-
-(defn clojure-file-outline-tool [nrepl-client-atom]
-  (tool-system/registration-map (create-file-structure-tool nrepl-client-atom)))
 
 (defn create-edit-replace-sexp-tool
   "Creates the tool configuration for replacing s-expressions in a file.

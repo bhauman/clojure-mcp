@@ -7,7 +7,7 @@
    [clojure-mcp.tool-system :as tool-system]
    [clojure.test :refer [use-fixtures]]
    [clojure.java.io :as io]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]))
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]))
 
 (defonce ^:dynamic *nrepl-server* nil)
 (defonce ^:dynamic *nrepl-client-atom* nil)
