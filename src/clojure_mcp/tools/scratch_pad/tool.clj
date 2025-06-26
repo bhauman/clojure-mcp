@@ -5,7 +5,9 @@
    [clojure-mcp.tools.scratch-pad.core :as core]
    [clojure.tools.logging :as log]
    [clojure.walk :as walk]
-   [clojure.pprint :as pprint]))
+   [clojure.pprint :as pprint]
+   [clojure.java.io :as io]
+   [clojure.edn :as edn]))
 
 (defn get-scratch-pad
   "Gets the current scratch pad data from the nrepl-client.
@@ -17,6 +19,50 @@
   "Updates the scratch pad data in the nrepl-client-atom."
   [nrepl-client-atom f & args]
   (apply swap! nrepl-client-atom update ::scratch-pad f args))
+
+(defn scratch-pad-file-path
+  "Returns the path to the scratch pad persistence file"
+  [working-directory]
+  (io/file working-directory ".clojure-mcp" "scratch_pad.edn"))
+
+(defn save-scratch-pad!
+  "Saves the scratch pad data to disk"
+  [working-directory data]
+  (try
+    (let [file (scratch-pad-file-path working-directory)
+          dir (.getParentFile file)]
+      (when-not (.exists dir)
+        (.mkdirs dir))
+      (spit file (pr-str data))
+      (log/debug "Saved scratch pad to" (.getPath file)))
+    (catch Exception e
+      (log/error e "Failed to save scratch pad"))))
+
+(defn load-scratch-pad
+  "Loads the scratch pad data from disk if it exists"
+  [working-directory]
+  (try
+    (let [file (scratch-pad-file-path working-directory)]
+      (if (.exists file)
+        (let [data (edn/read-string (slurp file))]
+          (log/debug "Loaded scratch pad from" (.getPath file))
+          data)
+        (do
+          (log/debug "No existing scratch pad file found")
+          {})))
+    (catch Exception e
+      (log/error e "Failed to load scratch pad")
+      {})))
+
+(defn setup-persistence-watch!
+  "Sets up a watch on the atom to save scratch pad changes to disk"
+  [nrepl-client-atom working-directory]
+  (add-watch nrepl-client-atom ::scratch-pad-persistence
+             (fn [_key _ref old-state new-state]
+               (let [old-data (::scratch-pad old-state)
+                     new-data (::scratch-pad new-state)]
+                 (when (not= old-data new-data)
+                   (save-scratch-pad! working-directory new-data))))))
 
 (defmethod tool-system/tool-name :scratch-pad [_]
   "scratch_pad")
@@ -143,7 +189,7 @@ Viewing tasks:
                       :enum ["set_path" "get_path" "delete_path" "inspect"]
                       :description "The operation to perform either\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth"}
                 "path" {:type "array"
-                        :items {:type "string"  #_["string" "number"]}
+                        :items {:type "string" #_["string" "number"]}
                         :description "Path to the data location (array of string or number keys) this works for all operations including inspect"}
                 "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
                          :type "object" #_["object" "array" "string" "number" "boolean"]}
@@ -311,17 +357,25 @@ Viewing tasks:
                                                  [(:error-details data)])))]
                       (callback error-msgs true))))))})
 
-(defn create-scratch-pad-tool [nrepl-client-atom]
+(defn create-scratch-pad-tool [nrepl-client-atom working-directory]
   {:tool-type :scratch-pad
-   :nrepl-client-atom nrepl-client-atom})
+   :nrepl-client-atom nrepl-client-atom
+   :working-directory working-directory})
 
 (defn scratch-pad-tool
   "Returns the registration map for the scratch pad tool.
    
    Parameters:
-   - nrepl-client-atom: Atom containing the nREPL client"
-  [nrepl-client-atom]
-  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom)))
+   - nrepl-client-atom: Atom containing the nREPL client
+   - working-directory: The working directory for file persistence"
+  [nrepl-client-atom working-directory]
+  ;; Initialize persistence
+  (let [existing-data (load-scratch-pad working-directory)]
+    (when (seq existing-data)
+      (swap! nrepl-client-atom assoc ::scratch-pad existing-data)))
+  (setup-persistence-watch! nrepl-client-atom working-directory)
+
+  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom working-directory)))
 
 (comment
   ;; Usage examples with JSON values:
