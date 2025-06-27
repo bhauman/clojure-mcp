@@ -91,6 +91,24 @@
   [nrepl-client-map]
   (not= false (get-write-file-guard nrepl-client-map)))
 
+(defn get-scratch-pad-load
+  "Returns whether scratch pad persistence is enabled.
+   Defaults to false when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :scratch-pad-load)]
+    (if (nil? value)
+      false ; Default to false when not specified
+      (boolean value))))
+
+(defn get-scratch-pad-file
+  "Returns the scratch pad filename.
+   Defaults to 'scratch_pad.edn' when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :scratch-pad-file)]
+    (if (nil? value)
+      "scratch_pad.edn" ; Default filename
+      value)))
+
 (defn set-config! [nrepl-client-atom k v]
   (swap! nrepl-client-atom assoc-in [::config k] v))
 

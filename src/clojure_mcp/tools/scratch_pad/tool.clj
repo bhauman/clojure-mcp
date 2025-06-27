@@ -7,7 +7,8 @@
    [clojure.walk :as walk]
    [clojure.pprint :as pprint]
    [clojure.java.io :as io]
-   [clojure.edn :as edn]))
+   [clojure.edn :as edn]
+   [clojure-mcp.config :as config]))
 
 (defn get-scratch-pad
   "Gets the current scratch pad data from the nrepl-client.
@@ -22,14 +23,14 @@
 
 (defn scratch-pad-file-path
   "Returns the path to the scratch pad persistence file"
-  [working-directory]
-  (io/file working-directory ".clojure-mcp" "scratch_pad.edn"))
+  [working-directory filename]
+  (io/file working-directory ".clojure-mcp" filename))
 
 (defn save-scratch-pad!
   "Saves the scratch pad data to disk"
-  [working-directory data]
+  [working-directory filename data]
   (try
-    (let [file (scratch-pad-file-path working-directory)
+    (let [file (scratch-pad-file-path working-directory filename)
           dir (.getParentFile file)]
       (when-not (.exists dir)
         (.mkdirs dir))
@@ -40,9 +41,9 @@
 
 (defn load-scratch-pad
   "Loads the scratch pad data from disk if it exists"
-  [working-directory]
+  [working-directory filename]
   (try
-    (let [file (scratch-pad-file-path working-directory)]
+    (let [file (scratch-pad-file-path working-directory filename)]
       (if (.exists file)
         (let [data (edn/read-string (slurp file))]
           (log/debug "Loaded scratch pad from" (.getPath file))
@@ -56,13 +57,13 @@
 
 (defn setup-persistence-watch!
   "Sets up a watch on the atom to save scratch pad changes to disk"
-  [nrepl-client-atom working-directory]
+  [nrepl-client-atom working-directory filename]
   (add-watch nrepl-client-atom ::scratch-pad-persistence
              (fn [_key _ref old-state new-state]
                (let [old-data (::scratch-pad old-state)
                      new-data (::scratch-pad new-state)]
                  (when (not= old-data new-data)
-                   (save-scratch-pad! working-directory new-data))))))
+                   (save-scratch-pad! working-directory filename new-data))))))
 
 (defmethod tool-system/tool-name :scratch-pad [_]
   "scratch_pad")
@@ -369,11 +370,16 @@ Viewing tasks:
    - nrepl-client-atom: Atom containing the nREPL client
    - working-directory: The working directory for file persistence"
   [nrepl-client-atom working-directory]
-  ;; Initialize persistence
-  (let [existing-data (load-scratch-pad working-directory)]
-    (when (seq existing-data)
-      (swap! nrepl-client-atom assoc ::scratch-pad existing-data)))
-  (setup-persistence-watch! nrepl-client-atom working-directory)
+  ;; Check if persistence is enabled via config
+  (let [enabled? (config/get-scratch-pad-load @nrepl-client-atom)
+        filename (config/get-scratch-pad-file @nrepl-client-atom)]
+    (when enabled?
+      ;; Initialize persistence
+      (let [existing-data (load-scratch-pad working-directory filename)]
+        (when (seq existing-data)
+          (swap! nrepl-client-atom assoc ::scratch-pad existing-data)))
+      (setup-persistence-watch! nrepl-client-atom working-directory filename)
+      (log/info "Scratch pad persistence enabled. File:" filename)))
 
   (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom working-directory)))
 

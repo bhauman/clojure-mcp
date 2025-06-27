@@ -139,13 +139,21 @@ your-project/
 - `cljfmt`: Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`)
   - `true` - Applies cljfmt formatting to edited files (default behavior)
   - `false` - Disables formatting, preserving exact whitespace and formatting
+- `scratch-pad-load`: Boolean flag to enable/disable scratch pad persistence (default: `false`)
+  - `true` - Loads existing data on startup and saves changes to disk
+  - `false` - Scratch pad operates in memory only, no file persistence
+- `scratch-pad-file`: Filename for scratch pad persistence (default: `"scratch_pad.edn"`)
+  - Specifies the filename within `.clojure-mcp/` directory
+  - Only used when `scratch-pad-load` is `true`
 
 ### Example Configuration
 ```edn
 {:allowed-directories ["." "src" "test" "resources" "../sibling-project"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :scratch-pad-load false
+ :scratch-pad-file "scratch_pad.edn"}
 ```
 
 ### Path Resolution and Security
