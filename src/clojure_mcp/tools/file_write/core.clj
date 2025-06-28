@@ -81,7 +81,7 @@
           diff (if file-exists?
                  (if (= old-content content)
                    ""
-                   (diff-utils/generate-diff-via-shell old-content content 3))
+                   (diff-utils/generate-unified-diff old-content content))
                  "")]
 
       ;; Write the content directly

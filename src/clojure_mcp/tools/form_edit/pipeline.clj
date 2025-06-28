@@ -451,7 +451,7 @@
                "" ;; No diff if content is identical
                (try
                  ;; Use 3 lines of context
-                 (diff-utils/generate-diff-via-shell old-content new-content 3)
+                 (diff-utils/generate-unified-diff old-content new-content)
                  (catch Exception e
                    ;; If shell diff fails, return a fallback message
                    (str "Changes made, but diff generation failed: " (.getMessage e)))))]
