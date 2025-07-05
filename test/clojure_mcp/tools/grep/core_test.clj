@@ -120,7 +120,7 @@
       (let [result (sut/grep-files "/path/that/does/not/exist" "pattern")]
         (is (contains? result :error))
         (is (string? (:error result)))
-        (is (.contains (:error result) "not a valid directory"))))
+        (is (.contains (:error result) "not a valid file or directory"))))
 
     (testing "invalid regex pattern handling with controlled dir"
       (let [temp-dir (io/file (System/getProperty "java.io.tmpdir") "grep-error-test")]
@@ -162,3 +162,35 @@
           (finally
             (io/delete-file (io/file temp-dir "test.txt") true)
             (io/delete-file temp-dir true)))))))
+
+(deftest grep-single-file
+  (testing "grep-files with a single file"
+    (let [temp-dir (io/file (System/getProperty "java.io.tmpdir") "grep-single-file-test")
+          test-file (io/file temp-dir "test.clj")]
+      (try
+        (.mkdirs temp-dir)
+        (spit test-file "(defn my-function [x]\n  (+ x 1))\n\n(defn another-function [y]\n  (* y 2))")
+
+        (testing "find lines containing pattern"
+          (let [result (sut/grep-files (.getAbsolutePath test-file) "defn")]
+            (is (map? result))
+            (is (contains? result :lines))
+            (is (contains? result :numMatches))
+            (is (= 2 (:numMatches result)))
+            (is (= [{:line-number 1 :content "(defn my-function [x]"}
+                    {:line-number 4 :content "(defn another-function [y]"}]
+                   (:lines result)))))
+
+        (testing "find lines with complex pattern"
+          (let [result (sut/grep-files (.getAbsolutePath test-file) "\\+ x")]
+            (is (= 1 (:numMatches result)))
+            (is (= 2 (:line-number (first (:lines result)))))))
+
+        (testing "no matches returns empty lines"
+          (let [result (sut/grep-files (.getAbsolutePath test-file) "NONEXISTENT")]
+            (is (= 0 (:numMatches result)))
+            (is (empty? (:lines result)))))
+
+        (finally
+          (io/delete-file test-file true)
+          (io/delete-file temp-dir true))))))

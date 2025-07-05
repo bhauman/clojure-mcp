@@ -42,7 +42,9 @@
 
 (defn create-string-resource
   "Creates a resource specification for serving a string.
-   Accepts nrepl-client-atom for consistency with create-file-resource, but doesn't use it."
+   Accepts nrepl-client-atom for consistency with create-file-resource, but doesn't use it.
+
+   :contents should be a vector of strings"
   [url name description mime-type contents & [nrepl-client-atom]]
   {:url url
    :name name

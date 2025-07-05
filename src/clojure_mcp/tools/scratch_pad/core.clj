@@ -1,6 +1,5 @@
 (ns clojure-mcp.tools.scratch-pad.core
   (:require
-   [clojure.edn :as edn]
    [clojure.pprint :as pprint]
    [clojure-mcp.tools.scratch-pad.truncate :as truncate]
    [clojure-mcp.tools.scratch-pad.smart-path :as sp]))

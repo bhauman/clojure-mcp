@@ -5,7 +5,6 @@
    [clojure-mcp.tools.grep.core :as core]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config] ; Added config require
-   [clojure.data.json :as json]
    [clojure.string :as string]))
 
 ;; Factory function to create the tool configuration
@@ -24,7 +23,7 @@
 
 (defmethod tool-system/tool-description :grep [_]
   "Fast content search tool that works with any codebase size.
-- Searches file contents using regular expressions.
+- Finds the paths to files that have matching contents using regular expressions.
 - Supports full regex syntax (eg. \"log.*Error\", \"function\\s+\\w+\", etc.).
 - Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\").
 - Returns matching file paths sorted by modification time.
@@ -72,21 +71,45 @@
     {:result [(:error result)]
      :error true}
     ;; Otherwise, format the results in a human-readable way
-    (let [{:keys [filenames numFiles truncated]} result
-          output (cond
-                   (nil? filenames)
-                   "No files found"
+    (cond
+      ;; File search results (searching a directory)
+      (contains? result :filenames)
+      (let [{:keys [filenames numFiles truncated]} result]
+        {:result [(cond
+                    (nil? filenames)
+                    "No files found"
 
-                   (zero? numFiles)
-                   "No files found"
+                    (zero? numFiles)
+                    "No files found"
 
-                   :else
-                   (let [base-message (str "Found " numFiles " file" (when-not (= numFiles 1) "s") "\n"
-                                           (string/join "\n" filenames))]
-                     (if truncated
-                       (str base-message "\n(Results are truncated. Consider using a more specific path or pattern.)")
-                       base-message)))]
-      {:result [output]
+                    :else
+                    (let [base-message (str "Found " numFiles " file" (when-not (= numFiles 1) "s") "\n"
+                                            (string/join "\n" filenames))]
+                      (if truncated
+                        (str base-message "\n(Results are truncated. Consider using a more specific path or pattern.)")
+                        base-message)))]
+         :error false})
+
+      ;; Line search results (searching within a file)
+      (contains? result :lines)
+      (let [{:keys [lines numMatches]} result]
+        {:result [(cond
+                    (nil? lines)
+                    "No matches found"
+
+                    (zero? numMatches)
+                    "No matches found"
+
+                    :else
+                    (str "Found " numMatches " match" (when-not (= numMatches 1) "es") "\n"
+                         (string/join "\n"
+                                      (map #(str (:line-number %) ": " (:content %))
+                                           lines))))]
+         :error false})
+
+      ;; Fallback (shouldn't happen with current implementation)
+      :else
+      {:result ["Unknown result format"]
        :error false})))
 
 ;; Backward compatibility function that returns the registration map

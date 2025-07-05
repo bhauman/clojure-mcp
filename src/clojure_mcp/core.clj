@@ -2,6 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure-mcp.nrepl :as nrepl]
@@ -241,12 +242,13 @@
    - Setting up the working directory
    - Loading remote configuration
    
-   Takes initial-config map with :port and optional :host.
+   Takes initial-config map with :port and optional :host and :project-dir.
    Returns the configured nrepl-client-map with ::config/config attached."
   [initial-config]
   (log/info "Creating nREPL connection with config:" initial-config)
   (try
-    (let [nrepl-client-map (nrepl/create initial-config)]
+    (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir))
+          project-dir (:project-dir initial-config)]
       (log/info "nREPL client map created")
       (nrepl/start-polling nrepl-client-map)
       (log/info "Started polling nREPL")
@@ -261,14 +263,18 @@
       (nrepl/tool-eval-code nrepl-client-map "(in-ns 'user)")
       (log/debug "Required namespaces loaded")
 
-      (let [user-dir (try
-                       (edn/read-string
-                        (nrepl/tool-eval-code
-                         nrepl-client-map
-                         "(System/getProperty \"user.dir\")"))
-                       (catch Exception e
-                         (log/warn e "Failed to get user.dir")
-                         nil))]
+      (let [user-dir (if project-dir
+                       (do
+                         (log/info "Using provided project-dir:" project-dir)
+                         (.getCanonicalPath (io/file project-dir)))
+                       (try
+                         (edn/read-string
+                          (nrepl/tool-eval-code
+                           nrepl-client-map
+                           "(System/getProperty \"user.dir\")"))
+                         (catch Exception e
+                           (log/warn e "Failed to get user.dir")
+                           nil)))]
         (if user-dir
           (log/info "Working directory set to:" user-dir)
           (do
@@ -322,12 +328,41 @@
       (log/error e "Error during server shutdown")
       (throw e))))
 
+(s/def ::port pos-int?)
+(s/def ::host string?)
+(s/def ::project-dir (s/and string?
+                            #(try (let [f (io/file %)]
+                                    (and (.exists f) (.isDirectory f)))
+                                  (catch Exception _ false))))
+(s/def ::nrepl-args (s/keys :req-un [::port]
+                            :opt-un [::host ::project-dir]))
+
 (def nrepl-client-atom (atom nil))
+
+(defn coerce-options [{:keys [project-dir] :as opts}]
+  (cond-> opts
+    (symbol? project-dir)
+    (assoc :project-dir (str project-dir))))
+
+(defn validate-options
+  "Validates the options map for build-and-start-mcp-server.
+   Throws an exception with spec explanation if validation fails."
+  [opts]
+  (let [opts (coerce-options opts)]
+    (if-not (s/valid? ::nrepl-args opts)
+      (let [explanation (s/explain-str ::nrepl-args opts)]
+        (println "Invalid options:" explanation)
+        (log/error "Invalid options:" explanation)
+        (throw (ex-info "Invalid options for MCP server"
+                        {:explanation explanation
+                         :spec-data (s/explain-data ::nrepl-args opts)})))
+      opts)))
 
 (defn build-and-start-mcp-server
   "Builds and starts an MCP server with the provided configuration.
    
    This is the main entry point for creating custom MCP servers. It handles:
+   - Validating input options
    - Creating and starting the nREPL connection
    - Setting up the working directory
    - Calling factory functions to create tools, prompts, and resources
@@ -337,6 +372,7 @@
    - nrepl-args: Map with connection settings
      - :port (required) - nREPL server port
      - :host (optional) - nREPL server host (defaults to localhost)
+     - :project-dir (optional) - Root directory for the project (must exist)
    
    - config: Map with factory functions
      - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
@@ -354,7 +390,8 @@
                       make-prompts-fn
                       make-resources-fn]}]
   ;; the nrepl-args are a map with :port and optional :host
-  (let [nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
+  (let [nrepl-args (validate-options nrepl-args)
+        nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
         _ (reset! nrepl-client-atom nrepl-client-map)
         resources (when make-resources-fn

@@ -13,7 +13,7 @@
         clj-kondo/clj-kondo {:mvn/version "2024.03.13"}
         org.clojars.oakes/parinfer {:mvn/version "0.4.0"}
 
-;; llm ecosystem java libs
+        ;; llm ecosystem java libs
         org.apache.tika/tika-core {:mvn/version "3.2.0"}
         io.modelcontextprotocol.sdk/mcp {:mvn/version "0.10.0"}
 
@@ -24,6 +24,9 @@
 
         ;; in order to use the stdio server you have to handle logging somehow
         ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
+
+        ;; native Java diff library
+        io.github.java-diff-utils/java-diff-utils {:mvn/version "4.15"}
         }
  :aliases
 

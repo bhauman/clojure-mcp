@@ -36,9 +36,21 @@
   (with-open [reader (BufferedReader. (InputStreamReader. stream))]
     (str/join "\n" (line-seq reader))))
 
+(defn- truncate-with-limit
+  "Truncate a string if it exceeds the limit, adding a truncation message"
+  [s limit]
+  (if (> (count s) limit)
+    (str (subs s 0 (- limit 16))
+         "\n... (truncated)")
+    s))
+
 (defn execute-bash-command
   [_ {:keys [command working-directory timeout-ms] :as args}]
-  (let [timeout-ms (or timeout-ms default-timeout-ms)]
+  (log/info "Using local bash command: " command)
+  (let [timeout-ms (or timeout-ms default-timeout-ms)
+        ;; Use same truncation limit as nREPL for consistency
+        truncation-limit (int (* nrepl/truncation-length 0.85))
+        max-stderr-length (quot truncation-limit 2)]
     (when-not (command-allowed? command)
       (throw (ex-info "Command not allowed due to security restrictions"
                       {:command command
@@ -50,18 +62,31 @@
               (.directory pb (io/file working-directory)))
           process (.start pb)]
       (if (.waitFor process timeout-ms TimeUnit/MILLISECONDS)
-        {:exit-code (.exitValue process)
-         :stdout (read-stream (.getInputStream process))
-         :stderr (read-stream (.getErrorStream process))
-         :timed-out false}
+        (let [;; Read stderr first with its limit
+              stderr-content (read-stream (.getErrorStream process))
+              stderr (truncate-with-limit stderr-content max-stderr-length)
+              ;; Calculate remaining space for stdout
+              remaining-space (max 500 (- truncation-limit 500 (count stderr)))
+              stdout-content (read-stream (.getInputStream process))
+              stdout (truncate-with-limit stdout-content remaining-space)]
+          {:exit-code (.exitValue process)
+           :stdout stdout
+           :stderr stderr
+           :timed-out false})
         (do
           (.destroyForcibly process)
-          {:stdout (try (read-stream (.getInputStream process))
-                        (catch Exception _ ""))
-           :stderr (try (read-stream (.getErrorStream process))
-                        (catch Exception _ ""))
-           :exit-code -1
-           :timed-out true})))))
+          (let [;; For timeout case, still apply truncation
+                stderr-content (try (read-stream (.getErrorStream process))
+                                    (catch Exception _ ""))
+                stderr (truncate-with-limit stderr-content max-stderr-length)
+                remaining-space (max 500 (- truncation-limit 500 (count stderr)))
+                stdout-content (try (read-stream (.getInputStream process))
+                                    (catch Exception _ ""))
+                stdout (truncate-with-limit stdout-content remaining-space)]
+            {:stdout stdout
+             :stderr stderr
+             :exit-code -1
+             :timed-out true}))))))
 
 (defn generate-shell-eval-code
   "Generate Clojure code to execute shell command with explicit timeout handling"
@@ -141,7 +166,7 @@ EDN parsing failed: %s\nRaw result: %s"
          opts)))
 
 (defn execute-bash-command-nrepl
-  [nrepl-client-atom {:keys [command working-directory timeout-ms] :as args}]
+  [nrepl-client-atom {:keys [command working-directory timeout-ms session] :as args}]
   (let [timeout-ms (or timeout-ms default-timeout-ms)]
     (when-not (command-allowed? command)
       (throw (ex-info "Command not allowed due to security restrictions"
@@ -154,8 +179,9 @@ EDN parsing failed: %s\nRaw result: %s"
           eval-timeout-ms (+ 5000 timeout-ms)
           result (eval-core/evaluate-code
                   @nrepl-client-atom
-                  {:code clj-shell-code
-                   :timeout-ms eval-timeout-ms})
+                  (cond-> {:code clj-shell-code
+                           :timeout-ms eval-timeout-ms}
+                    session (assoc :session session)))
           output-map (into {} (:outputs result))
           inner-value (:value output-map)]
       (when (:error result)

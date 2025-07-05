@@ -15,7 +15,7 @@
       (log/warn "Bad file paths " (pr-str [dir path]))
       nil)))
 
-(defn process-remote-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt] :as config} user-dir]
+(defn process-remote-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl] :as config} user-dir]
   (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
     (when (some? write-file-guard)
@@ -36,7 +36,9 @@
       (some? (:emacs-notify config))
       (assoc :emacs-notify (boolean (:emacs-notify config)))
       (some? (:cljfmt config))
-      (assoc :cljfmt (boolean (:cljfmt config))))))
+      (assoc :cljfmt (boolean (:cljfmt config)))
+      (some? (:bash-over-nrepl config))
+      (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config))))))
 
 (defn load-remote-config [nrepl-client user-dir]
   (let [remote-cfg-str
@@ -84,6 +86,15 @@
       :else (do
               (log/warn "Invalid write-file-guard value:" value "- using default :full-read")
               :full-read))))
+
+(defn get-bash-over-nrepl
+  "Returns whether bash commands should be executed over nREPL.
+   Defaults to true for compatibility."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :bash-over-nrepl)]
+    (if (nil? value)
+      true ; Default to true when not specified
+      (boolean value))))
 
 (defn write-guard?
   "Returns true if write-file-guard is enabled (not false).

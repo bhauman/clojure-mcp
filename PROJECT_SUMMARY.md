@@ -54,6 +54,10 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/code_critique/`: Code quality feedback
 - `/src/clojure_mcp/tools/think/`: Reflective thinking tool for AI assistants
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
+  - **NEW**: Uses a separate nREPL session for isolation
+  - Each bash tool instance creates its own session on initialization
+  - Commands execute in an isolated environment from the main REPL
+  - Supports both nREPL and local execution modes via config
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
@@ -140,6 +144,9 @@ your-project/
 - `cljfmt`: Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`)
   - `true` - Applies cljfmt formatting to edited files (default behavior)
   - `false` - Disables formatting, preserving exact whitespace and formatting
+- `bash-over-nrepl`: Boolean flag to control bash command execution mode (default: `true`)
+  - `true` - Execute bash commands over nREPL connection (default behavior)
+  - `false` - Execute bash commands locally on the MCP server
 - `scratch-pad-load`: Boolean flag to enable/disable scratch pad persistence (default: `false`)
   - `true` - Loads existing data on startup and saves changes to disk
   - `false` - Scratch pad operates in memory only, no file persistence
@@ -155,6 +162,7 @@ your-project/
  :emacs-notify false
  :write-file-guard :full-read
  :cljfmt true
+ :bash-over-nrepl true
  :scratch-pad-load false
  :scratch-pad-file "scratch_pad.edn"}
 ```

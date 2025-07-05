@@ -5,6 +5,7 @@
    [clojure-mcp.config :as config]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.bash.core :as core]
+   [clojure-mcp.nrepl :as nrepl]
    [clojure.tools.logging :as log]
    [clojure.java.io :as io]
    [clojure.string :as str]))
@@ -16,9 +17,16 @@
    Parameters:
    - nrepl-client-atom: Atom containing the nREPL client"
   [nrepl-client-atom]
-  {:tool-type :bash
-   :nrepl-client-atom nrepl-client-atom
-   :working-dir (config/get-nrepl-user-dir @nrepl-client-atom)})
+  (let [nrepl-client @nrepl-client-atom
+        session (try
+                  (nrepl/new-session nrepl-client)
+                  (catch Exception e
+                    (log/debug "Could not create separate session for bash tool" e)
+                    nil))]
+    {:tool-type :bash
+     :nrepl-client-atom nrepl-client-atom
+     :nrepl-session session
+     :working-dir (config/get-nrepl-user-dir nrepl-client)}))
 
 ;; Implement the required multimethods for the bash tool
 (defmethod tool-system/tool-name :bash [_]
@@ -92,9 +100,16 @@ in the response to determine command success.")
         working_directory (assoc :working-directory validated-dir)
         timeout_ms (assoc :timeout-ms timeout_ms)))))
 
-(defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom]} inputs]
-  (let [{:keys [command working-directory timeout-ms]} inputs]
-    (core/execute-bash-command-nrepl nrepl-client-atom inputs)))
+(defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session]} inputs]
+  (let [{:keys [command working-directory timeout-ms]} inputs
+        nrepl-client @nrepl-client-atom
+        use-nrepl? (config/get-bash-over-nrepl nrepl-client)]
+    (if use-nrepl?
+      ;; Execute over nREPL with session
+      (let [inputs-with-session (assoc inputs :session nrepl-session)]
+        (core/execute-bash-command-nrepl nrepl-client-atom inputs-with-session))
+      ;; Execute locally
+      (core/execute-bash-command nrepl-client inputs))))
 
 (defmethod tool-system/format-results :bash [_ result]
   (let [{:keys [stdout stderr exit-code timed-out error]} result

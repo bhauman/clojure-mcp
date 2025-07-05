@@ -202,23 +202,69 @@
          :durationMs duration
          :truncated (> total-count max-results)}))))
 
-(defn grep-files
-  "Fast content search tool that searches file contents using regular expressions.
+(defn grep-file-with-lines
+  "Search within a single file and return matching lines with line numbers.
    
    Arguments:
-   - path: Directory to search in (defaults to current working directory)
+   - file-path: Path to the file to search
    - pattern: Regular expression pattern to search for
-   - include: Optional file pattern to include (e.g. \"*.clj\", \"*.{clj,cljs}\")
+   
+   Returns a map with:
+   - :lines - Vector of maps with :line-number and :content
+   - :numMatches - Number of matching lines found
+   - :durationMs - Time taken for the search in milliseconds"
+  [file-path pattern]
+  (let [start-time (System/currentTimeMillis)
+        pattern-regex (re-pattern pattern)
+        matches (atom [])]
+    (try
+      (with-open [rdr (io/reader file-path)]
+        (loop [lines (line-seq rdr)
+               line-num 1]
+          (when (seq lines)
+            (let [line (first lines)]
+              (when (re-find pattern-regex line)
+                (swap! matches conj {:line-number line-num
+                                     :content line}))
+              (recur (rest lines) (inc line-num))))))
+      {:lines @matches
+       :numMatches (count @matches)
+       :durationMs (- (System/currentTimeMillis) start-time)}
+      (catch Exception e
+        {:error (.getMessage e)
+         :durationMs (- (System/currentTimeMillis) start-time)}))))
+
+(defn grep-files
+  "Fast content search tool that searches file contents using regular expressions.
+   Can search within a single file (returning matching lines) or a directory (returning matching files).
+   
+   Arguments:
+   - path: File or directory to search in (defaults to current working directory)
+   - pattern: Regular expression pattern to search for
+   - include: Optional file pattern to include (e.g. \"*.clj\", \"*.{clj,cljs}\") - only for directories
    - max-results: Maximum number of results to return (default: 1000)
    
    Returns a map with:
+   For directories:
    - :filenames - Vector of files containing the pattern, sorted by modification time
    - :numFiles - Number of matching files found
+   - :durationMs - Time taken for the search in milliseconds
+   - :truncated - Boolean indicating if results were truncated
+   
+   For files:
+   - :lines - Vector of maps with :line-number and :content
+   - :numMatches - Number of matching lines found
    - :durationMs - Time taken for the search in milliseconds"
   [path pattern & {:keys [include max-results] :or {include nil max-results 1000}}]
   (let [start-time (System/currentTimeMillis)
-        dir-file (io/file path)]
-    (if (and (.exists dir-file) (.isDirectory dir-file))
+        file (io/file path)]
+    (cond
+      ;; If path is a file, search within it for matching lines
+      (and (.exists file) (.isFile file))
+      (grep-file-with-lines path pattern)
+
+      ;; If path is a directory, search for files containing the pattern
+      (and (.exists file) (.isDirectory file))
       (try
         ;; Check tool availability and prefer rg > grep > java
         (cond
@@ -239,5 +285,8 @@
         (catch Exception e
           {:error (.getMessage e)
            :durationMs (- (System/currentTimeMillis) start-time)}))
-      {:error (str path " is not a valid directory")
+
+      ;; Path doesn't exist or is neither file nor directory
+      :else
+      {:error (str path " is not a valid file or directory")
        :durationMs 0})))
