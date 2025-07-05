@@ -87,7 +87,7 @@
    (glob-files-tool/glob-files-tool nrepl-client-atom)
    (think-tool/think-tool nrepl-client-atom)
    ;; experimental todo list / scratch pad
-   (scratch-pad-tool/scratch-pad-tool nrepl-client-atom)
+   (scratch-pad-tool/scratch-pad-tool nrepl-client-atom working-directory)
 
    ;; eval
    (eval-tool/eval-code nrepl-client-atom)

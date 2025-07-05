@@ -11,7 +11,8 @@
 
 (deftest tool-metadata-test
   (let [tool-config {:tool-type :scratch-pad
-                     :nrepl-client-atom (create-mock-nrepl-client-atom)}]
+                     :nrepl-client-atom (create-mock-nrepl-client-atom)
+                     :working-directory "/tmp/test"}]
 
     (testing "tool-name returns the correct name"
       (is (= "scratch_pad" (tool-system/tool-name tool-config))))
@@ -37,7 +38,8 @@
 
 (deftest validate-inputs-test
   (let [tool-config {:tool-type :scratch-pad
-                     :nrepl-client-atom (create-mock-nrepl-client-atom)}]
+                     :nrepl-client-atom (create-mock-nrepl-client-atom)
+                     :working-directory "/tmp/test"}]
 
     (testing "validate-inputs for set_path operation"
       (testing "valid inputs"
@@ -201,7 +203,8 @@
 (deftest execute-tool-test
   (let [nrepl-client-atom (create-mock-nrepl-client-atom)
         tool-config {:tool-type :scratch-pad
-                     :nrepl-client-atom nrepl-client-atom}]
+                     :nrepl-client-atom nrepl-client-atom
+                     :working-directory "/tmp/test"}]
 
     (testing "set_path operation"
       (let [result (tool-system/execute-tool
@@ -288,7 +291,8 @@
 
 (deftest format-results-test
   (let [tool-config {:tool-type :scratch-pad
-                     :nrepl-client-atom (create-mock-nrepl-client-atom)}]
+                     :nrepl-client-atom (create-mock-nrepl-client-atom)
+                     :working-directory "/tmp/test"}]
 
     (testing "format-results for set_path"
       (let [result (tool-system/format-results
@@ -358,8 +362,8 @@
   (testing "scratch pad isolation between tests"
     (let [atom1 (create-mock-nrepl-client-atom)
           atom2 (create-mock-nrepl-client-atom)
-          tool1 {:tool-type :scratch-pad :nrepl-client-atom atom1}
-          tool2 {:tool-type :scratch-pad :nrepl-client-atom atom2}]
+          tool1 {:tool-type :scratch-pad :nrepl-client-atom atom1 :working-directory "/tmp/test1"}
+          tool2 {:tool-type :scratch-pad :nrepl-client-atom atom2 :working-directory "/tmp/test2"}]
 
       ;; Store data in first tool
       (tool-system/execute-tool
