@@ -58,7 +58,8 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
-  - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path)
+  - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path, persistence_config, status)
+  - `config.clj`: Configuration file management for dual-mode persistence (config file + runtime tool)
   - `truncate.clj`: Pretty-printing with depth truncation
 
 #### Unused Tools (moved to other_tools/)
@@ -142,9 +143,11 @@ your-project/
 - `scratch-pad-load`: Boolean flag to enable/disable scratch pad persistence (default: `false`)
   - `true` - Loads existing data on startup and saves changes to disk
   - `false` - Scratch pad operates in memory only, no file persistence
+  - Can be configured via config file OR runtime using `persistence_config` operation
 - `scratch-pad-file`: Filename for scratch pad persistence (default: `"scratch_pad.edn"`)
   - Specifies the filename within `.clojure-mcp/` directory
   - Only used when `scratch-pad-load` is `true`
+  - Can be modified at runtime using `persistence_config` operation
 
 ### Example Configuration
 ```edn
@@ -209,7 +212,7 @@ The following tools are available in the default configuration (`main.clj`):
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
-| `scratch_pad` | A persistent scratch pad for storing structured data between tool calls | Task tracking, intermediate results, inter-agent communication |
+| `scratch_pad` | A persistent scratch pad for storing structured data between tool calls | Task tracking, intermediate results, inter-agent communication, with dual-mode persistence configuration |
 | `code_critique` | Starts an interactive code review conversation that provides constructive feedback on your Clojure code | Iterative code quality improvement |
 
 ## Tool Examples
@@ -272,6 +275,18 @@ scratch_pad:
   path: ["todos", 0]
   explanation: Checking first task
   Output: Value at ["todos", 0]: {task: "Write tests", done: false}
+
+scratch_pad:
+  op: persistence_config
+  enabled: true
+  filename: "my_workspace.edn"
+  explanation: Enable persistence with custom filename
+  Output: Persistence enabled (file: my_workspace.edn)
+
+scratch_pad:
+  op: status
+  explanation: Check persistence status
+  Output: Scratch Pad Status with file info, size, and entry count
 ```
 
 ## Architecture and Design Patterns
@@ -340,6 +355,13 @@ scratch_pad:
    - Path elements as arrays of strings and numbers
    - Tree visualization for debugging and inspection
    - Pretty-printed output with truncation at depth 3 for readability
+   - Dual-mode persistence configuration:
+     - **Config File Based**: Enable persistence via `.clojure-mcp/config.edn` file
+     - **Runtime Tool Based**: Use `persistence_config` operation to enable/disable and configure filename
+     - Tool-based changes automatically update config file for session persistence
+   - Lock file management to prevent data corruption from multiple instances
+   - Error handling for corrupted files with user notification
+   - Status operation showing persistence state, file info, and statistics
 
 ## Development Workflow Recommendations
 
@@ -362,6 +384,7 @@ scratch_pad:
      - Storing intermediate computation results
      - Building up complex data structures incrementally
      - Sharing context between different agents or tool calls
+     - Enable persistence via config file or `persistence_config` operation for data that should survive sessions
 
 4. **Logging System**:
    - Uses `clojure.tools.logging` with Logback backend
@@ -370,7 +393,10 @@ scratch_pad:
    - Server startup/shutdown and errors are logged automatically
 
 5. **Project Maintenance**:
-   - Run tests with `clojure -X:test`
+   - Run all tests with `clojure -X:test`
+   - Run specific test files with `clojure -X:test :includes '["test-file-name"]'`
+     - Note: Use `:includes` (plural) for specific test patterns, not `:include`
+     - Example: `clojure -X:test :includes '["persistence-test"]'`
    - Update this project summary after significant changes
    
 6. **Testing Best Practices**:
@@ -461,6 +487,9 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
 - Building complex data structures incrementally
 - Path-based data manipulation using `set_path`/`get_path`/`delete_path` operations
 - Direct storage of JSON-compatible values
+- **Dual-mode persistence configuration**: Configure persistence via config file OR runtime tool operations
+- Runtime configuration operations (`persistence_config`, `status`) with immediate effect
+- Automatic config file updates when using tool-based configuration
 
 **Tool Reorganization**: To improve codebase maintainability, unused tools have been moved to `/src/clojure_mcp/other_tools/`. This separation clarifies which tools are actively used in the main MCP server (`main.clj`) versus those that remain available but are not currently essential.
 

@@ -402,8 +402,9 @@ This workflow creates a virtuous cycle where each session builds on the accumula
 
 The Clojure MCP server provides a pair of prompts that enable
 conversation continuity across chat sessions using the `scratch_pad`
-tool. This will be stored **in memory**. Things stored in the `scratch_pad`
-are not persisted to disk (yet).
+tool. By default, data is stored **in memory only** for the current session. 
+To persist summaries across server restarts, you must enable scratch pad 
+persistence using the configuration options described in the scratch pad section.
 
 ### How It Works
 
@@ -591,6 +592,7 @@ The default tools included in `main.clj` are organized by category to support di
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
+| `scratch_pad` | Persistent workspace for structured data storage | Task tracking, planning, inter-tool communication with optional file persistence (disabled by default) |
 | `code_critique` | Interactive code review and improvement suggestions | Iterative code quality improvement |
 
 ### Key Tool Features
@@ -616,6 +618,53 @@ The default tools included in `main.clj` are organized by category to support di
 - **Autonomous Search**: Handles complex, multi-step exploration tasks
 - **Read-only Access**: Agents have read only tool access
 - **Detailed Results**: Returns analysis and findings
+
+#### Scratch Pad (`scratch_pad`)
+- **Persistent Workspace**: Store structured data for planning and inter-tool communication
+- **Memory-Only by Default**: Data is stored in memory only and lost when session ends (default behavior)
+- **Optional File Persistence**: Enable to save data between sessions and server restarts
+- **Dual-Mode Configuration**: Configure persistence via config file or runtime tool operations
+- **Path-Based Operations**: Use `set_path`, `get_path`, `delete_path` for precise data manipulation
+- **JSON Compatibility**: Store any JSON-compatible data (objects, arrays, strings, numbers, booleans)
+
+**Default Behavior (Memory-Only):**
+By default, the scratch pad operates in memory only. Data persists during the session but is lost when the MCP server stops.
+
+**Enabling Persistence:**
+
+Option 1 - Runtime Configuration (Immediate Effect):
+```
+# Enable persistence via tool operation
+scratch_pad:
+  op: persistence_config
+  enabled: true
+  filename: "my_workspace.edn"  # optional, defaults to "scratch_pad.edn"
+  explanation: Enable persistence with custom filename
+
+# Check persistence status
+scratch_pad:
+  op: status
+  explanation: Check current persistence settings
+
+# Disable persistence (data remains in memory)
+scratch_pad:
+  op: persistence_config
+  enabled: false
+  explanation: Disable file persistence
+```
+
+Option 2 - Configuration File (On Startup):
+Add to `.clojure-mcp/config.edn`:
+```edn
+{:scratch-pad-load true    ; false by default
+ :scratch-pad-file "workspace.edn"}  ; defaults to "scratch_pad.edn"
+```
+
+**Persistence Details:**
+- Files are saved in `.clojure-mcp/` directory within your project
+- Changes are automatically saved when persistence is enabled
+- Corrupted files are handled gracefully with error reporting
+- Runtime configuration updates the config file for persistence across restarts
 
 
 
@@ -699,6 +748,28 @@ Controls the file timestamp tracking behavior (default: `:full-read`). This sett
 
 The timestamp tracking system prevents accidental overwrites when files are modified by external processes (other developers, editors, git operations, etc.).
 
+#### `scratch-pad-load`
+Boolean flag to enable/disable scratch pad persistence on startup (default: `false`).
+
+**Available values:**
+- `false` (default) - Scratch pad operates in memory only, no file persistence
+- `true` - Loads existing data on startup and saves changes to disk
+
+**When to use each setting:**
+- `false` - Best for temporary planning and session-only data
+- `true` - When you want data to persist across sessions and server restarts
+
+**Note:** This setting controls persistence at startup. You can also enable/disable persistence at runtime using the `persistence_config` operation.
+
+#### `scratch-pad-file`
+Filename for scratch pad persistence (default: `"scratch_pad.edn"`).
+
+**Configuration:**
+- Specifies the filename within `.clojure-mcp/` directory
+- Only used when `scratch-pad-load` is `true`
+- Can be modified at runtime using `persistence_config` operation
+- Runtime changes are saved to the config file for future sessions
+
 ### Example Configuration
 
 ```edn
@@ -711,7 +782,9 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "../sibling-project"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :scratch-pad-load false  ; Default: false (memory-only)
+ :scratch-pad-file "scratch_pad.edn"}
 ```
 
 ### Configuration Details
@@ -743,10 +816,12 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "docs"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :scratch-pad-load false  ; Memory-only scratch pad
+ :scratch-pad-file "scratch_pad.edn"}
 ```
 
-#### Multi-Project Setup
+#### Multi-Project Setup with Persistence
 ```edn
 {:allowed-directories ["."
                        "../shared-utils"
@@ -754,7 +829,9 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "/home/user/reference-code"]
  :emacs-notify false
  :write-file-guard :partial-read
- :cljfmt true}
+ :cljfmt true
+ :scratch-pad-load true  ; Enable file persistence
+ :scratch-pad-file "workspace.edn"}
 ```
 
 #### Restricted Mode (Extra Security)
@@ -763,7 +840,9 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "test"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt false}  ; Preserve original formatting
+ :cljfmt false  ; Preserve original formatting
+ :scratch-pad-load false  ; No persistence
+ :scratch-pad-file "scratch_pad.edn"}
 ```
 
 **Note**: Configuration is loaded when the MCP server starts. Restart the server after making configuration changes.

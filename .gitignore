@@ -49,3 +49,5 @@ src/user.clj
 NOTES.md
 *.log
 *.tmp
+/.idea/
+/clojure-mcp.iml

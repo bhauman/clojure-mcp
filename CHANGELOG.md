@@ -1,5 +1,58 @@
 # Changelog
 
+## [v0.1.6-alpha] - 2025-07-05
+
+### Major Enhancement: Scratch Pad Dual-Mode Persistence
+
+The `scratch_pad` tool has been significantly enhanced with a comprehensive persistence system that provides both configuration file-based and runtime tool-based approaches to data persistence.
+
+### Added
+- **Dual-mode persistence configuration** for `scratch_pad` tool with two complementary approaches:
+  - **Config file-based**: Enable persistence via `.clojure-mcp/config.edn` with `scratch-pad-load` and `scratch-pad-file` options
+  - **Runtime tool-based**: Use `persistence_config` operation to enable/disable and configure persistence immediately
+- **New scratch_pad operations**: 
+  - `persistence_config` - Enable/disable persistence and configure filename with immediate effect
+  - `status` - Show persistence state, file information, and statistics
+- **Automatic config file updates** when using tool-based persistence configuration
+- **Lock file management** to prevent data corruption from multiple MCP server instances
+- **Comprehensive error handling** for corrupted files, save errors, and permission issues
+- **Extensive test coverage** with 7 test files covering all persistence scenarios (1535+ lines of tests)
+
+### Configuration
+- Added `:scratch-pad-load` option to `.clojure-mcp/config.edn` to enable persistence on startup (default: `false`)
+- Added `:scratch-pad-file` option to specify persistence filename (default: `"scratch_pad.edn"`)
+- Tool-based configuration automatically updates config file for session persistence
+
+### Enhanced
+- **scratch_pad tool** now supports seamless data persistence across sessions and server restarts
+- **Error recovery** mechanisms with graceful degradation when persistence fails
+- **Security measures** including lock files and safe directory creation
+- **Status reporting** with file size, modification time, and entry count information
+
+### Examples
+```
+# Enable persistence via tool
+scratch_pad:
+  op: persistence_config
+  enabled: true
+  filename: "my_workspace.edn"
+  explanation: Enable persistence with custom filename
+
+# Check status
+scratch_pad:
+  op: status
+  explanation: Check persistence settings and file info
+
+# Configure via config file
+{:scratch-pad-load true
+ :scratch-pad-file "workspace.edn"}
+```
+
+### Internal
+- **New config management module** (`clojure_mcp.tools.scratch_pad.config`) for file operations
+- **Comprehensive test suite** covering config initialization, integration scenarios, and error conditions
+- **Documentation updates** across PROJECT_SUMMARY.md, README.md, and tool descriptions
+
 ## [v0.1.5-alpha] - 2025-06-22
 
 ### Major Refactoring: Simplified Custom MCP Server Creation
