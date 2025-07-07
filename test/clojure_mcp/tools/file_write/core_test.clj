@@ -49,6 +49,7 @@
     (is (file-write-core/is-clojure-file? "test.cljs"))
     (is (file-write-core/is-clojure-file? "test.cljc"))
     (is (file-write-core/is-clojure-file? "test.edn"))
+    (is (file-write-core/is-clojure-file? "test.bb"))
     (is (file-write-core/is-clojure-file? "/path/to/file.clj"))
     (is (file-write-core/is-clojure-file? "C:\\Path\\To\\File.CLJ")) ; Case insensitive
     (is (not (file-write-core/is-clojure-file? "test.txt")))

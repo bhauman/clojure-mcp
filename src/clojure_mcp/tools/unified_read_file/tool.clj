@@ -36,7 +36,7 @@
   [file-path]
   (when file-path
     (let [extension (last (str/split file-path #"\."))]
-      (contains? #{"clj" "cljc" "cljs"} extension))))
+      (contains? #{"clj" "cljc" "cljs" "edn" "bb"} extension))))
 
 ;; Implement the required multimethods for the unified read file tool
 (defmethod tool-system/tool-name :unified-read-file [_]
@@ -45,7 +45,7 @@
 (defmethod tool-system/tool-description :unified-read-file [{:keys [max-lines max-line-length]}]
   (str "Smart file reader with pattern-based exploration for Clojure files.
    
-For Clojure files (.clj, .cljc, .cljs):
+For Clojure files (.clj, .cljc, .cljs, .edn, .bb):
 
 This tool defaults to an expandable collapsed view to quickly grab the information you need from a Clojure file.
 If called without `name_pattern` or `content_pattern` it will return the file content where 

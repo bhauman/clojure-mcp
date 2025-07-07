@@ -15,11 +15,11 @@
    Parameters:
    - file-path: Path to the file to check
    
-   Returns true if the file has a Clojure-related extension (.clj, .cljs, .cljc, .edn),
+   Returns true if the file has a Clojure-related extension (.clj, .cljs, .cljc, .edn, .bb),
    false otherwise."
   [file-path]
   (let [lower-path (string/lower-case file-path)]
-    (some #(string/ends-with? lower-path %) [".clj" ".cljs" ".cljc" ".edn"])))
+    (some #(string/ends-with? lower-path %) [".clj" ".cljs" ".cljc" ".edn" ".bb"])))
 
 (defn write-clojure-file
   "Write content to a Clojure file, with linting, formatting, and diffing.
