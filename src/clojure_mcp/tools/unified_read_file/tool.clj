@@ -31,12 +31,12 @@
 
  ;; Helper functions
 
-(defn clojure-file?
-  "Determines if a file is a Clojure source file based on its extension."
+(defn collapsible-clojure-file?
+  "Determines if a file is a collapsible Clojure source file based on its extension."
   [file-path]
   (when file-path
     (let [extension (last (str/split file-path #"\."))]
-      (contains? #{"clj" "cljc" "cljs" "edn" "bb"} extension))))
+      (contains? #{"clj" "cljc" "cljs" "bb"} extension))))
 
 ;; Implement the required multimethods for the unified read file tool
 (defmethod tool-system/tool-name :unified-read-file [_]
@@ -45,7 +45,7 @@
 (defmethod tool-system/tool-description :unified-read-file [{:keys [max-lines max-line-length]}]
   (str "Smart file reader with pattern-based exploration for Clojure files.
    
-For Clojure files (.clj, .cljc, .cljs, .edn, .bb):
+For Clojure files (.clj, .cljc, .cljs, .bb):
 
 This tool defaults to an expandable collapsed view to quickly grab the information you need from a Clojure file.
 If called without `name_pattern` or `content_pattern` it will return the file content where 
@@ -138,7 +138,7 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
 (defmethod tool-system/execute-tool :unified-read-file [{:keys [max-lines max-line-length nrepl-client-atom]} inputs]
   (let [{:keys [path collapsed name_pattern content_pattern include_comments line_offset limit]} inputs
         limit-val (or limit max-lines)
-        is-clojure-file (clojure-file? path)
+        is-clojure-file (collapsible-clojure-file? path)
         ;; Get write-file-guard config if we have the atom
         write-file-guard (when nrepl-client-atom
                            (config/get-write-file-guard @nrepl-client-atom))]

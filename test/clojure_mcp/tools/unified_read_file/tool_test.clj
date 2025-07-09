@@ -53,3 +53,15 @@
                       {:path non-existent-path
                        :collapsed false})]
           (is (:error result) "Should return an error for non-existent file"))))))
+
+(deftest collapsible-clojure-file-test
+  (testing "Detecting collapsible Clojure file extensions"
+    (is (unified-read-file-tool/collapsible-clojure-file? "test.clj"))
+    (is (unified-read-file-tool/collapsible-clojure-file? "test.cljs"))
+    (is (unified-read-file-tool/collapsible-clojure-file? "test.cljc"))
+    (is (unified-read-file-tool/collapsible-clojure-file? "test.bb"))
+    (is (unified-read-file-tool/collapsible-clojure-file? "/path/to/file.clj"))
+    (is (not (unified-read-file-tool/collapsible-clojure-file? "test.edn"))) ; EDN files not collapsible
+    (is (not (unified-read-file-tool/collapsible-clojure-file? "test.txt")))
+    (is (not (unified-read-file-tool/collapsible-clojure-file? "test.md")))
+    (is (not (unified-read-file-tool/collapsible-clojure-file? "test.js")))))
