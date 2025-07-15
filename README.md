@@ -560,7 +560,7 @@ This project includes a workflow for maintaining an LLM-friendly `PROJECT_SUMMAR
 
 ### How It Works
 
-1. **Creating the Summary**: To generate or update the PROJECT_SUMMARY.md file, use the MCP prompt in the `+` > `clojure-mcp` menu `create-project-summary`. This prompt will:
+1. **Creating the Summary**: To generate or update the PROJECT_SUMMARY.md file, use the MCP prompt in the `+` > `clojure-mcp` menu `create-update-project-summary`. This prompt will:
    - Analyze the codebase structure
    - Document key files, dependencies, and available tools
    - Generate comprehensive documentation in a format optimized for LLM assistants
@@ -571,7 +571,7 @@ This project includes a workflow for maintaining an LLM-friendly `PROJECT_SUMMAR
    - The assistant can provide more accurate help without lengthy exploration
 
 3. **Keeping It Updated**: At the end of a productive session where new features or components were added:
-   - Invoke the `create-project-summary` prompt again
+   - Invoke the `create-update-project-summary` prompt again
    - The system will update the PROJECT_SUMMARY.md with newly added functionality
    - This ensures the summary stays current with ongoing development
 
