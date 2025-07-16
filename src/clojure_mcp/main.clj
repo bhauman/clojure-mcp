@@ -114,7 +114,7 @@
    ;; experimental 
    (code-critique-tool/code-critique-tool nrepl-client-atom)])
 
-;; DEPRECATED but maintained for backword compatability
+;; DEPRECATED but maintained for backward compatability
 (defn ^:deprecated my-prompts
   ([working-dir]
    (my-prompts working-dir core/nrepl-client-atom))

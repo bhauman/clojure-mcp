@@ -11,12 +11,12 @@
 Common use cases:
 * when having difficulty finding/reading the files you need
 * when having difficulty writing out code
-* when having using the tools or the clojure tools
-* When exploring a repository and discovering the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective
-* After receiving test results, use this tool to brainstorm ways to fix failing tests
-* When planning a complex refactoring, use this tool to outline different approaches and their tradeoffs
-* When designing a new feature, use this tool to think through architecture decisions and implementation details
-* When debugging a complex issue, use this tool to organize your thoughts and hypotheses
+* when having difficulty using the tools or the clojure tools
+* When exploring a repository and discovering the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective.
+* After receiving test results, use this tool to brainstorm ways to fix failing tests.
+* When planning a complex refactoring, use this tool to outline different approaches and their tradeoffs.
+* When designing a new feature, use this tool to think through architecture decisions and implementation details.
+* When debugging a complex issue, use this tool to organize your thoughts and hypotheses.
 The tool simply logs your thought process for better transparency and does not execute any code or make changes.")
 
 (defmethod tool-system/tool-schema :think [_]

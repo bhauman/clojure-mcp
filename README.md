@@ -700,6 +700,27 @@ To exit the ClojureScript REPL and return to Clojure, have Claude evaluate:
 
 This integration gives you the full power of ClojureMCP's REPL-driven development workflow for ClojureScript projects!
 
+### Dual Clojure and ClojureScript setup
+
+ClojureMCP even supports connecting to both REPLs at the same time!
+
+Add `clojure-mcp` in dual mode as an alias in your `~/.clojure/deps.edn`,
+being sure to set the port (your nrepl port), shadow port, and shadow build as needed.
+
+```clojure
+{:aliases
+  {:mcp-shadow-dual
+    {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
+            com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
+                                     :git/tag "v0.1.6-alpha"
+                                     :git/sha "4ad62f4"}}
+     :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
+     :exec-args {:port 7888 :shadow-port 7889 :shadow-build "app"}}}}
+```
+
+Be sure to update your `claude_desktop_config.json` to use the new alias.
+Remember: You only need to provide arguments to the ClojureMCP server if you need to override the settings in your `deps.edn`.
+
 ## LLM API Keys
 
 > This is NOT required to use the Clojure MCP server.
