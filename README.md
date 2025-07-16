@@ -721,6 +721,28 @@ being sure to set the port (your nrepl port), shadow port, and shadow build as n
 Be sure to update your `claude_desktop_config.json` to use the new alias.
 Remember: You only need to provide arguments to the ClojureMCP server if you need to override the settings in your `deps.edn`.
 
+Here is an example using the dual configuration:
+
+Prompt to Claude:
+
+> Evaluate this expression in clojure: `(+ 1 2 3)`
+
+Claude's response:
+
+> The expression (+ 1 2 3) evaluates to 6.
+> This is a simple addition operation in Clojure where the + function adds all the arguments together: 1 + 2 + 3 = 6.
+
+Now try ClojureScript:
+
+> Evaluate the same expression in clojurescript, and output the result to the browser console.
+
+Claude's response:
+
+> The expression (+ 1 2 3) evaluates to 6 in ClojureScript as well, and the result has been logged to the browser console.
+> The function returns nil because js/console.log doesn't return a value, but if you check your browser's developer console, you should see 6 printed there.
+
+Success!
+
 ## LLM API Keys
 
 > This is NOT required to use the Clojure MCP server.
