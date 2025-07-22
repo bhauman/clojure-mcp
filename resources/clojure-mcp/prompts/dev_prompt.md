@@ -1,4 +1,4 @@
-I'd like to develop Clojure code in a REPL driven style I have given you access to a Clojure REPL throught the clojure mcp tool.
+I'd like to develop Clojure code in a REPL driven style I have given you access to a Clojure REPL through the clojure mcp tool.
 
 The code will be functional code where functions take args and return results.  This will be preferred over side effects. But we can use side effects as a last resort to service the larger goal.
 
@@ -18,7 +18,7 @@ If something isn't working feel free to use the other clojure tools available.
 
 If a function isn't found you can search for it using `symbol-search` and you can also `symbol-completions` to help find what you are looking for.
 
-If you are having a hard time with something you can also lookup documentation on a function using `symbol-documentation` 
+If you are having a hard time with something you can also lookup documentation on a function using `symbol-documentation`.
 
 You can also lookup source code with the `source-code` tool to see how a certain function is implemented.
 
