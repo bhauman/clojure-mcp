@@ -50,7 +50,9 @@ Examples:
 (defmethod tool-system/tool-schema ::clojure-eval [_]
   {:type :object
    :properties {:code {:type :string
-                       :description "The Clojure code to evaluate."}}
+                       :description "The Clojure code to evaluate."}
+                :timeout-ms {:type :integer
+                             :description "Optional timeout in milliseconds for evaluation."}}
    :required [:code]})
 
 (defmethod tool-system/validate-inputs ::clojure-eval [_ inputs]
