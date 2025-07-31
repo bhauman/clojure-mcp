@@ -509,30 +509,41 @@ For reliable results, use a unique substring that appears in only one comment bl
         emacs-notify (config/get-emacs-notify client)]
     {:tool-type :clojure-update-sexp
      :nrepl-client-atom nrepl-client-atom
-     :enable-emacs-notifications emacs-notify}))
+     :enable-emacs-notifications emacs-notify
+     :multi-op false}))
 
-(defmethod tool-system/tool-name :clojure-update-sexp [_]
-  "clojure_update_sexp")
+(defmethod tool-system/tool-name :clojure-update-sexp [{:keys [multi-op]}]
+  (if multi-op "clojure_update_sexp" "clojure_edit_replace_sexp"))
 
-(defmethod tool-system/tool-description :clojure-update-sexp [_]
-  (slurp (io/resource "clojure-mcp/tools/form_edit/clojure_update_sexp-description.md")))
+(defmethod tool-system/tool-description :clojure-update-sexp [{:keys [multi-op]}]
+  (slurp
+   (io/resource
+    (if multi-op
+      "clojure-mcp/tools/form_edit/clojure_update_sexp-description.md"
+      "clojure-mcp/tools/form_edit/clojure_edit_replace_sexp-description.md"))))
 
-(defmethod tool-system/tool-schema :clojure-update-sexp [_]
+(defmethod tool-system/tool-schema :clojure-update-sexp [{:keys [multi-op]}]
   {:type :object
-   :properties {:file_path {:type :string
-                            :description "Path to the file to edit"}
-                :match_form {:type :string
-                             :description "The s-expression to find (include # for anonymous functions)"}
-                :new_form {:type :string
-                           :description "The s-expression to use for the operation"}
-                :operation {:type :string
-                            :enum ["replace" "insert_before" "insert_after"]
-                            :description "The editing operation to perform"}
-                :replace_all {:type :boolean
-                              :description "Whether to apply operation to all occurrences (default: false)"}}
-   :required [:file_path :match_form :new_form :operation]})
+   :properties
+   (cond-> {:file_path {:type :string
+                        :description "Path to the file to edit"}
+            :match_form {:type :string
+                         :description "The s-expression to find (include # for anonymous functions)"}
+            :new_form {:type :string
+                       :description "The s-expression to use for the operation"}
+            :replace_all {:type :boolean
+                          :description
+                          (format "Whether to %s all occurrences (default: false)"
+                                  (if multi-op "apply operation to" "replace"))}}
+     multi-op
+     (assoc :operation {:type :string
+                        :enum ["replace" "insert_before" "insert_after"]
+                        :description "The editing operation to perform"}))
+   :required (cond-> [:file_path :match_form :new_form]
+               multi-op (conj :operation))})
 
-(defmethod tool-system/validate-inputs :clojure-update-sexp [{:keys [nrepl-client-atom]} inputs]
+(defmethod tool-system/validate-inputs :clojure-update-sexp
+  [{:keys [nrepl-client-atom multi-op]} inputs]
   (let [file-path (validate-file-path inputs nrepl-client-atom)
         {:keys [match_form new_form operation replace_all whitespace_sensitive]} inputs]
     (when-not match_form
@@ -541,10 +552,13 @@ For reliable results, use a unique substring that appears in only one comment bl
     (when-not new_form
       (throw (ex-info "Missing required parameter: new_form"
                       {:inputs inputs})))
-    (when-not operation
+    (when (and multi-op
+               (nil? operation))
       (throw (ex-info "Missing required parameter: operation"
                       {:inputs inputs})))
-    (when-not (contains? #{"replace" "insert_before" "insert_after"} operation)
+    (when (and multi-op
+               operation
+               (not (contains? #{"replace" "insert_before" "insert_after"} operation)))
       (throw (ex-info (str "Invalid operation: " operation
                            ". Supported operations: replace, insert_before, insert_after")
                       {:inputs inputs})))
@@ -552,19 +566,25 @@ For reliable results, use a unique substring that appears in only one comment bl
     (when (str/blank? match_form)
       (throw (ex-info "Bad parameter: match-form can not be a blank string."
                       {:inputs inputs})))
+
+    ;; TODO we can get more sophisticated here...  we are handling
+    ;; code repairs deeper inside the actually tools evaluation and
+    ;; this prevents it.  Also I think we can actually do comment
+    ;; replacement now but we might need special handling for that.
+
     ;; Special handling for empty string
-    (when-not (str/blank? match_form)
-      (try
-        (let [parsed (p/parse-string-all match_form)]
-          ;; Check if there's at least one non-whitespace, non-comment node
-          (when (zero? (count (n/child-sexprs parsed)))
-            (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
-                            {:inputs inputs}))))
-        (catch Exception e
-          (if (str/includes? (.getMessage e) "match_form must contain")
-            (throw e)
-            (throw (ex-info (str "Invalid Clojure code in match_form: " (.getMessage e))
-                            {:inputs inputs}))))))
+    #_(when-not (str/blank? match_form)
+        (try
+          (let [parsed (p/parse-string-all match_form)]
+            ;; Check if there's at least one non-whitespace, non-comment node
+            (when (zero? (count (n/child-sexprs parsed)))
+              (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
+                              {:inputs inputs}))))
+          (catch Exception e
+            (if (str/includes? (.getMessage e) "match_form must contain")
+              (throw e)
+              (throw (ex-info (str "Invalid Clojure code in match_form: " (.getMessage e))
+                              {:inputs inputs}))))))
 
     (when-not (str/blank? new_form)
       ;; Validate that new_form is valid Clojure code
@@ -581,13 +601,15 @@ For reliable results, use a unique substring that appears in only one comment bl
      :replace_all (boolean (or replace_all false))
      :whitespace_sensitive (boolean (or whitespace_sensitive false))}))
 
-(defmethod tool-system/execute-tool :clojure-update-sexp [{:keys [nrepl-client-atom] :as tool} inputs]
+(defmethod tool-system/execute-tool :clojure-update-sexp [{:keys [multi-op nrepl-client-atom] :as tool} inputs]
   (let [{:keys [file_path match_form new_form operation replace_all whitespace_sensitive]} inputs
         ;; Convert operation string to keyword for the pipeline
-        operation-kw (case operation
-                       "replace" :replace
-                       "insert_before" :insert-before
-                       "insert_after" :insert-after)
+        operation-kw (if-not multi-op
+                       :replace
+                       (condp = operation
+                         "replace" :replace
+                         "insert_before" :insert-before
+                         "insert_after" :insert-after))
         result (pipeline/sexp-edit-pipeline
                 file_path match_form new_form operation-kw replace_all whitespace_sensitive tool)
         formatted-result (pipeline/format-result result)]
