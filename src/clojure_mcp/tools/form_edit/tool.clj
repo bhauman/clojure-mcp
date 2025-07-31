@@ -12,6 +12,7 @@
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config]
    [clojure.string :as str]
+   [clojure.java.io :as io]
    [rewrite-clj.parser :as p]
    [rewrite-clj.node :as n]))
 
@@ -514,48 +515,7 @@ For reliable results, use a unique substring that appears in only one comment bl
   "clojure_update_sexp")
 
 (defmethod tool-system/tool-description :clojure-update-sexp [_]
-  "Updates s-expressions in a file using replace, insert-before, or insert-after operations.
-
-This unified tool provides targeted editing of s-expressions within forms. For complete top-level form operations, use `clojure_edit` instead.
-
-KEY BENEFITS:
-- Syntax-aware matching that understands Clojure code structure
-- Ignores whitespace differences by default, focusing on actual code meaning
-- Matches expressions regardless of formatting, indentation, or spacing
-- Prevents errors from mismatched text or irrelevant formatting differences
-- Can apply operations to all occurrences with replace_all: true
-
-SUPPORTED OPERATIONS:
-- \"replace\": Replace matched s-expression with new content
-- \"insert_before\": Insert new content before the matched s-expression
-- \"insert_after\": Insert new content after the matched s-expression
-
-CONSTRAINTS:
-- match_form must contain only a SINGLE s-expression (error otherwise)
-- Requires syntactically valid Clojure expressions in both match_form and new_form
-
-WARNING: You will receive errors if the syntax is wrong. The most common error is an extra or missing parenthesis in either match_form or new_form, so count your parentheses carefully!
-
-COMMON APPLICATIONS:
-- Renaming symbols throughout the file: 
-    match_form:  old-name 
-    new_form:    new-name
-    operation:   replace 
-    replace_all: true
-- Adding logging before a function call: {\"match_form\": \"(process-data x)\", \"new_form\": \"(println \\\"Processing...\\\")\", \"operation\": \"insert_before\"}
-- Adding validation after binding: {\"match_form\": \"(let [x (get-value)])\", \"new_form\": \"(assert (valid? x))\", \"operation\": \"insert_after\"}
-- Editing special forms like if/cond/let/when within functions:
-  * Changing if branches: {\"match_form\": \"(if condition expr1 expr2)\", \"new_form\": \"(if condition (do expr1) expr2)\", \"operation\": \"replace\"}
-  * Adding to let bindings: {\"match_form\": \"[x 10]\", \"new_form\": \"[y 20]\", \"operation\": \"insert_after\"}
-- Modifying nested function calls: {\"match_form\": \"(str (+ a b))\", \"new_form\": \"(str (+ a b c))\", \"operation\": \"replace\"}
-
-Other Examples:
-- Replace a calculation: {\"match_form\": \"(+ x 2)\", \"new_form\": \"(+ x 10)\", \"operation\": \"replace\"}
-- Delete an expression: {\"match_form\": \"(println debug-info)\", \"new_form\": \"\", \"operation\": \"replace\"}
-- Add error handling: {\"match_form\": \"(risky-operation)\", \"new_form\": \"(try\", \"operation\": \"insert_before\"}
-- Complete error handling: {\"match_form\": \"(risky-operation)\", \"new_form\": \"(catch Exception e (handle-error e)))\", \"operation\": \"insert_after\"}
-
-Returns a diff showing the changes made to the file.")
+  (slurp (io/resource "clojure-mcp/tools/form_edit/clojure_update_sexp-description.md")))
 
 (defmethod tool-system/tool-schema :clojure-update-sexp [_]
   {:type :object
