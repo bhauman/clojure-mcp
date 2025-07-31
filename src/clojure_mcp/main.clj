@@ -98,7 +98,7 @@
 
    ;; editing tools
    (combined-edit-tool/unified-form-edit-tool nrepl-client-atom)
-   (new-form-edit-tool/sexp-replace-tool nrepl-client-atom)
+   (new-form-edit-tool/sexp-update-tool nrepl-client-atom)
    (file-edit-tool/file-edit-tool nrepl-client-atom)
    (file-write-tool/file-write-tool nrepl-client-atom)
 

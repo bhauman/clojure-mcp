@@ -696,6 +696,24 @@
       {::error true
        ::message (str "Error replacing form: " (.getMessage e))})))
 
+(defn edit-sexp
+  [{:keys [::zloc ::match-form ::new-form ::operation ::replace-all ::whitespace-sensitive] :as ctx}]
+  (try
+    (if-let [result (core/find-and-edit-multi-sexp
+                     zloc
+                     match-form
+                     new-form
+                     (cond-> {:operation operation}
+                       replace-all (assoc :all? true)))]
+      (-> ctx
+          (assoc ::zloc (:zloc result))
+          (assoc ::edit-locations (:locations result)))
+      {::error true
+       ::message (str "Could not find form: " match-form)})
+    (catch Exception e
+      {::error true
+       ::message (str "Error editing form: " (.getMessage e))})))
+
 (defn sexp-replace-pipeline
   "Pipeline for replacing s-expressions in a file.
    
@@ -727,6 +745,47 @@
      check-file-modified
      parse-source
      replace-sexp
+     zloc->output-source
+     edit-locations->offsets
+     format-source
+     determine-file-type
+     generate-diff
+     save-file
+     update-file-timestamp
+     highlight-form)))
+
+(defn sexp-edit-pipeline
+  "Pipeline for editing s-expressions in a file with support for replace, insert-before, and insert-after operations.
+   
+   Arguments:
+   - file-path: Path to the file containing the forms
+   - match-form: S-expression to find
+   - new-form: S-expression to use for the operation
+   - operation: The operation to perform (:replace, :insert-before, :insert-after)
+   - replace-all: Whether to apply the operation to all occurrences
+   - whitespace-sensitive: Whether to match forms exactly as written
+   - config: Optional tool configuration map with nrepl-client-atom
+   
+   Returns:
+   - A context map with the result of the operation"
+  [file-path match-form new-form operation replace-all whitespace-sensitive {:keys [nrepl-client-atom] :as config}]
+  (let [ctx {::file-path file-path
+             ::match-form match-form
+             ::new-form new-form
+             ::operation operation
+             ::replace-all replace-all
+             ::whitespace-sensitive whitespace-sensitive
+             ::nrepl-client-atom nrepl-client-atom
+             ::config config}]
+    (thread-ctx
+     ctx
+     #(lint-repair-code % ::match-form)
+     #(lint-repair-code % ::new-form)
+     emacs-buffer-modified-check
+     load-source
+     check-file-modified
+     parse-source
+     edit-sexp
      zloc->output-source
      edit-locations->offsets
      format-source
