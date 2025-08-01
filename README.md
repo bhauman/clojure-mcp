@@ -980,7 +980,7 @@ clojure -X:mcp :port 7888 :nrepl-env-type :bb
 
 **Note**: When using `-X` invocation, string values need to be properly quoted for the shell, hence `'"value"'` syntax for strings. 
 
-## Configuration
+## ⚙️ Configuration
 
 The Clojure MCP server supports minimal project-specific configuration
 through a `.clojure-mcp/config.edn` file in your project's root
@@ -1164,6 +1164,39 @@ emacs libraries.
 
 **Note**: Configuration is loaded when the MCP server starts. Restart the server after making configuration changes.
 
+## Advanced Usage
+
+### Code Indexing
+
+As mentioned above, the `dispatch-agent-context` configuration option allows you to add context about
+your code before calling `dispatch_agent`. The default includes a `code_index.txt` file located in
+the `./.clojure-mcp/` folder in your project. This can be customized, of course.
+
+In order to generate the code index, you will need to set up an alias for this purpose, then run
+`clojure-mcp` from the CLI.
+
+```clojure
+{:aliases
+  {:index
+    {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
+            com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
+                                     :git/tag "v0.1.7-alpha"
+                                     :git/sha "992fe5d"}}
+            :exec-fn clojure-mcp.code-indexer/map-project
+            :exec-args {}}}}
+```
+
+Then run the indexer from the CLI:
+
+```bash
+# Basic usage with default settings
+clojure -X:index
+
+# Customized code index generation
+clojure -X:index :dirs '["src" "lib"]' :include-tests true :out-file '"my-index.txt"'
+```
+
+Of course, you will need to specify the name of the code index file when invoking `dispatch_agent`.
 
 ## 🔧 Project Maintenance
 
