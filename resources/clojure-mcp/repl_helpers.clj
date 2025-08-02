@@ -19,10 +19,10 @@
 (defn list-vars
   "List all public vars in the given namespace with their arglists and docstrings.
    ns-name can be a symbol or string."
-  [ns-name]
-  (let [ns-obj (if (symbol? ns-name)
-                 (find-ns ns-name)
-                 (find-ns (symbol ns-name)))]
+  [ns-nm]
+  (let [ns-obj (if (symbol? ns-nm)
+                 (find-ns ns-nm)
+                 (find-ns (symbol ns-nm)))]
     (if ns-obj
       (let [vars (sort-by first (ns-publics ns-obj))]
         (println (str "Vars in " (ns-name ns-obj) ":"))
@@ -36,7 +36,7 @@
               (println (str "  " doc)))
             (println)))
         (println (str "Total: " (count vars) " vars")))
-      (println (str "Error: Namespace not found: " ns-name)))
+      (println (str "Error: Namespace not found: " ns-nm)))
     nil))
 
 ;; Symbol exploration
