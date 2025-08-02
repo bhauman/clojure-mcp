@@ -573,18 +573,18 @@ For reliable results, use a unique substring that appears in only one comment bl
     ;; replacement now but we might need special handling for that.
 
     ;; Special handling for empty string
-    #_(when-not (str/blank? match_form)
-        (try
-          (let [parsed (p/parse-string-all match_form)]
+    (when-not (str/blank? match_form)
+      (try
+        (let [parsed (p/parse-string-all match_form)]
             ;; Check if there's at least one non-whitespace, non-comment node
-            (when (zero? (count (n/child-sexprs parsed)))
-              (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
-                              {:inputs inputs}))))
-          (catch Exception e
-            (if (str/includes? (.getMessage e) "match_form must contain")
-              (throw e)
-              (throw (ex-info (str "Invalid Clojure code in match_form: " (.getMessage e))
-                              {:inputs inputs}))))))
+          (when (zero? (count (n/child-sexprs parsed)))
+            (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
+                            {:inputs inputs}))))
+        (catch Exception e
+          (if (str/includes? (.getMessage e) "match_form must contain")
+            (throw e)
+            (throw (ex-info (str "Invalid Clojure code in match_form: " (.getMessage e))
+                            {:inputs inputs}))))))
 
     (when-not (str/blank? new_form)
       ;; Validate that new_form is valid Clojure code
@@ -598,7 +598,9 @@ For reliable results, use a unique substring that appears in only one comment bl
      :match_form match_form
      :new_form new_form
      :operation operation
-     :replace_all (boolean (or replace_all false))
+     :replace_all (boolean (if (#{"insert_before" "insert_after"} operation)
+                             false
+                             (or replace_all false)))
      :whitespace_sensitive (boolean (or whitespace_sensitive false))}))
 
 (defmethod tool-system/execute-tool :clojure-update-sexp [{:keys [multi-op nrepl-client-atom] :as tool} inputs]

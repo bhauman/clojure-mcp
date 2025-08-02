@@ -250,7 +250,7 @@
 (deftest sexp-replace-validation-test
   (testing "Sexp replace validation checks for multiple forms in match_form"
     (let [client-atom *client-atom*
-          sexp-tool (sut/create-edit-replace-sexp-tool client-atom)
+          sexp-tool (sut/create-update-sexp-tool client-atom)
           valid-inputs {:file_path (get-file-path)
                         :match_form "(+ x y)"
                         :new_form "(+ x (* y 2))"}

@@ -106,7 +106,7 @@
 ;; Integration tests for the S-Expression replace tool
 (deftest sexp-replace-tool-test
   (let [client-atom *client-atom*
-        sexp-tool (sut/create-edit-replace-sexp-tool client-atom)]
+        sexp-tool (sut/create-update-sexp-tool client-atom)]
 
     (testing "Basic S-Expression replacement"
       (let [file-path (get-file-path)
@@ -314,7 +314,7 @@
 (deftest sexp-replace-tool-fn-test
   (testing "Tool function works through the registration map"
     (let [client-atom *client-atom*
-          reg-map (sut/sexp-replace-tool client-atom)
+          reg-map (sut/sexp-update-tool client-atom)
           tool-fn (:tool-fn reg-map)
           prom (promise)
           file-path (get-file-path)
