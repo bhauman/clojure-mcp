@@ -55,7 +55,7 @@
      "Guidelines for writing Clojure code for the current project hosting the REPL"
      "text/markdown"
      (str working-dir "/LLM_CODE_STYLE.md"))
-    (let [{:keys [outputs error]} (project/inspect-project @nrepl-client-atom)]
+    (let [{:keys [outputs error]} (project/inspect-project nrepl-client-atom)] ; Changed from @nrepl-client-atom
       (when-not error
         (resources/create-string-resource
          "custom://project-info"

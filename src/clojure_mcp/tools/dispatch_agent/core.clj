@@ -13,6 +13,7 @@
             [clojure-mcp.tools.grep.tool :as grep-tool]
             [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
             [clojure-mcp.tools.project.tool :as project-tool]
+            [clojure-mcp.tools.project.core :as project-core] ; NEW LINE
             [clojure-mcp.tools.think.tool :as think-tool]
             #_[clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool])
   (:import
@@ -23,9 +24,13 @@
 
 (def MEMORY-SIZE 300)
 
-(defn initialize-memory-with-index! [working-directory memory]
+(defn initialize-memory-with-index! [nrepl-client-atom working-directory memory]
   (let [f (io/file working-directory ".clojure-mcp" "code_index.txt")
-        proj-sumary (io/file working-directory "PROJECT_SUMMARY.md")]
+        proj-sumary (io/file working-directory "PROJECT_SUMMARY.md")
+        ;; Get project info using the cached version
+        {:keys [outputs error]} (when nrepl-client-atom
+                                  (project-core/inspect-project nrepl-client-atom))]
+
     (if (.exists f)
       (let [content (slurp f)]
         (doto memory
@@ -34,6 +39,10 @@
                    (.exists proj-sumary)
                    (conj (TextContent/from (str "This is a project summary:\n"
                                                 (slurp proj-sumary))))
+                   ;; Add project info if available
+                   (and (not error) outputs)
+                   (conj (TextContent/from (str "This is the current project structure:\n"
+                                                (string/join "\n" outputs))))
                    content
                    (conj (TextContent/from (str "This is a code index of the code in this project.
 Please use it to inform you as to which files should be investigated.\n=======================\n"
@@ -44,6 +53,7 @@ Please use it to inform you as to which files should be investigated.\n=========
   "Initialize memory with content from specific files.
    files - vector of absolute file paths to load"
   [files memory]
+  ;; TODO there is no reason why we shouldn't be able to handle images
   (if (seq files)
     (let [contents (for [file-path files
                          :let [file (io/file file-path)]
@@ -66,10 +76,10 @@ Please use it to inform you as to which files should be investigated.\n=========
    - true: use default code index
    - sequential: use specific file paths
    - false/nil: no initialization"
-  [working-directory memory context-config]
+  [nrepl-client-atom working-directory memory context-config]
   (cond
     (true? context-config)
-    (initialize-memory-with-index! working-directory memory)
+    (initialize-memory-with-index! nrepl-client-atom working-directory memory)
 
     (sequential? context-config)
     (initialize-memory-with-files! context-config memory)
@@ -77,10 +87,10 @@ Please use it to inform you as to which files should be investigated.\n=========
     :else
     memory))
 
-(defn reset-memory-if-needed! [working-directory memory context-config]
+(defn reset-memory-if-needed! [nrepl-client-atom working-directory memory context-config]
   (if (> (count (.messages memory)) (- MEMORY-SIZE 50))
     (let [cleared-memory (doto memory (.clear))]
-      (initialize-memory! working-directory cleared-memory context-config))
+      (initialize-memory! nrepl-client-atom working-directory cleared-memory context-config))
     memory))
 
 #_(chain/chat-memory 300)
@@ -103,7 +113,7 @@ Please use it to inform you as to which files should be investigated.\n=========
        (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
              base-memory (chain/chat-memory 300)
              context-config (config/get-dispatch-agent-context @nrepl-client-atom)
-             memory (initialize-memory! working-directory base-memory context-config)
+             memory (initialize-memory! nrepl-client-atom working-directory base-memory context-config) ; CHANGED LINE
              ai-service-data {:memory memory
                               :model selected-model
                               :tools
@@ -153,7 +163,8 @@ Please use it to inform you as to which files should be investigated.\n=========
       (if-let [ai-service (get-ai-service nrepl-client-atom model)]
         ;; Clear memory for stateless behavior
         (do
-          (reset-memory-if-needed! working-directory
+          (reset-memory-if-needed! nrepl-client-atom
+                                   working-directory
                                    (:memory ai-service)
                                    (config/get-dispatch-agent-context @nrepl-client-atom))
           (let [result (.chat (:service ai-service) prompt)]

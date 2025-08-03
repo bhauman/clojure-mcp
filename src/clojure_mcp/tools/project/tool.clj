@@ -48,8 +48,8 @@ clojure_inspect_project()")
   inputs)
 
 (defmethod tool-system/execute-tool :clojure-inspect-project [{:keys [nrepl-client-atom]} _]
-  ;; Delegate to core implementation
-  (core/inspect-project @nrepl-client-atom))
+  ;; Pass the atom directly to core implementation instead of dereferencing
+  (core/inspect-project nrepl-client-atom))
 
 (defmethod tool-system/format-results :clojure-inspect-project [_ {:keys [outputs error]}]
   ;; Format the results according to MCP expectations
@@ -63,7 +63,7 @@ clojure_inspect_project()")
 (comment
   ;; === Examples of using the project inspection tool ===
   (require 'clojure-mcp.nrepl)
-  
+
   ;; Setup for REPL-based testing
   (def client-atom (atom (clojure-mcp.nrepl/create {:port 7888})))
   (clojure-mcp.nrepl/start-polling @client-atom)

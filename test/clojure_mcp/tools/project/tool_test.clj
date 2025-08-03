@@ -95,7 +95,7 @@
 (deftest integration-test-with-real-repl
   (testing "Project inspection with real REPL connection"
     ;; First directly test the inspect-project function
-    (let [direct-result (core/inspect-project @*client-atom*)]
+    (let [direct-result (core/inspect-project *client-atom*)] ; Changed from @*client-atom*
       (is (map? direct-result) "Should return a result map"))
 
     ;; Now test the full tool pipeline
