@@ -138,6 +138,9 @@
       (when (and (seq? sexpr) (symbol? (first sexpr)))
         (let [first-sym (first sexpr)
               form-type (name first-sym)
+              base-type (if (str/ends-with? form-type "-")
+                          (subs form-type 0 (dec (count form-type)))
+                          form-type)
               form-name (extract-form-name sexpr)]
 
           ;; Check if it's a namespaced symbol (like s/def, s/fdef)
@@ -155,7 +158,7 @@
               (str "(" first-sym " " (or form-name "") " ...)"))
 
             ;; Non-namespaced symbols
-            (case form-type
+            (case base-type
               "defn" (let [zloc-down (z/down zloc)
                            name-loc (and zloc-down (z/right zloc-down))
                            maybe-docstring (and name-loc (z/right name-loc))
@@ -165,8 +168,8 @@
                                       (z/right maybe-docstring)
                                       maybe-docstring)]
                        (if (and args-loc (= (z/tag args-loc) :vector))
-                         (str "(defn " form-name " " (z/string args-loc) " ...)")
-                         (str "(defn " form-name " [...] ...)")))
+                         (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                         (str "(" form-type " " form-name " [...] ...)")))
 
               "defmacro" (let [zloc-down (z/down zloc)
                                name-loc (and zloc-down (z/right zloc-down))
@@ -177,8 +180,8 @@
                                           (z/right maybe-docstring)
                                           maybe-docstring)]
                            (if (and args-loc (= (z/tag args-loc) :vector))
-                             (str "(defmacro " form-name " " (z/string args-loc) " ...)")
-                             (str "(defmacro " form-name " [...] ...)")))
+                             (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                             (str "(" form-type " " form-name " [...] ...)")))
 
               "defmethod" (let [zloc-down (z/down zloc)
                                 method-loc (and zloc-down (z/right zloc-down))
@@ -197,11 +200,11 @@
                                              (= (z/tag loc) :vector) loc
                                              :else (recur (z/right loc))))]
                             (if (and args-loc (= (z/tag args-loc) :vector))
-                              (str "(defmethod " method-name " " dispatch-str " " (z/string args-loc) " ...)")
-                              (str "(defmethod " method-name " " dispatch-str " [...] ...)")))
+                              (str "(" form-type " " method-name " " dispatch-str " " (z/string args-loc) " ...)")
+                              (str "(" form-type " " method-name " " dispatch-str " [...] ...)")))
 
-              "def" (str "(def " form-name " ...)")
-              "deftest" (str "(deftest " form-name " ...)")
+              "def" (str "(" form-type " " form-name " ...)")
+              "deftest" (str "(" form-type " " form-name " ...)")
               "ns" (z/string zloc) ; Always show the full namespace
 
               (str "(" form-type " " (or form-name "") " ...)"))))))

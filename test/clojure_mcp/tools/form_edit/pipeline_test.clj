@@ -147,6 +147,23 @@
       (is (some? (::sut/zloc result)))
       (is (= 'defn (-> result ::sut/zloc z/down z/sexpr)))))
 
+  (testing "find-form locates private defn and def forms"
+    (let [ctx {::sut/source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+               ::sut/top-level-def-type "defn"
+               ::sut/top-level-def-name "hidden"}
+          parsed (sut/parse-source ctx)
+          result (sut/find-form parsed)]
+      (is (some? (::sut/zloc result)))
+      (is (= 'defn- (-> result ::sut/zloc z/down z/sexpr))))
+
+    (let [ctx {::sut/source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+               ::sut/top-level-def-type "def"
+               ::sut/top-level-def-name "secret"}
+          parsed (sut/parse-source ctx)
+          result (sut/find-form parsed)]
+      (is (some? (::sut/zloc result)))
+      (is (= 'def- (-> result ::sut/zloc z/down z/sexpr)))))
+
   (testing "find-form returns error for non-existent form"
     (let [ctx {::sut/source "(ns test.core)\n\n(defn example-fn [x y]\n  (+ x y))"
                ::sut/top-level-def-type "defn"

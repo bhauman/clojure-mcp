@@ -48,11 +48,21 @@
   (when (and dispatch-elem expected-dispatch)
     (= (get-node-string dispatch-elem) expected-dispatch)))
 
+(defn tag-match?
+  "Determine if the actual tag matches the expected tag.
+
+  Matches both public and private definition forms, allowing `def` to match
+  `def-` and `defn` to match `defn-`."
+  [expected actual]
+  (or (= actual expected)
+      (= actual (str expected "-"))))
+
 (defn check-tag
   "Check if the first element matches the expected tag."
   [first-elem tag]
-  (when (= (str/trim (n/string (z/node first-elem))) tag)
-    first-elem))
+  (let [actual (str/trim (n/string (z/node first-elem)))]
+    (when (tag-match? tag actual)
+      first-elem)))
 
 (defn check-method-and-dispatch
   "Check if method name and optionally dispatch value match the expected patterns."
@@ -122,7 +132,7 @@
                        ;; Check for forms where the tag's unqualified name matches our tag
                        (when (and (symbol? form-tag)
                                   (symbol? form-name)
-                                  (= (name form-tag) tag) ;; Tag's name part matches our tag
+                                  (tag-match? tag (name form-tag)) ;; Tag matches expected (public or private)
                                   (= (name form-name) dname)) ;; Form name's name part matches our name
                          (swap! similar-matches conj
                                 {:form-name dname
@@ -471,11 +481,15 @@
   (try
     (let [sexpr (z/sexpr zloc)]
       (when (and (seq? sexpr) (symbol? (first sexpr)))
-        (let [form-type (name (first sexpr))
+        (let [form-sym (first sexpr)
+              form-type (name form-sym)
+              base-type (if (str/ends-with? form-type "-")
+                          (subs form-type 0 (dec (count form-type)))
+                          form-type)
               form-name (extract-form-name sexpr)]
 
-          (case form-type
-            "defn" (let [zloc-down (z/down zloc) ; Move to the symbol "defn"
+          (case base-type
+            "defn" (let [zloc-down (z/down zloc) ; Move to the symbol (defn/defn-)
                          name-loc (and zloc-down (z/right zloc-down)) ; Move to name
                          maybe-docstring (and name-loc (z/right name-loc)) ; Next node after name
                          args-loc (if (and maybe-docstring
@@ -484,10 +498,10 @@
                                     (z/right maybe-docstring) ; Skip docstring to find args
                                     maybe-docstring)] ; No docstring, args right after name
                      (if (and args-loc (= (z/tag args-loc) :vector))
-                       (str "(defn " form-name " " (z/string args-loc) " ...)")
-                       (str "(defn " form-name " [...] ...)")))
+                       (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                       (str "(" form-type " " form-name " [...] ...)")))
 
-            "defmacro" (let [zloc-down (z/down zloc) ; Move to the symbol "defmacro"
+            "defmacro" (let [zloc-down (z/down zloc) ; Move to the symbol (defmacro/defmacro-)
                              name-loc (and zloc-down (z/right zloc-down)) ; Move to name
                              maybe-docstring (and name-loc (z/right name-loc)) ; Next node after name
                              args-loc (if (and maybe-docstring
@@ -496,8 +510,8 @@
                                         (z/right maybe-docstring) ; Skip docstring to find args
                                         maybe-docstring)] ; No docstring, args right after name
                          (if (and args-loc (= (z/tag args-loc) :vector))
-                           (str "(defmacro " form-name " " (z/string args-loc) " ...)")
-                           (str "(defmacro " form-name " [...] ...)")))
+                           (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                           (str "(" form-type " " form-name " [...] ...)")))
 
             "defmethod" (let [zloc-down (z/down zloc) ; Move to the symbol "defmethod"
                               method-loc (and zloc-down (z/right zloc-down)) ; Move to method name
@@ -517,11 +531,11 @@
                                            (= (z/tag loc) :vector) loc
                                            :else (recur (z/right loc))))]
                           (if (and args-loc (= (z/tag args-loc) :vector))
-                            (str "(defmethod " method-name " " dispatch-str " " (z/string args-loc) " ...)")
-                            (str "(defmethod " method-name " " dispatch-str " [...] ...)")))
+                            (str "(" form-type " " method-name " " dispatch-str " " (z/string args-loc) " ...)")
+                            (str "(" form-type " " method-name " " dispatch-str " [...] ...)")))
 
-            "def" (str "(def " form-name " ...)")
-            "deftest" (str "(deftest " form-name " ...)")
+            "def" (str "(" form-type " " form-name " ...)")
+            "deftest" (str "(" form-type " " form-name " ...)")
             "ns" (z/string zloc) ; Always show the full namespace
             (str "(" form-type " " (or form-name "") " ...)")))))
     (catch Exception e

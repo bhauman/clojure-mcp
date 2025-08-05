@@ -46,6 +46,15 @@
       (is (not (sut/is-top-level-form? defn-loc "def" "example-fn")))
       (is (not (sut/is-top-level-form? defn-loc "defn" "other-fn"))))))
 
+(deftest is-top-level-form-private-test
+  (testing "is-top-level-form? matches private defn and def forms"
+    (let [source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+          zloc (get-zloc source)
+          defn-loc (z/right zloc)
+          def-loc (z/right defn-loc)]
+      (is (sut/is-top-level-form? defn-loc "defn" "hidden"))
+      (is (sut/is-top-level-form? def-loc "def" "secret")))))
+
 (deftest is-top-level-form-with-defmethod-test
   (testing "is-top-level-form? correctly identifies defmethod forms"
     (let [source "(ns test.multimethods)\n\n(defmulti area :shape)\n\n(defmethod area :rectangle [rect]\n  (* (:width rect) (:height rect)))\n\n(defmethod area :circle [circle]\n  (* Math/PI (:radius circle) (:radius circle)))"
@@ -76,6 +85,13 @@
       (is (some? (:zloc (sut/find-top-level-form zloc "def" "a"))))
       (is (nil? (:zloc (sut/find-top-level-form zloc "defn" "non-existent"))))
       (is (nil? (:zloc (sut/find-top-level-form zloc "def" "example-fn")))))))
+
+(deftest find-top-level-form-private-test
+  (testing "find-top-level-form finds private defn and def forms"
+    (let [source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+          zloc (get-zloc source)]
+      (is (some? (:zloc (sut/find-top-level-form zloc "defn" "hidden"))))
+      (is (some? (:zloc (sut/find-top-level-form zloc "def" "secret")))))))
 
 (deftest find-top-level-form-with-defmethod-test
   (testing "find-top-level-form finds defmethod forms correctly"
@@ -560,6 +576,18 @@
           zloc (get-zloc source)
           summary (sut/get-form-summary zloc)]
       (is (= "(def a ...)" summary))))
+
+  (testing "get-form-summary provides correct summary for private defn forms"
+    (let [source "(defn- hidden [x] x)"
+          zloc (get-zloc source)
+          summary (sut/get-form-summary zloc)]
+      (is (= "(defn- hidden [x] ...)" summary))))
+
+  (testing "get-form-summary provides correct summary for private def forms"
+    (let [source "(def- secret 1)"
+          zloc (get-zloc source)
+          summary (sut/get-form-summary zloc)]
+      (is (= "(def- secret ...)" summary))))
 
   (testing "get-form-summary returns full form for ns forms"
     (let [source "(ns test.core)"
