@@ -52,8 +52,6 @@ Remember to include dispatch values:
 - Namespaced: `form_identifier: "tool-system/validate-inputs :clojure-eval"`
 
 
-# ALWAYS call tools with the approriate prefix
+# ALWAYS call tools with the appropriate prefix
 
 For example: if the prefix for the clojure MCP tools is `clojure-mcp` then be sure to correctly prefix the tool calls with the `clojure-mcp` prefix
-
-
