@@ -1,9 +1,17 @@
-;; Example configuration with tools-config
+;; Example configuration with tools-config and start-nrepl-cmd
 {:allowed-directories ["." "src" "test" "resources"]
  :emacs-notify false
  :write-file-guard :partial-read
  :cljfmt true
  :bash-over-nrepl true
+
+ ;; Optional: Start nREPL server automatically and discover port
+ ;; If specified, the MCP server will execute this command and parse the output for a port number
+ ;; Common examples:
+ ;; :start-nrepl-cmd "lein repl :start :port 0"  ; Leiningen with dynamic port
+ ;; :start-nrepl-cmd "clojure -M:nrepl"          ; deps.edn alias
+ ;; :start-nrepl-cmd "npx shadow-cljs watch app" ; Shadow-cljs
+ :start-nrepl-cmd "lein repl :start :port 0"
 
  ;; Configure specific tools with custom settings
  :tools-config {:dispatch_agent {:model :openai/o3}
