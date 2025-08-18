@@ -2,26 +2,45 @@
   (:require [clojure-mcp.tool-system :as tool-system]
             [clojure-mcp.tools.dispatch-agent.core :as core]
             [clojure-mcp.config :as config]
-            [clojure-mcp.agent.langchain.model :as model]))
+            [clojure-mcp.agent.langchain.model :as model]
+            [clojure-mcp.agent.langchain :as chain]
+            [clojure-mcp.tools.unified-read-file.tool :as read-file-tool]
+            [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
+            [clojure-mcp.tools.grep.tool :as grep-tool]
+            [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
+            [clojure-mcp.tools.project.tool :as project-tool]
+            [clojure-mcp.tools.think.tool :as think-tool]))
 
 (defn create-dispatch-agent-tool
   "Creates the dispatch agent tool configuration.
    Checks for :tools-config {:dispatch_agent {:model ...}} in the nrepl-client-atom
    and automatically creates the model if configured.
-   
+
    Args:
    - nrepl-client-atom: Required nREPL client atom
    - model: Optional pre-built langchain model to use instead of auto-detection or config"
   ([nrepl-client-atom]
    (create-dispatch-agent-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
-   (let [;; Check for tool-specific config if no model provided
-         final-model (or model
-                         ;; Try to get model from config
-                         (model/get-tool-model @nrepl-client-atom :dispatch_agent))]
+   (let [final-model (or model (model/get-tool-model @nrepl-client-atom :dispatch_agent))
+         working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+         context-config (config/get-dispatch-agent-context @nrepl-client-atom)
+         base-memory (chain/chat-memory 300)
+         memory (core/initialize-memory! nrepl-client-atom working-directory base-memory context-config)
+         tools (mapv #(% nrepl-client-atom)
+                     [read-file-tool/unified-read-file-tool
+                      directory-tree-tool/directory-tree-tool
+                      grep-tool/grep-tool
+                      glob-files-tool/glob-files-tool
+                      project-tool/inspect-project-tool
+                      think-tool/think-tool])]
      {:tool-type :dispatch-agent
       :nrepl-client-atom nrepl-client-atom
-      :model final-model})))
+      :model final-model
+      :working-directory working-directory
+      :context-config context-config
+      :memory memory
+      :tools tools})))
 
 (defn dispatch-agent-tool
   "Returns a tool registration for the dispatch-agent tool compatible with the MCP system.

@@ -1,21 +1,11 @@
 (ns clojure-mcp.tools.dispatch-agent.core
   "Core implementation for the dispatch agent tool.
    This namespace contains the pure functionality without any MCP-specific code."
-  (:require [clojure.data.json :as json]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
-            [clojure-mcp.config :as config]
-
             [clojure-mcp.agent.langchain :as chain]
-            [clojure-mcp.tools.unified-read-file.tool :as read-file-tool]
-            [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
-            [clojure-mcp.tools.grep.tool :as grep-tool]
-            [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
-            [clojure-mcp.tools.project.tool :as project-tool]
-            [clojure-mcp.tools.project.core :as project-core] ; NEW LINE
-            [clojure-mcp.tools.think.tool :as think-tool]
-            #_[clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool])
+            [clojure-mcp.tools.project.core :as project-core])
   (:import
    [clojure_mcp.agent.langchain AiService]
    [dev.langchain4j.data.message UserMessage TextContent]))
@@ -100,78 +90,61 @@ Please use it to inform you as to which files should be investigated.\n=========
 
 (defn create-ai-service
   "Creates an AI service for doing read only tasks.
-   
+
    Args:
-   - nrepl-client-atom: Required nREPL client atom
-   - model: Optional pre-built langchain model. If nil, uses chain/agent-model"
-  ([nrepl-client-atom] (create-ai-service nrepl-client-atom nil))
-  ([nrepl-client-atom model]
+   - model: Optional pre-built langchain model. If nil, uses chain/agent-model
+   - memory: Chat memory instance to use
+   - tools: Vector of tool functions"
+  ([memory tools] (create-ai-service nil memory tools))
+  ([model memory tools]
    (try
      (when-let [selected-model (or model
                                    (some-> (chain/agent-model)
                                            (.build)))]
-       (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
-             base-memory (chain/chat-memory 300)
-             context-config (config/get-dispatch-agent-context @nrepl-client-atom)
-             memory (initialize-memory! nrepl-client-atom working-directory base-memory context-config) ; CHANGED LINE
-             ai-service-data {:memory memory
+       (let [ai-service-data {:memory memory
                               :model selected-model
-                              :tools
-                              (mapv
-                               #(% nrepl-client-atom)
-                               [read-file-tool/unified-read-file-tool
-                                directory-tree-tool/directory-tree-tool
-                                grep-tool/grep-tool
-                                glob-files-tool/glob-files-tool
-                                project-tool/inspect-project-tool
-                                think-tool/think-tool
-                                #_scratch-pad-tool/scratch-pad-tool])
+                              :tools tools
                               :system-message system-message}
              service (-> (chain/create-service AiService ai-service-data)
                          (.build))]
-         (assoc ai-service-data
-                :service service)))
+         (assoc ai-service-data :service service)))
      (catch Exception e
        (log/error e "Failed to create dispatch_agent AI service")
        (throw e)))))
 
 (defn get-ai-service
   "Gets or creates an AI service. Uses a simple cache in nrepl-client-atom.
-   
+
    Args:
-   - nrepl-client-atom: Required nREPL client atom  
-   - model: Optional pre-built langchain model"
-  ([nrepl-client-atom] (get-ai-service nrepl-client-atom nil))
-  ([nrepl-client-atom model]
-   (or (::ai-service @nrepl-client-atom)
-       (when-let [ai (create-ai-service nrepl-client-atom model)]
-         (swap! nrepl-client-atom assoc ::ai-service ai)
-         ai))))
+   - tool: Map containing :nrepl-client-atom, :model, :memory and :tools"
+  [{:keys [nrepl-client-atom model memory tools] :as _tool}]
+  (or (::ai-service @nrepl-client-atom)
+      (when-let [ai (create-ai-service model memory tools)]
+        (swap! nrepl-client-atom assoc ::ai-service ai)
+        ai)))
 
 (defn dispatch-agent
   "Dispatches an agent with the given prompt. The agent will only have access to read tools.
    Returns a string response from the agent.
-   
+
    Args:
-   - context: Map containing :nrepl-client-atom and optional :model
+   - tool: Map containing agent configuration
    - prompt: String prompt to send to the agent"
-  [{:keys [nrepl-client-atom model]} prompt]
+  [{:keys [nrepl-client-atom working-directory context-config] :as tool} prompt]
   (if (string/blank? prompt)
     {:result "Error: Cannot process empty prompt"
      :error true}
-    (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
-      (if-let [ai-service (get-ai-service nrepl-client-atom model)]
-        ;; Clear memory for stateless behavior
-        (do
-          (reset-memory-if-needed! nrepl-client-atom
-                                   working-directory
-                                   (:memory ai-service)
-                                   (config/get-dispatch-agent-context @nrepl-client-atom))
-          (let [result (.chat (:service ai-service) prompt)]
-            {:result result
-             :error false}))
-        {:result "ERROR: No model configured for this agent."
-         :error true}))))
+    (if-let [ai-service (get-ai-service tool)]
+      (do
+        (reset-memory-if-needed! nrepl-client-atom
+                                 working-directory
+                                 (:memory ai-service)
+                                 context-config)
+        (let [result (.chat (:service ai-service) prompt)]
+          {:result result
+           :error false}))
+      {:result "ERROR: No model configured for this agent."
+       :error true})))
 
 (defn validate-dispatch-agent-inputs
   "Validates inputs for the dispatch-agent function"
