@@ -45,3 +45,12 @@
   (testing "allows nil start-nrepl-cmd"
     (let [result (config/process-config {} "/tmp")]
       (is (nil? (:start-nrepl-cmd result))))))
+
+(deftest parse-nrepl-port-dependency-test
+  (testing "parse-nrepl-port=true requires start-nrepl-cmd"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"parse-nrepl-port requires start-nrepl-cmd"
+         (config/process-config {:parse-nrepl-port true} "/tmp"))))
+  (testing "parse-nrepl-port=false does not require start-nrepl-cmd"
+    (is (map? (config/process-config {:parse-nrepl-port false} "/tmp")))))
