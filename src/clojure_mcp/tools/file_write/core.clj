@@ -2,24 +2,22 @@
   "Core implementation for the file-write tool.
    This namespace contains the pure functionality without any MCP-specific code."
   (:require
-   [clojure.java.io :as io]
-   [clojure.string :as string]
-   [clojure-mcp.tools.form-edit.pipeline :as pipeline]
-   [clojure-mcp.utils.diff :as diff-utils]
-   [clojure-mcp.linting :as linting]
-   [rewrite-clj.zip :as z]))
+    [clojure.java.io :as io]
+    [clojure-mcp.tools.form-edit.pipeline :as pipeline]
+    [clojure-mcp.utils.diff :as diff-utils]
+    [clojure-mcp.linting :as linting]
+    [clojure-mcp.utils.valid-paths :as valid-paths]
+    [rewrite-clj.zip :as z]))
 
-(defn is-clojure-file?
-  "Check if a file is a Clojure-related file based on its extension.
-   
-   Parameters:
-   - file-path: Path to the file to check
-   
-   Returns true if the file has a Clojure-related extension (.clj, .cljs, .cljc, .edn, .bb),
-   false otherwise."
-  [file-path]
-  (let [lower-path (string/lower-case file-path)]
-    (some #(string/ends-with? lower-path %) [".clj" ".cljs" ".cljc" ".edn" ".bb"])))
+  (defn is-clojure-file?
+    "Check if a file is a Clojure-related file based on its extension or Babashka shebang.
+
+     Parameters:
+     - file-path: Path to the file to check
+
+     Returns true for Clojure extensions (.clj, .cljs, .cljc, .edn, .bb) or files with a `bb` shebang."
+    [file-path]
+    (boolean (valid-paths/clojure-file? file-path)))
 
 (defn write-clojure-file
   "Write content to a Clojure file, with linting, formatting, and diffing.

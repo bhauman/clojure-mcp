@@ -82,24 +82,39 @@
 
     (validate-path path current-dir allowed-dirs)))
 
-(defn clojure-file?
-  "Checks if a file path has a Clojure-related extension.
-   
-   Supported extensions:
-   - .clj (Clojure)
-   - .cljs (ClojureScript)
-   - .cljc (Clojure/ClojureScript shared)
-   - .bb (Babashka)
-   - .edn (Extensible Data Notation)"
-  [file-path]
-  (when file-path
-    (let [lower-path (str/lower-case file-path)]
-      (or (str/ends-with? lower-path ".clj")
-          (str/ends-with? lower-path ".cljs")
-          (str/ends-with? lower-path ".cljc")
-          (str/ends-with? lower-path ".bb")
-          (str/ends-with? lower-path ".lpy")
-          (str/ends-with? lower-path ".edn")))))
+  (defn- babashka-shebang?
+    [file-path]
+    (when (path-exists? file-path)
+      (try
+        (with-open [r (io/reader file-path)]
+          (let [line (-> r line-seq first)]
+            (and line
+                 (or (str/starts-with? line "#!/usr/bin/env bb")
+                     (str/starts-with? line "#!/usr/bin/bb")
+                     (str/starts-with? line "#!/bin/bb")))))
+        (catch Exception _ false))))
+
+  (defn clojure-file?
+    "Checks if a file path has a Clojure-related extension or Babashka shebang."
+
+     Supported extensions:
+     - .clj (Clojure)
+     - .cljs (ClojureScript)
+     - .cljc (Clojure/ClojureScript shared)
+     - .bb (Babashka)
+     - .edn (Extensible Data Notation)
+     - .lpy (Librepl)
+     Also detects files starting with a Babashka shebang (`bb`)."
+    [file-path]
+    (when file-path
+      (let [lower-path (str/lower-case file-path)]
+        (or (str/ends-with? lower-path ".clj")
+            (str/ends-with? lower-path ".cljs")
+            (str/ends-with? lower-path ".cljc")
+            (str/ends-with? lower-path ".bb")
+            (str/ends-with? lower-path ".lpy")
+            (str/ends-with? lower-path ".edn")
+            (babashka-shebang? file-path)))))
 
 (defn extract-paths-from-bash-command
   "Extract file/directory paths from a bash command string.

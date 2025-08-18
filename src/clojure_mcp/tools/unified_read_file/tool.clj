@@ -30,11 +30,11 @@
  ;; Helper functions
 
 (defn collapsible-clojure-file?
-  "Determines if a file is a collapsible Clojure source file based on its extension."
+  "Determines if a file is a collapsible Clojure source file."
   [file-path]
   (when file-path
-    (let [extension (last (str/split file-path #"\."))]
-      (contains? #{"clj" "cljc" "cljs" "bb" "lpy"} extension))))
+    (and (valid-paths/clojure-file? file-path)
+         (not (str/ends-with? (str/lower-case file-path) ".edn")))))
 
 ;; Implement the required multimethods for the unified read file tool
 (defmethod tool-system/tool-name :unified-read-file [_]
