@@ -30,7 +30,7 @@
 (defn- validate-parse-nrepl-port-dependency
   "Validate that parse-nrepl-port has required start-nrepl-cmd"
   [parse-nrepl-port start-nrepl-cmd]
-  (when (and (some? parse-nrepl-port) (not start-nrepl-cmd))
+  (when (and parse-nrepl-port (not start-nrepl-cmd))
     (log/error "parse-nrepl-port requires start-nrepl-cmd to be set")
     (throw
      (ex-info
