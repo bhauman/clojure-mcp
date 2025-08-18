@@ -18,15 +18,27 @@
    Returns the port number as an integer, or nil if no valid port found.
    Valid ports are in range 1024-65535."
   [output]
-  (when output
-    (let [;; Extract all numbers from the output
-          all-numbers (re-seq #"\d+" output)
-          ;; Convert to integers and filter for valid port range
-          valid-ports (->> all-numbers
-                           (map #(try (Integer/parseInt %)
-                                      (catch NumberFormatException _ nil)))
-                           (filter #(and % (>= % 1024) (<= % 65535))))]
-      (first valid-ports))))
+  (let [s             (str output)
+        valid-port?   (fn [n] (and (<= 1024 n) (<= n 65535)))
+        parse-int     (fn [^String x]
+                        (try (Integer/parseInt x)
+                             (catch NumberFormatException _ nil)))
+        ;; Prefer explicit "port" or "nrepl" contexts
+        patterns      [#"(?i)\bnrepl[^\n\r]*?\bport\b[^\d]{0,20}(\d{4,5})\b"
+                       #"(?i)\bport\b[^\d]{0,20}(\d{4,5})\b"
+                       #"(?i)\bnrepl[^\n\r]*?(\d{4,5})\b"]
+        from-patterns (some (fn [re]
+                              (when-let [[_ p] (re-find re s)]
+                                (let [n (parse-int p)]
+                                  (when (and n (valid-port? n)) n))))
+                            patterns)]
+    (or from-patterns
+        ;; Fallback: choose the last plausible 4-5 digit number in range
+        (some->> (re-seq #"\d{4,5}" s)
+                 (map parse-int)
+                 (filter some?)
+                 (filter valid-port?)
+                 last))))
 
 (defn- read-available-output
   "Read available bytes from a stream without blocking.
