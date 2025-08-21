@@ -23,24 +23,23 @@
 
 (def text-like-mime-patterns
   "Regex patterns for MIME types that should be treated as text.
-   Limited to SQL, JSON, YAML, and XML formats that may not inherit 
-   from text/plain in the Apache Tika MediaType hierarchy."
-  [#"application/sql"
-   #"application/json"
-   #"application/.*xml"
-   #"application/.*yaml"])
+   Covers common text-based data formats used in projects that don't
+   inherit from text/plain in the Apache Tika MediaType hierarchy."
+  [#"^application/(sql|json|xml|(?:x-)?yaml)$"])
 
 (defn text-media-type?
   "Determines if a MIME type represents text content.
    Uses Apache Tika's type hierarchy plus additional patterns for
-   common text-based formats that don't inherit from text/plain."
+   common text-based formats that don't inherit from text/plain.
+   Handles invalid MIME strings gracefully."
   [mime]
-  (boolean
-   (or
-     ;; Check Apache Tika's type hierarchy
-    (.isInstanceOf registry (MediaType/parse mime) MediaType/TEXT_PLAIN)
-     ;; Check against additional text-like patterns
-    (some #(re-find % mime) text-like-mime-patterns))))
+  (let [s (some-> mime str)
+        text-according-to-tika-hierarchy?
+        (try
+          (.isInstanceOf registry (MediaType/parse s) MediaType/TEXT_PLAIN)
+          (catch IllegalArgumentException _ false))]
+    (boolean (or text-according-to-tika-hierarchy?
+                 (and s (some #(re-matches % s) text-like-mime-patterns))))))
 
 (defn image-media-type? [mime-or-media-type]
   (= "image" (.getType (MediaType/parse mime-or-media-type))))
