@@ -52,6 +52,22 @@
     (is (fc/text-media-type? "application/json; charset=utf-8"))
     (is (fc/text-media-type? "text/plain; charset=iso-8859-1")))
 
+  (testing "Case-insensitive MIME types per RFC 2045"
+    (is (fc/text-media-type? "APPLICATION/JSON"))
+    (is (fc/text-media-type? "Application/Json"))
+    (is (fc/text-media-type? "APPLICATION/SQL"))
+    (is (fc/text-media-type? "Application/Xml"))
+    (is (fc/text-media-type? "APPLICATION/YAML")))
+
+  (testing "Invalid MIME strings that cause MediaType/parse to return null"
+    (is (not (fc/text-media-type? "not/a/valid/mime")))
+    (is (not (fc/text-media-type? "text/")))
+    (is (not (fc/text-media-type? "/json")))
+    (is (not (fc/text-media-type? ";;;invalid")))
+    (is (not (fc/text-media-type? " ")))
+    (is (not (fc/text-media-type? "")))
+    (is (not (fc/text-media-type? nil))))
+
   (testing "Binary types are not recognized as text"
     (is (not (fc/text-media-type? "application/pdf")))
     (is (not (fc/text-media-type? "application/octet-stream")))
