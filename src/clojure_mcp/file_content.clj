@@ -33,7 +33,7 @@
    common text-based formats that don't inherit from text/plain.
    Handles invalid MIME strings gracefully."
   [mime]
-  (let [s (some-> mime str)
+  (let [s (some-> mime str str/lower-case)
         text-according-to-tika-hierarchy?
         (try
           (.isInstanceOf registry (MediaType/parse s) MediaType/TEXT_PLAIN)
