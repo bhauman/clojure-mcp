@@ -21,8 +21,26 @@
 (def ^MediaTypeRegistry registry
   (.getMediaTypeRegistry (MimeTypes/getDefaultMimeTypes)))
 
-(defn text-media-type? [mime]
-  (.isInstanceOf registry (MediaType/parse mime) MediaType/TEXT_PLAIN))
+(def text-like-mime-patterns
+  "Regex patterns for MIME types that should be treated as text.
+   Limited to SQL, JSON, YAML, and XML formats that may not inherit 
+   from text/plain in the Apache Tika MediaType hierarchy."
+  [#"application/sql"
+   #"application/json"
+   #"application/.*xml"
+   #"application/.*yaml"])
+
+(defn text-media-type?
+  "Determines if a MIME type represents text content.
+   Uses Apache Tika's type hierarchy plus additional patterns for
+   common text-based formats that don't inherit from text/plain."
+  [mime]
+  (boolean
+   (or
+     ;; Check Apache Tika's type hierarchy
+    (.isInstanceOf registry (MediaType/parse mime) MediaType/TEXT_PLAIN)
+     ;; Check against additional text-like patterns
+    (some #(re-find % mime) text-like-mime-patterns))))
 
 (defn image-media-type? [mime-or-media-type]
   (= "image" (.getType (MediaType/parse mime-or-media-type))))
@@ -90,5 +108,5 @@
       file-response->file-content)
 
   (should-be-file-response? "./dev/logback.xml")
-  
+
   (text-media-type? (mime-type (str->nio-path "hello.md"))))
