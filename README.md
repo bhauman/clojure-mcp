@@ -805,7 +805,7 @@ Personally I `source` them right in bash command:
 }
 ```
 
-> **Note**: The agent tools will work with any available API key. You don't need all three - just set up the ones you have access to. The tools will automatically select from available models. For now the ANTHROPIC API is limited to the displatch_agent.
+> **Note**: The agent tools will work with any available API key. You don't need all three - just set up the ones you have access to. The tools will automatically select from available models. For now the ANTHROPIC API is limited to the dispatch_agent.
 
 
 ## Learning Curve
@@ -1016,7 +1016,7 @@ Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: 
 - `true` - Best for maintaining consistent code style across your project
 - `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting
 
-#### `bash-over-nrepl`
+#### `:bash-over-nrepl`
 Boolean flag to control bash command execution mode (default: `true`). This setting determines whether bash commands are executed over the nREPL connection or locally on the MCP server.
 
 **Available values:**
