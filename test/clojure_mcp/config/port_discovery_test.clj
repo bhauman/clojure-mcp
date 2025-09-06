@@ -2,6 +2,7 @@
   "Comprehensive tests for port discovery configuration options"
   (:require
    [clojure.test :refer [deftest is testing]]
+   [clojure.java.io :as io]
    [clojure-mcp.config :as config]
    [clojure-mcp.core :as core]))
 
