@@ -63,7 +63,6 @@
     (is (= 7888
            (subprocess/start-nrepl-cmd-and-parse-port
             "echo 'nREPL server started on port 7888'"
-            "."
             5000)))))
 
 (deftest read-nrepl-port-file-test
@@ -124,7 +123,7 @@
 
         ;; Test coordination with rebound file path
         (binding [subprocess/*nrepl-port-file-path* (constantly (.getAbsolutePath temp-port-file))]
-          (let [result (subprocess/start-nrepl-and-read-port-file cmd temp-dir 10000)]
+          (let [result (subprocess/start-nrepl-and-read-port-file cmd 10000)]
             (is (= 9999 result))))
         (finally
           (when (.exists temp-port-file) (.delete temp-port-file))))))
@@ -140,7 +139,7 @@
 
         ;; Test that coordination removes it and creates fresh one
         (binding [subprocess/*nrepl-port-file-path* (constantly (.getAbsolutePath temp-port-file))]
-          (let [result (subprocess/start-nrepl-and-read-port-file cmd temp-dir 10000)]
+          (let [result (subprocess/start-nrepl-and-read-port-file cmd 10000)]
             (is (= 7777 result))))
         (finally
           (when (.exists temp-port-file) (.delete temp-port-file))))))
@@ -154,7 +153,7 @@
           (is (thrown-with-msg?
                clojure.lang.ExceptionInfo
                #"Timeout waiting for .nrepl-port file creation"
-               (subprocess/start-nrepl-and-read-port-file cmd temp-dir 1000))))
+               (subprocess/start-nrepl-and-read-port-file cmd 1000))))
         (finally
           (when (.exists temp-port-file) (.delete temp-port-file)))))))
 

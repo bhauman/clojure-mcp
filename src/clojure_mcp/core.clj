@@ -272,9 +272,7 @@
         parse-port (:parse-nrepl-port config)
         read-port-file (:read-nrepl-port-file config)
         ;; Only use parse-port if explicitly set to true
-        effective-parse-port (boolean parse-port)
-        ;; Compute working directory from project-dir
-        working-dir (:project-dir nrepl-config)]
+        effective-parse-port (boolean parse-port)]
 
     (cond
       ;; Port explicitly provided
@@ -287,7 +285,7 @@
       (and start-cmd read-port-file)
       (do
         (log/info "Both :start-nrepl-cmd and :read-nrepl-port-file enabled, coordinating")
-        (let [coordinated-port (subprocess/start-nrepl-and-read-port-file start-cmd working-dir)]
+        (let [coordinated-port (subprocess/start-nrepl-and-read-port-file start-cmd)]
           (log/info "Coordinated port discovery successful:" coordinated-port)
           (assoc nrepl-config :port coordinated-port)))
 
@@ -295,7 +293,7 @@
       (and start-cmd effective-parse-port)
       (do
         (log/info "Found :start-nrepl-cmd with :parse-nrepl-port enabled, executing command to discover nREPL port")
-        (let [discovered-port (subprocess/start-nrepl-cmd-and-parse-port start-cmd working-dir)]
+        (let [discovered-port (subprocess/start-nrepl-cmd-and-parse-port start-cmd)]
           (log/info "Discovered nREPL port:" discovered-port "from command:" start-cmd)
           (assoc nrepl-config :port discovered-port)))
 
@@ -311,7 +309,7 @@
       start-cmd
       (do
         (log/info "Found :start-nrepl-cmd but :parse-nrepl-port is disabled, executing command without port discovery")
-        (subprocess/start-nrepl-cmd start-cmd working-dir)
+        (subprocess/start-nrepl-cmd start-cmd)
         ;; Still need a port, so this will fail later if not provided
         (when-not (:port nrepl-config)
           (throw (ex-info "No :port specified and port discovery is disabled"

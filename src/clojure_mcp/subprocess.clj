@@ -18,15 +18,15 @@
    Returns the port number as an integer, or nil if no valid port found.
    Valid ports are in range 1024-65535."
   [output]
-  (let [s (str output)
-        valid-port? (fn [n] (and (<= 1024 n) (<= n 65535)))
-        parse-int (fn [^String x]
-                    (try (Integer/parseInt x)
-                         (catch NumberFormatException _ nil)))
+  (let [s             (str output)
+        valid-port?   (fn [n] (and (<= 1024 n) (<= n 65535)))
+        parse-int     (fn [^String x]
+                        (try (Integer/parseInt x)
+                             (catch NumberFormatException _ nil)))
         ;; Prefer explicit "port" or "nrepl" contexts
-        patterns [#"(?i)\bnrepl[^\n\r]*?\bport\b[^\d]{0,20}(\d{4,5})\b"
-                  #"(?i)\bport\b[^\d]{0,20}(\d{4,5})\b"
-                  #"(?i)\bnrepl[^\n\r]*?(\d{4,5})\b"]
+        patterns      [#"(?i)\bnrepl[^\n\r]*?\bport\b[^\d]{0,20}(\d{4,5})\b"
+                       #"(?i)\bport\b[^\d]{0,20}(\d{4,5})\b"
+                       #"(?i)\bnrepl[^\n\r]*?(\d{4,5})\b"]
         from-patterns (some (fn [re]
                               (when-let [[_ p] (re-find re s)]
                                 (let [n (parse-int p)]
@@ -137,27 +137,22 @@
 
    Parameters:
      cmd - Shell command string to execute
-     working-dir - Working directory for the command (optional)
 
    Returns:
      The running Process object
 
    Throws:
      Exception on command execution failure"
-  ([cmd] (start-nrepl-cmd cmd nil))
-  ([cmd working-dir]
-   (log/info "Starting :start-nrepl-cmd:" cmd (when working-dir (str "in directory: " working-dir)))
-   (try
-     (let [process-opts (cond-> {:out :pipe :err :pipe}
-                          working-dir (assoc :dir working-dir))]
-       (apply process/start process-opts (shell-cmd cmd)))
-     (catch Exception e
-       (log/error e "Failed to start :start-nrepl-cmd:" cmd)
-       (throw (ex-info "Command execution failed"
-                       {:cmd cmd
-                        :working-dir working-dir
-                        :cause (.getMessage e)}
-                       e))))))
+  [cmd]
+  (log/info "Starting :start-nrepl-cmd:" cmd)
+  (try
+    (apply process/start {:out :pipe :err :pipe} (shell-cmd cmd))
+    (catch Exception e
+      (log/error e "Failed to start :start-nrepl-cmd:" cmd)
+      (throw (ex-info "Command execution failed"
+                      {:cmd cmd
+                       :cause (.getMessage e)}
+                      e)))))
 
 (defn start-nrepl-cmd-and-parse-port
   "Start nREPL command and discover the port by parsing stdout.
@@ -167,7 +162,6 @@
 
    Parameters:
      cmd - Shell command string to execute
-     working-dir - Working directory for the command (optional)
      timeout-ms - Timeout in milliseconds (default 30000)
 
    Returns:
@@ -175,12 +169,11 @@
 
    Throws:
      Exception on any failure (command execution, timeout, port parsing)"
-  ([cmd] (start-nrepl-cmd-and-parse-port cmd nil))
-  ([cmd working-dir] (start-nrepl-cmd-and-parse-port cmd working-dir 30000))
-  ([cmd working-dir timeout-ms]
+  ([cmd] (start-nrepl-cmd-and-parse-port cmd 30000))
+  ([cmd timeout-ms]
    (log/info "Starting nREPL command with port parsing:" cmd)
    (try
-     (let [process (start-nrepl-cmd cmd working-dir)
+     (let [process (start-nrepl-cmd cmd)
            result (wait-for-port-in-output process timeout-ms)]
 
        (cond
@@ -194,19 +187,16 @@
            (log/error "Failed to discover nREPL port:" (:error result))
            (throw (ex-info "nREPL port discovery failed"
                            {:cmd cmd
-                            :working-dir working-dir
                             :error (:error result)})))
 
          :else
          (throw (ex-info "Unknown error during port discovery"
-                         {:cmd cmd
-                          :working-dir working-dir}))))
+                         {:cmd cmd}))))
 
      (catch Exception e
        (log/error e "Failed to start nREPL command and parse port:" cmd)
        (throw (ex-info "Command execution failed"
                        {:cmd cmd
-                        :working-dir working-dir
                         :cause (.getMessage e)}
                        e))))))
 
@@ -321,7 +311,6 @@
 
    Parameters:
      cmd - Shell command string to execute
-     working-dir - Working directory for the command (optional)
      timeout-ms - Timeout in milliseconds (default 30000)
 
    Returns:
@@ -329,9 +318,8 @@
 
    Throws:
      Exception on any failure"
-  ([cmd] (start-nrepl-and-read-port-file cmd nil))
-  ([cmd working-dir] (start-nrepl-and-read-port-file cmd working-dir 30000))
-  ([cmd working-dir timeout-ms]
+  ([cmd] (start-nrepl-and-read-port-file cmd 30000))
+  ([cmd timeout-ms]
    (let [port-file-path (*nrepl-port-file-path*)
          port-file (io/file port-file-path)
          start-time (System/currentTimeMillis)]
@@ -344,7 +332,7 @@
        (.delete port-file))
 
      ;; Step 2: Start the nREPL command
-     (let [process (start-nrepl-cmd cmd working-dir)]
+     (let [process (start-nrepl-cmd cmd)]
        (log/info "Started nREPL command, waiting for .nrepl-port file")
 
        ;; Step 3: Poll for fresh .nrepl-port file and read port
