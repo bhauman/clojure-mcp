@@ -16,94 +16,52 @@
       (log/warn "Bad file paths " (pr-str [dir path]))
       nil)))
 
-(defn- validate-config-value
-  "Validate a single config value with consistent error handling"
-  [key value validator error-msg]
-  (when (some? value)
-    (when-not (validator value)
-      (log/error "Invalid" key "value:" value "-" error-msg)
-      (throw
-       (ex-info
-        (str "Invalid Config: " key " value: " value " - " error-msg)
-        {key value})))))
-
-(defn- validate-parse-nrepl-port-dependency
-  "Validate that parse-nrepl-port has required start-nrepl-cmd"
-  [parse-nrepl-port start-nrepl-cmd]
-  (when (and (some? parse-nrepl-port) (not start-nrepl-cmd))
-    (log/error "parse-nrepl-port requires start-nrepl-cmd to be set")
-    (throw
-     (ex-info
-      "Invalid Config: parse-nrepl-port requires start-nrepl-cmd to be set"
-      {:parse-nrepl-port parse-nrepl-port
-       :start-nrepl-cmd start-nrepl-cmd}))))
-
-(defn working-dir [project-dir]
-  (let [ud (io/file (or project-dir (System/getProperty "user.dir")))]
+(defn process-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
+  (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
-    (.getCanonicalPath ud)))
+    (when (some? write-file-guard)
+      (when-not (contains? #{:full-read :partial-read false} write-file-guard)
+        (log/warn "Invalid write-file-guard value:" write-file-guard
+                  "- using default :partial-read")
+        (throw (ex-info (str "Invalid Config: write-file-guard value:  " write-file-guard
+                             "- must be one of (:full-read, :partial-read, false)")
+                        {:write-file-guard write-file-guard}))))
+    (cond-> config
+      user-dir (assoc :nrepl-user-dir (.getCanonicalPath ud))
+      true
+      (assoc :allowed-directories
+             (->> (cons user-dir allowed-directories)
+                  (keep #(relative-to user-dir %))
+                  distinct
+                  vec))
+      (some? (:emacs-notify config))
+      (assoc :emacs-notify (boolean (:emacs-notify config)))
+      (some? (:cljfmt config))
+      (assoc :cljfmt (boolean (:cljfmt config)))
+      (some? (:bash-over-nrepl config))
+      (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config)))
+      (some? (:nrepl-env-type config))
+      (assoc :nrepl-env-type (:nrepl-env-type config)))))
 
-(defn- validate-config!
-  [{:keys [write-file-guard
-           start-nrepl-cmd parse-nrepl-port read-nrepl-port-file]}]
-      ;; Validate all config values using helper functions
-  (validate-config-value :write-file-guard write-file-guard
-                         #(contains? #{:full-read :partial-read false} %)
-                         "must be one of (:full-read, :partial-read, false)")
-  (validate-config-value :start-nrepl-cmd start-nrepl-cmd
-                         string?
-                         "must be a string command")
-  (validate-config-value :parse-nrepl-port parse-nrepl-port
-                         boolean?
-                         "must be a boolean")
-  (validate-config-value :read-nrepl-port-file read-nrepl-port-file
-                         boolean?
-                         "must be a boolean")
-  (validate-parse-nrepl-port-dependency parse-nrepl-port start-nrepl-cmd))
-
-(defn process-config
-  "Processes raw config map by validating values and applying defaults.
-   Takes raw config map and user directory, returns processed config."
-  [{:keys [allowed-directories] :as config} user-dir]
-  (validate-config! config)
-  ;; Transform and return config
-  (let [processed-config (cond-> config
-                           user-dir (assoc :nrepl-user-dir user-dir)
-                           true
-                           (assoc :allowed-directories
-                                  (->> (cons user-dir allowed-directories)
-                                       (keep #(relative-to user-dir %))
-                                       distinct
-                                       vec))
-                           (some? (:emacs-notify config))
-                           (assoc :emacs-notify (boolean (:emacs-notify config)))
-                           (some? (:cljfmt config))
-                           (assoc :cljfmt (boolean (:cljfmt config)))
-                           (some? (:bash-over-nrepl config))
-                           (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config)))
-                           (some? (:nrepl-env-type config))
-                           (assoc :nrepl-env-type (:nrepl-env-type config)))]
-    (log/info "Processed config:" processed-config)
-    processed-config))
-
-(defn read-config-from-file
-  "Reads configuration from .clojure-mcp/config.edn in the given directory.
-   Reads the file directly from the filesystem and returns raw config map."
+(defn load-config
+  "Loads configuration from .clojure-mcp/config.edn in the given directory.
+   Reads the file directly from the filesystem."
   [cli-config-file user-dir]
   (let [config-file (if cli-config-file
                       (io/file cli-config-file)
                       (io/file user-dir ".clojure-mcp" "config.edn"))
         config (if (.exists config-file)
                  (try
-                   (log/info "Loading early config from:" config-file)
                    (edn/read-string (slurp config-file))
                    (catch Exception e
                      (log/warn e "Failed to read config file:" (.getPath config-file))
                      {}))
-                 {})]
+                 {})
+        processed-config (process-config config user-dir)]
     (log/info "Config file:" (.getPath config-file) "exists:" (.exists config-file))
     (log/info "Raw config:" config)
-    config))
+    (log/info "Processed config:" processed-config)
+    processed-config))
 
 (defn get-config [nrepl-client-map k]
   (get-in nrepl-client-map [::config k]))
@@ -361,3 +319,5 @@
    Uses set-config* to perform the actual update."
   [nrepl-client-atom k v]
   (swap! nrepl-client-atom set-config* k v))
+
+

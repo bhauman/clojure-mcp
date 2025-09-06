@@ -8,8 +8,7 @@
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
             [clojure-mcp.dialects :as dialects]
-            [clojure-mcp.file-content :as file-content]
-            [clojure-mcp.subprocess :as subprocess])
+            [clojure-mcp.file-content :as file-content])
   (:import [io.modelcontextprotocol.server.transport
             StdioServerTransportProvider]
            [io.modelcontextprotocol.server McpServer McpServerFeatures
@@ -237,117 +236,23 @@
 ;; Setting up a server
 ;; this could be in a new namespace
 
-(defn setup-config-in-client
-  "Processes already-loaded config and attaches it to nrepl-client-map.
-   Takes processed config map instead of loading it again."
-  [nrepl-client-map processed-config cli-env-type env-type]
-  (let [final-env-type (or cli-env-type
-                           (if (contains? processed-config :nrepl-env-type)
-                             (:nrepl-env-type processed-config)
-                             env-type))]
-    (assoc nrepl-client-map ::config/config (assoc processed-config :nrepl-env-type final-env-type))))
-
-(defn- resolve-nrepl-port
-  "Resolve nREPL port through various configured methods.
-
-   This function may start an nREPL server process if configured to do so.
-   It handles multiple port resolution strategies:
-   - Use explicitly provided port (no side effects)
-   - Start nREPL command and coordinate with .nrepl-port file
-   - Start nREPL command and parse port from stdout
-   - Read port from existing .nrepl-port file
-   - Start nREPL command without port parsing (backward compatibility)
-   
-   Parameters:
-     initial-config - The initial configuration map
-     early-config - Early loaded config for port discovery options
-   
-   Returns:
-     Updated config map with :port set
-   
-   Throws:
-     Exception if no port can be resolved"
-  [nrepl-config config]
-  (let [start-cmd (:start-nrepl-cmd config)
-        parse-port (:parse-nrepl-port config)
-        read-port-file (:read-nrepl-port-file config)
-        ;; Only use parse-port if explicitly set to true
-        effective-parse-port (boolean parse-port)]
-
-    (cond
-      ;; Port explicitly provided
-      (:port nrepl-config)
-      (do
-        (log/info "Using explicitly provided port:" (:port nrepl-config))
-        nrepl-config)
-
-      ;; Both start-nrepl-cmd and read-nrepl-port-file enabled - coordinate them
-      (and start-cmd read-port-file)
-      (do
-        (log/info "Both :start-nrepl-cmd and :read-nrepl-port-file enabled, coordinating")
-        (let [coordinated-port (subprocess/start-nrepl-and-read-port-file start-cmd)]
-          (log/info "Coordinated port discovery successful:" coordinated-port)
-          (assoc nrepl-config :port coordinated-port)))
-
-      ;; Use start-nrepl-cmd with port parsing
-      (and start-cmd effective-parse-port)
-      (do
-        (log/info "Found :start-nrepl-cmd with :parse-nrepl-port enabled, executing command to discover nREPL port")
-        (let [discovered-port (subprocess/start-nrepl-cmd-and-parse-port start-cmd)]
-          (log/info "Discovered nREPL port:" discovered-port "from command:" start-cmd)
-          (assoc nrepl-config :port discovered-port)))
-
-      ;; Read port from .nrepl-port file only
-      read-port-file
-      (do
-        (log/info "Reading nREPL port from .nrepl-port file")
-        (let [file-port (subprocess/read-nrepl-port-file)]
-          (log/info "Read nREPL port from file:" file-port)
-          (assoc nrepl-config :port file-port)))
-
-      ;; Fallback: start-nrepl-cmd without parsing (for backward compatibility)
-      start-cmd
-      (do
-        (log/info "Found :start-nrepl-cmd but :parse-nrepl-port is disabled, executing command without port discovery")
-        (subprocess/start-nrepl-cmd-and-parse-port start-cmd)
-        ;; Still need a port, so this will fail later if not provided
-        (when-not (:port nrepl-config)
-          (throw (ex-info "No :port specified and port discovery is disabled"
-                          {:config nrepl-config})))
-        nrepl-config)
-
-      ;; No port discovery options
-      :else
-      (do
-        (when-not (:port nrepl-config)
-          (throw (ex-info "No :port specified and no port discovery options configured"
-                          {:config nrepl-config})))
-        nrepl-config))))
-
-(defn- setup-environment
-  "Setup nREPL environment with config initialization.
-   Takes already-processed config to avoid duplicate config loading."
-  [nrepl-client-map processed-config cli-env-type project-dir]
-  (let [;; Detect environment type early
-        env-type (dialects/detect-nrepl-env-type nrepl-client-map)
-        nrepl-client-map-with-config (setup-config-in-client nrepl-client-map
-                                                             processed-config
-                                                             cli-env-type
-                                                             env-type)
-        nrepl-env-type' (config/get-config nrepl-client-map-with-config :nrepl-env-type)]
-    (log/debug "Initializing Clojure environment")
-    (dialects/initialize-environment nrepl-client-map-with-config nrepl-env-type')
-    (dialects/load-repl-helpers nrepl-client-map-with-config nrepl-env-type')
-    (log/debug "Environment initialized")
-    nrepl-client-map-with-config))
+(defn fetch-config [nrepl-client-map config-file cli-env-type env-type project-dir]
+  (let [user-dir (dialects/fetch-project-directory nrepl-client-map env-type project-dir)]
+    (when-not user-dir
+      (log/warn "Could not determine working directory")
+      (throw (ex-info "No project directory!!" {})))
+    (log/info "Working directory set to:" user-dir)
+    (let [config (config/load-config config-file user-dir)
+          final-env-type (or cli-env-type
+                             (if (contains? config :nrepl-env-type)
+                               (:nrepl-env-type config)
+                               env-type))]
+      (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))))
 
 (defn create-and-start-nrepl-connection
   "Convenience higher-level API function to create and initialize an nREPL connection.
    
    This function handles the complete setup process including:
-   - Checking for and executing :start-nrepl-cmd if configured with :parse-nrepl-port
-   - Reading port from .nrepl-port file if :read-nrepl-port-file is enabled
-   - Coordinating both options when used together to ensure file freshness
    - Creating the nREPL client connection
    - Starting the polling mechanism
    - Loading required namespaces and helpers (if Clojure environment)
@@ -355,25 +260,30 @@
    - Loading configuration
    
    Takes initial-config map with :port and optional :host, :project-dir, :nrepl-env-type, :config-file.
-   If port discovery options are configured, :port can be omitted and will be discovered.
    Returns the configured nrepl-client-map with ::config/config attached."
-  [{:keys [project-dir] :as nrepl-config} config]
-  (log/info "Creating nREPL connection with config:" nrepl-config)
+  [{:keys [project-dir config-file] :as initial-config}]
+  (log/info "Creating nREPL connection with config:" initial-config)
   (try
-    ;; Step 1: possibly start nrepl, and discover port
-    (let [final-config (resolve-nrepl-port nrepl-config config)
-
-          ;; Step 2: Create and start nREPL client
-          nrepl-client-map (nrepl/create (dissoc final-config :project-dir :nrepl-env-type))
-          cli-env-type (:nrepl-env-type config)]
-
-      (log/info "nREPL client map created")
-      (nrepl/start-polling nrepl-client-map)
-      (log/info "Started polling nREPL")
-
-      ;; Step 3: Setup environment using config
-      (setup-environment nrepl-client-map config cli-env-type project-dir))
-
+    (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type))
+          cli-env-type (:nrepl-env-type initial-config)
+          _ (do
+              (log/info "nREPL client map created")
+              (nrepl/start-polling nrepl-client-map)
+              (log/info "Started polling nREPL"))
+          ;; Detect environment type early
+          ;; TODO this needs to be sorted out
+          env-type (dialects/detect-nrepl-env-type nrepl-client-map)
+          nrepl-client-map-with-config (fetch-config nrepl-client-map
+                                                     config-file
+                                                     cli-env-type
+                                                     env-type
+                                                     project-dir)
+          nrepl-env-type' (config/get-config nrepl-client-map-with-config :nrepl-env-type)]
+      (log/debug "Initializing Clojure environment")
+      (dialects/initialize-environment nrepl-client-map-with-config nrepl-env-type')
+      (dialects/load-repl-helpers nrepl-client-map-with-config nrepl-env-type')
+      (log/debug "Environment initialized")
+      nrepl-client-map-with-config)
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
@@ -430,7 +340,8 @@
                             #(try (let [f (io/file %)]
                                     (and (.exists f) (.isFile f)))
                                   (catch Exception _ false))))
-(s/def ::nrepl-args (s/keys :opt-un [::port ::host ::config-file ::project-dir ::nrepl-env-type]))
+(s/def ::nrepl-args (s/keys :req-un [::port]
+                            :opt-un [::host ::config-file ::project-dir ::nrepl-env-type]))
 
 (def nrepl-client-atom (atom nil))
 
@@ -441,41 +352,19 @@
     (symbol? config-file)
     (assoc :config-file (str config-file))))
 
-(defn- validation-error
-  "Helper to throw validation errors with consistent logging"
-  [message data]
-  (println "Invalid configuration:" message)
-  (log/error "Invalid configuration:" message)
-  (throw (ex-info message data)))
-
-(defn- has-port-discovery?
-  "Check if valid port discovery options are configured"
-  [config]
-  (let [{:keys [start-nrepl-cmd parse-nrepl-port read-nrepl-port-file]} config]
-    (or (and start-nrepl-cmd parse-nrepl-port)
-        read-nrepl-port-file)))
-
 (defn validate-options
   "Validates the options map for build-and-start-mcp-server.
-   Throws an exception with spec explanation if validation fails.
-   :port is required unless one of the port discovery options is enabled in config:
-   - :start-nrepl-cmd with :parse-nrepl-port (must be explicitly set to true)
-   - :read-nrepl-port-file"
-  [opts config]
+   Throws an exception with spec explanation if validation fails."
+  [opts]
   (let [opts (coerce-options opts)]
-    ;; Validate against spec
-    (when-not (s/valid? ::nrepl-args opts)
-      (validation-error
-       "Invalid options for MCP server"
-       {:explanation (s/explain-str ::nrepl-args opts)
-        :spec-data (s/explain-data ::nrepl-args opts)}))
-
-    ;; Check port requirement
-    (when-not (or (:port opts) (has-port-discovery? config))
-      (validation-error
-       "No :port provided and no port discovery options enabled. Either provide :port, or configure one of: :start-nrepl-cmd with :parse-nrepl-port (true), or :read-nrepl-port-file (true)"
-       {:opts opts :config config}))
-    opts))
+    (if-not (s/valid? ::nrepl-args opts)
+      (let [explanation (s/explain-str ::nrepl-args opts)]
+        (println "Invalid options:" explanation)
+        (log/error "Invalid options:" explanation)
+        (throw (ex-info "Invalid options for MCP server"
+                        {:explanation explanation
+                         :spec-data (s/explain-data ::nrepl-args opts)})))
+      opts)))
 
 (defn build-and-start-mcp-server
   "Builds and starts an MCP server with the provided configuration.
@@ -509,13 +398,9 @@
                       make-prompts-fn
                       make-resources-fn]}]
   ;; the nrepl-args are a map with :port and optional :host
-  (let [working-dir (config/working-dir (:project-dir nrepl-args))
-        config (config/read-config-from-file
-                (:config-file nrepl-args)
-                working-dir)
-        nrepl-args (validate-options nrepl-args config)
-        config (config/process-config config working-dir)
-        nrepl-client-map (create-and-start-nrepl-connection nrepl-args config)
+  (let [nrepl-args (validate-options nrepl-args)
+        nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
+        working-dir (config/get-nrepl-user-dir nrepl-client-map)
         _ (reset! nrepl-client-atom nrepl-client-map)
         resources (when make-resources-fn
                     (doall (make-resources-fn nrepl-client-atom working-dir)))
