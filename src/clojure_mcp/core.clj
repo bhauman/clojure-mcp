@@ -446,6 +446,7 @@
 (defn- validation-error
   "Helper to throw validation errors with consistent logging"
   [message data]
+  (println "Invalid configuration:" message)
   (log/error "Invalid configuration:" message)
   (throw (ex-info message data)))
 
