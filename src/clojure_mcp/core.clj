@@ -309,7 +309,7 @@
       start-cmd
       (do
         (log/info "Found :start-nrepl-cmd but :parse-nrepl-port is disabled, executing command without port discovery")
-        (subprocess/start-nrepl-cmd start-cmd)
+        (subprocess/start-nrepl-cmd-and-parse-port start-cmd)
         ;; Still need a port, so this will fail later if not provided
         (when-not (:port nrepl-config)
           (throw (ex-info "No :port specified and port discovery is disabled"
