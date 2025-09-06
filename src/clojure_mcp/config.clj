@@ -39,11 +39,9 @@
        :start-nrepl-cmd start-nrepl-cmd}))))
 
 (defn working-dir [project-dir]
-  (let [ud (-> (io/file (or project-dir (System/getProperty "user.dir")))
-               (.getCanonicalPath))]
-    (assert (and (.isAbsolute (io/file ud))
-                 (.isDirectory (io/file ud))))
-    ud))
+  (let [ud (io/file (or project-dir (System/getProperty "user.dir")))]
+    (assert (and (.isAbsolute ud) (.isDirectory ud)))
+    (.getCanonicalPath ud)))
 
 (defn- validate-config!
   [{:keys [write-file-guard
