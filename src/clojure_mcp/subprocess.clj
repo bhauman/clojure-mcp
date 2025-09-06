@@ -117,8 +117,7 @@
           (let [{:keys [stdout stderr]} (collect-process-output process)
                 updated-stdout (str collected-stdout stdout)
                 updated-stderr (str collected-stderr stderr)]
-            (if-let [port (and (seq stdout)
-                               (parse-port-from-output updated-stdout))]
+            (if-let [port (and (seq stdout) (parse-port-from-output stdout))]
               {:port port}
               (do
                 (Thread/sleep 100)
