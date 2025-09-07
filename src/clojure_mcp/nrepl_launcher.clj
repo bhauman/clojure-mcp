@@ -76,44 +76,55 @@
     process))
 
 (defn wait-for-port
-  "Monitor process output for port information.
-   Returns port number when found or nil on timeout."
+  "Monitor process stdout for port information.
+   Returns port number when found or nil on timeout.
+   Uses non-blocking buffer reads to accumulate all available output."
   [^Process process timeout-ms parse-port?]
   (if-not parse-port?
     (do
       (log/info "Port parsing disabled, skipping port discovery")
       nil)
-    (let [^BufferedReader stdout-reader (io/reader (.inputReader process))
-          ^BufferedReader stderr-reader (io/reader (.errorReader process))
+    (let [input-stream (.getInputStream process)
+          reader (io/reader input-stream)
           start-time (System/currentTimeMillis)
-          port-atom (atom nil)]
+          buffer (StringBuilder.)
+          char-buffer (char-array 1024)]
       (try
         (loop []
           (when (< (- (System/currentTimeMillis) start-time) timeout-ms)
-            (if-let [line (or (.readLine stdout-reader)
-                             (.readLine stderr-reader))]
-              (do
-                (log/debug "Process output:" line)
-                (when-let [port (parse-port-from-output line)]
-                  (log/info (str "Discovered nREPL port: " port))
-                  (reset! port-atom port))
-                (if @port-atom
-                  @port-atom
+            ;; Check if data is available to read from the underlying stream
+            (let [available-bytes (.available input-stream)]
+              (if (> available-bytes 0)
+                ;; Read available data into buffer
+                (let [chars-read (.read reader char-buffer 0 (min 1024 available-bytes))]
+                  (when (> chars-read 0)
+                    (.append buffer char-buffer 0 chars-read)
+                    (log/debug "Read" chars-read "chars, buffer now contains:" (str buffer))
+                    ;; Check accumulated buffer for port
+                    (if-let [port (parse-port-from-output (str buffer))]
+                      (do
+                        (log/info (str "Discovered nREPL port: " port))
+                        port)
+                      ;; No port found yet, continue accumulating
+                      (do
+                        (Thread/sleep 10)
+                        (recur)))))
+                ;; No data available, check if process is still alive
+                (if (.isAlive process)
                   (do
                     (Thread/sleep 100)
-                    (recur))))
-              (if (.isAlive process)
-                (do
-                  (Thread/sleep 100)
-                  (recur))
-                (do
-                  (log/warn "Process exited before port was discovered")
-                  nil)))))
+                    (recur))
+                  ;; Process exited, check final buffer content
+                  (if-let [port (parse-port-from-output (str buffer))]
+                    (do
+                      (log/info (str "Discovered nREPL port from final buffer: " port))
+                      port)
+                    (do
+                      (log/warn "Process exited before port was discovered")
+                      nil)))))))
         (catch Exception e
           (log/error e "Error reading process output")
-          nil)
-        (finally
-          @port-atom)))))
+          nil)))))
 
 (defn start-nrepl-process
   "Start an nREPL server process using the provided command.
