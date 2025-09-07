@@ -8,7 +8,8 @@
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
             [clojure-mcp.dialects :as dialects]
-            [clojure-mcp.file-content :as file-content])
+            [clojure-mcp.file-content :as file-content]
+            [clojure-mcp.nrepl-launcher :as nrepl-launcher])
   (:import [io.modelcontextprotocol.server.transport
             StdioServerTransportProvider]
            [io.modelcontextprotocol.server McpServer McpServerFeatures
@@ -321,6 +322,10 @@
     (when-let [client @nrepl-client-atom]
       (log/info "Stopping nREPL polling")
       (nrepl/stop-polling client)
+      ;; Clean up auto-started nREPL process if present
+      (when-let [nrepl-process (:nrepl-process client)]
+        (log/info "Cleaning up auto-started nREPL process")
+        (nrepl-launcher/destroy-nrepl-process nrepl-process))
       (when-let [mcp-server (:mcp-server client)]
         (log/info "Closing MCP server gracefully")
         (.closeGracefully mcp-server)
@@ -340,8 +345,12 @@
                             #(try (let [f (io/file %)]
                                     (and (.exists f) (.isFile f)))
                                   (catch Exception _ false))))
-(s/def ::nrepl-args (s/keys :req-un [::port]
-                            :opt-un [::host ::config-file ::project-dir ::nrepl-env-type]))
+(s/def ::start-nrepl-cmd (s/or :string string?
+                               :vector (s/coll-of string? :kind vector?)))
+(s/def ::parse-nrepl-port boolean?)
+(s/def ::nrepl-args (s/keys :req-un []
+                            :opt-un [::port ::host ::config-file ::project-dir ::nrepl-env-type
+                                    ::start-nrepl-cmd ::parse-nrepl-port]))
 
 (def nrepl-client-atom (atom nil))
 
@@ -366,8 +375,10 @@
                          :spec-data (s/explain-data ::nrepl-args opts)})))
       opts)))
 
-(defn build-and-start-mcp-server
-  "Builds and starts an MCP server with the provided configuration.
+(defn build-and-start-mcp-server-impl
+  "Internal implementation of MCP server startup.
+   
+   Builds and starts an MCP server with the provided configuration.
    
    This is the main entry point for creating custom MCP servers. It handles:
    - Validating input options
@@ -398,10 +409,15 @@
                       make-prompts-fn
                       make-resources-fn]}]
   ;; the nrepl-args are a map with :port and optional :host
-  (let [nrepl-args (validate-options nrepl-args)
+  ;; Note: validation should be done by caller
+  (let [_ (assert (:port nrepl-args) "Port must be provided for build-and-start-mcp-server-impl")
         nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        _ (reset! nrepl-client-atom nrepl-client-map)
+        ;; Store nREPL process (if auto-started) in client map for cleanup
+        nrepl-client-with-process (if-let [process (:nrepl-process nrepl-args)]
+                                    (assoc nrepl-client-map :nrepl-process process)
+                                    nrepl-client-map)
+        _ (reset! nrepl-client-atom nrepl-client-with-process)
         resources (when make-resources-fn
                     (doall (make-resources-fn nrepl-client-atom working-dir)))
         tools (when make-tools-fn
@@ -423,3 +439,44 @@
         (add-prompt mcp prompt)))
     (swap! nrepl-client-atom assoc :mcp-server mcp)
     nil))
+
+(defn build-and-start-mcp-server
+  "Builds and starts an MCP server with optional automatic nREPL startup.
+   
+   This function wraps build-and-start-mcp-server-impl with nREPL auto-start capability.
+   
+   If auto-start conditions are met (see nrepl-launcher/should-start-nrepl?), it will:
+   1. Start an nREPL server process using :start-nrepl-cmd
+   2. Parse the port from process output (if :parse-nrepl-port is true)
+   3. Pass the discovered port to the main MCP server setup
+   
+   Otherwise, it requires a :port parameter.
+   
+   Args:
+   - nrepl-args: Map with connection settings and optional nREPL start
+     configuration
+     - :port (required if not auto-starting) - nREPL server port
+     - :host (optional) - nREPL server host (defaults to localhost)  
+     - :project-dir (optional) - Root directory for the project
+     - :start-nrepl-cmd (optional) - Command to start nREPL server
+     - :parse-nrepl-port (optional) - Parse port from command output (default true)
+   
+   - config: Map with factory functions (same as
+     build-and-start-mcp-server-impl)
+   
+   Auto-start conditions (must satisfy ONE):
+   1. Both :start-nrepl-cmd AND :project-dir provided in nrepl-args
+   2. Current directory contains .clojure-mcp/config.edn with :start-nrepl-cmd
+   
+   Returns: nil"
+  [nrepl-args config]
+  (let [validated-args (validate-options nrepl-args)
+        args-with-port (nrepl-launcher/maybe-start-nrepl-process
+                        validated-args)]
+    ;; Ensure we have a port after auto-start or validation
+    (when-not (:port args-with-port)
+      (throw
+       (ex-info
+        "No nREPL port available - either provide :port or configure auto-start"
+        {:provided-args nrepl-args})))
+    (build-and-start-mcp-server-impl args-with-port config)))
