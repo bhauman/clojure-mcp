@@ -41,8 +41,17 @@
       (log/info "Terminating auto-started nREPL process")
       (.destroy process)
       ;; Give it a moment to shutdown gracefully
-      (when (.waitFor process 3 TimeUnit/SECONDS)
-        (log/info "nREPL process terminated gracefully"))
+      (if (.waitFor process 3 TimeUnit/SECONDS)
+        (log/info "nREPL process terminated gracefully")
+        ;; Process didn't terminate within timeout - force kill
+        (do
+          (log/warn "nREPL process did not terminate within timeout, forcing termination")
+          (try
+            (.destroyForcibly process)
+            (.waitFor process 2 TimeUnit/SECONDS)
+            (log/info "nREPL process force-terminated")
+            (catch Exception e
+              (log/error e "Failed to force-terminate nREPL process")))))
       (catch Exception e
         (log/warn e "Error while terminating nREPL process")
         ;; Force kill if graceful termination failed

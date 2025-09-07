@@ -152,7 +152,44 @@
       ;; Create a mock process-like object
       (let [mock-process (proxy [java.lang.Process] []
                            (isAlive [] false))]
-        (is (nil? (launcher/destroy-nrepl-process mock-process))))))
+        (is (nil? (launcher/destroy-nrepl-process mock-process)))))
+    
+    (testing "handles process that terminates gracefully"
+      ;; Mock process that terminates within timeout
+      (let [destroy-called (atom false)
+            wait-for-called (atom false)
+            mock-process (proxy [java.lang.Process] []
+                           (isAlive [] true)
+                           (destroy []
+                             (reset! destroy-called true))
+                           (waitFor [timeout unit]
+                             (reset! wait-for-called true)
+                             true))]  ; Returns true - process terminated
+        (launcher/destroy-nrepl-process mock-process)
+        (is @destroy-called "destroy should be called")
+        (is @wait-for-called "waitFor should be called")))
+    
+    (testing "handles timeout and forces termination"
+      ;; Mock process that doesn't terminate within timeout
+      (let [destroy-called (atom false)
+            destroy-forcibly-called (atom false)
+            wait-for-count (atom 0)
+            mock-process (proxy [java.lang.Process] []
+                           (isAlive [] true)
+                           (destroy []
+                             (reset! destroy-called true))
+                           (destroyForcibly []
+                             (reset! destroy-forcibly-called true)
+                             this)  ; Return self as Process does
+                           (waitFor [timeout unit]
+                             (swap! wait-for-count inc)
+                             (if (= 1 @wait-for-count)
+                               false  ; First call returns false (timeout)
+                               true)))]  ; Second call returns true
+        (launcher/destroy-nrepl-process mock-process)
+        (is @destroy-called "destroy should be called for graceful termination")
+        (is @destroy-forcibly-called "destroyForcibly should be called after timeout")
+        (is (= 2 @wait-for-count) "waitFor should be called twice"))))
   
   (testing "setup-process-cleanup"
     (testing "handles nil process gracefully"
