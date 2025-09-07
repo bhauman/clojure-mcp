@@ -41,21 +41,21 @@
       (is (not (launcher/should-start-nrepl?
                 {:port 7888})))
       (is (not (launcher/should-start-nrepl?
-                {:port 7888 :start-nrepl-cmd "lein repl"}))))
+                {:port 7888 :start-nrepl-cmd ["lein" "repl"]}))))
     
     (testing "returns true for CLI condition: both start-nrepl-cmd and project-dir"
-      (is (launcher/should-start-nrepl? {:start-nrepl-cmd "lein repl :headless"
+      (is (launcher/should-start-nrepl? {:start-nrepl-cmd ["lein" "repl" ":headless"]
                                          :project-dir     "/tmp/test"})))
     
     (testing "returns false when only one CLI parameter provided"
-      (is (not (launcher/should-start-nrepl? {:start-nrepl-cmd "lein repl"})))
+      (is (not (launcher/should-start-nrepl? {:start-nrepl-cmd ["lein" "repl"]})))
       (is (not (launcher/should-start-nrepl? {:project-dir "/tmp/test"}))))
     
     (testing "returns false for empty args"
       (is (not (launcher/should-start-nrepl? {}))))
     
     (testing "allows auto-start when both start-nrepl-cmd and port provided"
-      (is (launcher/should-start-nrepl? {:start-nrepl-cmd "lein repl :headless"
+      (is (launcher/should-start-nrepl? {:start-nrepl-cmd ["lein" "repl" ":headless"]
                                          :project-dir     "/tmp/test"
                                          :port            7888})))
     
@@ -81,10 +81,10 @@
       (testing "loads config when file exists"
         (try
           (.mkdir config-dir)
-          (spit config-file "{:start-nrepl-cmd \"lein repl :headless\" :parse-nrepl-port true}")
+          (spit config-file "{:start-nrepl-cmd [\"lein\" \"repl\" \":headless\"] :parse-nrepl-port true}")
           
           (let [config (launcher/load-config-if-exists (.getPath temp-dir))]
-            (is (= "lein repl :headless" (:start-nrepl-cmd config)))
+            (is (= ["lein" "repl" ":headless"] (:start-nrepl-cmd config)))
             (is (true? (:parse-nrepl-port config))))
           
           (finally
@@ -101,7 +101,7 @@
         (is (= args (launcher/maybe-start-nrepl-process args)))))
     
     (testing "returns unchanged args when port already provided"
-      (let [args {:port 7888 :start-nrepl-cmd "lein repl"}]
+      (let [args {:port 7888 :start-nrepl-cmd ["lein" "repl"]}]
         (is (= args (launcher/maybe-start-nrepl-process args)))))
     
     ;; Note: Testing actual process startup would require integration tests
@@ -117,7 +117,7 @@
            clojure.lang.ExceptionInfo
            #"When :parse-nrepl-port is false, :port must be provided"
            (launcher/maybe-start-nrepl-process
-            {:start-nrepl-cmd  "lein repl :headless"
+            {:start-nrepl-cmd  ["lein" "repl" ":headless"]
              :project-dir      "/tmp/test"
              :parse-nrepl-port false}))))
     
@@ -125,7 +125,7 @@
       ;; This would normally try to start a process, but since we're just
       ;; testing validation, we can't easily mock the process startup in unit
       ;; tests We'll test that it doesn't throw the validation error at least
-      (let [args {:start-nrepl-cmd "echo test"  ; Use a safe command
+      (let [args {:start-nrepl-cmd ["echo" "test"]  ; Use a safe command
                   :project-dir "/tmp"  
                   :parse-nrepl-port false
                   :port 7888}]

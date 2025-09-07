@@ -345,8 +345,7 @@
                             #(try (let [f (io/file %)]
                                     (and (.exists f) (.isFile f)))
                                   (catch Exception _ false))))
-(s/def ::start-nrepl-cmd (s/or :string string?
-                               :vector (s/coll-of string? :kind vector?)))
+(s/def ::start-nrepl-cmd (s/coll-of string? :kind vector?))
 (s/def ::parse-nrepl-port boolean?)
 (s/def ::nrepl-args (s/keys :req-un []
                             :opt-un [::port ::host ::config-file ::project-dir ::nrepl-env-type
