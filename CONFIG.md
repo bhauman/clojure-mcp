@@ -1,14 +1,14 @@
 # Clojure-MCP Configuration
 
-While the initial alpha-release of clojure-mcp might have required rolling your own custom
-MCP server, recent releases allow for much more configuration to be done via a configuration file.
+If you want to tweak the operation of clojure-mcp but do not want to customize your own server,
+you can now control most settings via a configuration file.
 
 The default location for the configuration file is `.clojure-mcp/config.edn`. This, of course,
-can be configured as well.
+is also configurable.
 
 ## Core Configuration
 
-These basic settings globally affect how clojure-mcp interacts with your local system.
+These basic settings affect how clojure-mcp interacts with your local system.
 
 #### `:allowed-directories`
 Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute.
@@ -102,24 +102,41 @@ Much of the behavior of clojure-mcp is exposed as components. These include reso
 
 #### Resources
 
+Configured under the `:resources` key.
+
 Resources include files and other content you want to use with clojure-mcp.
-The standard guide for creating resources in MCP. Resources provide read-only content like documentation, configuration files, or project information. This same approach works whether you're using ClojureMCP or creating standalone resources.
+Resources provide read-only content like documentation, configuration files, or project information. This same approach works whether you're using ClojureMCP or creating standalone resources.
 
 [Configuring Resources](doc/configuring-resources.md)
 
 #### Prompts
 
+Configured under the `:prompts` key.
+
 You can add your own prompts to clojure-mcp, then call them as-needed by name.
-The standard guide for creating prompts in MCP. Prompts generate conversation contexts to help AI assistants understand specific tasks or workflows. This same approach works whether you're using ClojureMCP or creating standalone prompts.
+Prompts generate conversation contexts to help AI assistants understand specific tasks or workflows. This same approach works whether you're using ClojureMCP or creating standalone prompts.
 
 [Creating Prompts](doc/creating-prompts.md)
 
 #### Models
 
+Configured under the `:models` key.
+
 You may want to use different models than provided by default.
 Configure custom LLM models with your own API keys, endpoints, and parameters. Support for OpenAI, Anthropic, Google Gemini, and more through the LangChain4j integration.
 
 [Model Configuration](doc/model-configuration.md)
+
+#### Agents
+
+Configured under the `:agents` key.
+
+TBD
+
+#### Tools Configuration
+
+Configured under the `:tools-config` key.
+
 
 #### Component Filtering
 
