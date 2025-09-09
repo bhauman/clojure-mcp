@@ -2,8 +2,9 @@
 
 (ns clj-mcp.repl-tools
   "Namespace containing helper functions for REPL-driven development"
-  (:require [clojure.string :as str]
-            [clojure.pprint :as pprint]))
+  (:require [clojure.pprint :as pprint]
+            [clojure.spec.alpha :as s]
+            [clojure.string :as str]))
 
 ;; Namespace exploration
 (defn list-ns
@@ -52,10 +53,23 @@
         (println (str "  Arguments: " arglists)))
       (when-let [added (:added m)]
         (println (str "  Added in: " added)))
+      (when-let [fn-spec (s/get-spec (symbol v))]
+        (println "  Function Spec: " (with-out-str (pprint/pprint (s/describe fn-spec)))))
       (when-let [deprecated (:deprecated m)]
         (println (str "  DEPRECATED: " deprecated)))
       (println (str "-------------------------")))
     (println (str "Error: Symbol not found: " sym)))
+  nil)
+
+(defn doc-namespace
+  "Show documentation for a namespace. Accepts symbol or string."
+  [sym]
+  (if-let [ns (find-ns (if (symbol? sym) sym (symbol sym)))]
+    (let [m (meta ns)]
+      (println (str "-------------------------"))
+      (println (str (name sym) " - " (or (:doc m) "No documentation")))
+      (println (str "-------------------------")))
+    (println (str "Error: Namespace not found: " sym)))
   nil)
 
 (defn source-symbol
@@ -63,15 +77,40 @@
   [sym]
   (if-let [v (resolve (if (symbol? sym) sym (symbol sym)))]
     (if-let [source-fn (resolve 'clojure.repl/source-fn)]
-      (source-fn (symbol (str (-> v meta :ns)) (str (-> v meta :name))))
+      (println (source-fn (symbol v)))
       (println "Error: clojure.repl/source-fn not available"))
     (println (str "Error: Symbol not found: " sym)))
   nil)
 
+(defn describe-spec
+  "Show detailed information about a keyword/symbol/var `spec`."
+  [spec]
+  (if-let [spec-form (s/get-spec spec)]
+    (do
+      (println (str "-------------------------"))
+      (println (str "Spec: " spec))
+      (pprint/pprint (s/describe spec-form))
+      (println (str "-------------------------")))
+    (println (str "Error: Spec not found: " spec)))
+  nil)
+
 (defn find-symbols
-  "Find symbols matching the given pattern across all namespaces."
+  "Find symbols matching the given pattern across all namespaces.
+   Pattern can be a string (for substring matching) or a regex pattern.
+   Matches against both namespace and symbol name in the format 'namespace/symbol'."
   [pattern]
-  (let [matches (sort (map str (clojure.repl/apropos pattern)))]
+  (let [match-fn (cond
+                   (instance? java.util.regex.Pattern pattern)
+                   #(re-find pattern %)
+                   :else
+                   #(str/includes? % (str pattern)))
+
+        matches (sort (for [ns (all-ns)
+                            :let [ns-name (str (ns-name ns))]
+                            [sym-name] (ns-publics ns)
+                            :let [qualified-name (str ns-name "/" (name sym-name))]
+                            :when (match-fn qualified-name)]
+                        qualified-name))]
     (println (str "Symbols matching '" pattern "':"))
     (doseq [sym matches]
       (println (str "  " sym)))
@@ -90,7 +129,7 @@
           ;; Exact namespace match - return all vars in that namespace
           exact-ns
           (map #(str exact-ns "/" %)
-               (map name (keys (ns-publics (find-ns (symbol exact-ns))))))
+            (map name (keys (ns-publics (find-ns (symbol exact-ns))))))
 
           ;; Namespace prefix - return matching namespaces
           (and (not has-ns) (some #(.startsWith ^String % prefix) all-ns-strs))
@@ -111,9 +150,9 @@
           :else
           (sort (distinct (mapcat (fn [ns]
                                     (let [matching-symbols (filter #(.startsWith ^String (name %) prefix)
-                                                                   (keys (ns-publics ns)))]
+                                                             (keys (ns-publics ns)))]
                                       (map name matching-symbols)))
-                                  (all-ns)))))]
+                            (all-ns)))))]
     (println (str "Completions for '" prefix "':"))
     (doseq [m (sort matches)]
       (println (str "  " m)))
@@ -127,7 +166,9 @@
   (println "  clj-mcp.repl-tools/list-ns           - List all available namespaces")
   (println "  clj-mcp.repl-tools/list-vars         - List all vars in namespace")
   (println "  clj-mcp.repl-tools/doc-symbol        - Show documentation for symbol")
+  (println "  clj-mcp.repl-tools/doc-namespace     - Show documentation for a namespace")
   (println "  clj-mcp.repl-tools/source-symbol     - Show source code for symbol")
+  (println "  clj-mcp.repl-tools/describe-spec     - Show detailed information about spec")
   (println "  clj-mcp.repl-tools/find-symbols      - Find symbols matching pattern")
   (println "  clj-mcp.repl-tools/complete          - Find completions for prefix")
   (println "  clj-mcp.repl-tools/help              - Show this help message")
@@ -136,8 +177,11 @@
   (println "  (clj-mcp.repl-tools/list-ns)                     ; List all namespaces")
   (println "  (clj-mcp.repl-tools/list-vars 'clojure.string)   ; List functions in clojure.string")
   (println "  (clj-mcp.repl-tools/doc-symbol 'map)             ; Show documentation for map")
+  (println "  (clj-mcp.repl-tools/doc-namespace 'clojure.repl) ; Show documentation for a namespace")
   (println "  (clj-mcp.repl-tools/source-symbol 'map)          ; Show source code for map")
-  (println "  (clj-mcp.repl-tools/find-symbols \"seq\")          ; Find symbols containing \"seq\"")
+  (println "  (clj-mcp.repl-tools/describe-spec :my/spec)      ; Show detailed information about a clojure spec")
+  (println "  (clj-mcp.repl-tools/find-symbols \"seq\")          ; Find symbols containing \"seq\" (namespace/symbol)")
+  (println "  (clj-mcp.repl-tools/find-symbols #\".*math.*\")    ; Find symbols matching regex pattern")
   (println "  (clj-mcp.repl-tools/complete \"clojure.string/j\") ; Find completions for prefix")
   (println)
   (println "For convenience, you can require the namespace with an alias:")
