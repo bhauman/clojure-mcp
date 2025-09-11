@@ -181,7 +181,7 @@ advantages:
 
 #### Enhanced Clojure Integration
 - **Smart file editing** with automatic parenthesis balancing, linting, and formatting
-- **Structure-aware operations** that understand Clojure syntax and semantics  
+- **Structure-aware operations** that understand Clojure syntax and semantics
 - **REPL-integrated development** with stateful namespace management
 
 #### Stateful File Tracking
@@ -240,8 +240,8 @@ Setting up ClojureMCP can be challenging as it is currently in alpha and not opt
 1. **Configure nREPL**: Set up and verify an nREPL server on port `7888` in your project
 2. **Install ClojureMCP**: Add `clojure-mcp` to your `~/.clojure/deps.edn`
 3. **Configure MCP Client**: Set up `clojure-mcp` as an MCP server in Claude Desktop or other MCP clients
-4. **Install Riggrep (Optional)**: [ripgrep](https://github.com/BurntSushi/ripgrep#installation) is a smart, fast file search tool that respects `.gitignore`. 
-   
+4. **Install Riggrep (Optional)**: [ripgrep](https://github.com/BurntSushi/ripgrep#installation) is a smart, fast file search tool that respects `.gitignore`.
+
 > **Note**: This setup verifies that all components work together. You can customize specific configuration details (like port numbers) after confirming the basic setup works.
 
 ## Step 1: Configure Your Target Project's nREPL Connection
@@ -258,7 +258,7 @@ Add an `:nrepl` alias to your project's `deps.edn`:
   :aliases {
     ;; nREPL server for AI to connect to
     ;; Include all paths you want available for development
-    :nrepl {:extra-paths ["test"] 
+    :nrepl {:extra-paths ["test"]
             :extra-deps {nrepl/nrepl {:mvn/version "1.3.1"}}
 			;; this allows nrepl to interrupt runaway repl evals
             :jvm-opts ["-Djdk.attach.allowAttachSelf"]
@@ -286,8 +286,8 @@ $ lein repl :headless :port 7888
 Add `clojure-mcp` as an alias in your `~/.clojure/deps.edn`:
 
 ```clojure
-{:aliases 
-  {:mcp 
+{:aliases
+  {:mcp
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
             com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
                                      :git/tag "v0.1.8-alpha"
@@ -334,7 +334,7 @@ This means `clojure-mcp` couldn't connect to your nREPL server. Ensure:
 - The nREPL server is running
 - The port numbers match (default: 7888)
 
-**Extraneous Output**: 
+**Extraneous Output**:
 If you see output other than JSON-RPC messages, it's likely due to `clojure-mcp` being included in a larger environment. Ensure `clojure-mcp` runs with its own isolated dependencies.
 
 ### Important Notes
@@ -404,7 +404,7 @@ Create or edit `~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 3. **Verify Connection**: In Claude Desktop, click the `+` button in the chat area. You should see "Add from clojure-mcp" in the menu. It's important to note that it may take a few moments for this to show up.
 
-4. If there was an error please see the [Troubleshooting Tips](#troubleshooting-tips). If it connected go see the [Starting a new conversation](#starting-a-new-conversation) section. 
+4. If there was an error please see the [Troubleshooting Tips](#troubleshooting-tips). If it connected go see the [Starting a new conversation](#starting-a-new-conversation) section.
 
 ## Troubleshooting Tips
 
@@ -529,7 +529,7 @@ Iterate on that a bit then have it either:
 A. code and validate the idea in the REPL.
 
 > Don't underestimate LLMs abilities to use the REPL! Current LLMs are
-> absolutely fantastic at using the Clojure REPL. 
+> absolutely fantastic at using the Clojure REPL.
 
 B. ask the LLM to make the changes to the source code and then have it validate the code in the REPL after file editing.
 
@@ -581,8 +581,8 @@ This workflow creates a virtuous cycle where each session builds on the accumula
 
 The Clojure MCP server provides a pair of prompts that enable
 conversation continuity across chat sessions using the `scratch_pad`
-tool. By default, data is stored **in memory only** for the current session. 
-To persist summaries across server restarts, you must enable scratch pad 
+tool. By default, data is stored **in memory only** for the current session.
+To persist summaries across server restarts, you must enable scratch pad
 persistence using the configuration options described in the scratch pad section.
 
 ### How It Works
@@ -668,15 +668,15 @@ ClojureMCP works seamlessly with [shadow-cljs](https://github.com/thheller/shado
    ```
 
 OR change the shadow port to 7888 (or whatever port you have configured) and leave your client config as is.
-   
+
 
 3. **Switch to ClojureScript REPL** in Claude Desktop:
-   
+
    Once Claude Desktop is connected, prompt Claude to evaluate:
    ```clojure
    (shadow/repl :app)
    ```
-   
+
    Replace `:app` with your actual build ID from `shadow-cljs.edn`.
 
 4. **All set!** Now all `clojure_eval` calls will be routed to your ClojureScript REPL, allowing you to:
@@ -926,7 +926,7 @@ The customization approach is both easy and empowering - you're essentially buil
 
 **📖 [Complete Customization Documentation](doc/README.md)**
 
-For a quick start: **[Creating Your Own Custom MCP Server](doc/custom-mcp-server.md)** - This is where most users should begin. 
+For a quick start: **[Creating Your Own Custom MCP Server](doc/custom-mcp-server.md)** - This is where most users should begin.
 
 ## CLI options
 
@@ -952,7 +952,7 @@ Using the -X invocation requires EDN values.
 
 `:project-dir "/path/to/your/clojure/project"`
 
-#### `:nrepl-env-type` 
+#### `:nrepl-env-type`
 **Optional** - Specify the type of environment that we are connecting to over the nREPL connection. This overrides automatic detection. Valid options are:
 
 * `:clj` for Clojure or ClojureScript
@@ -978,7 +978,7 @@ clojure -X:mcp :port 7888 :config-file '"/path/to/custom-config.edn"'
 clojure -X:mcp :port 7888 :nrepl-env-type :bb
 ```
 
-**Note**: When using `-X` invocation, string values need to be properly quoted for the shell, hence `'"value"'` syntax for strings. 
+**Note**: When using `-X` invocation, string values need to be properly quoted for the shell, hence `'"value"'` syntax for strings.
 
 ## ⚙️ Configuration
 
@@ -1000,98 +1000,16 @@ your-project/
 └── ...
 ```
 
-### Configuration Options 
+### Configuration Options
 
-#### `:allowed-directories`
-Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute.
-
-#### `:cljfmt`
-Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`). When disabled, file edits preserve the original formatting without applying cljfmt.
-
-**Available values:**
-- `true` (default) - Applies cljfmt formatting to all edited files
-- `false` - Disables formatting, preserving exact whitespace and formatting
-
-**When to use each setting:**
-- `true` - Best for maintaining consistent code style across your project
-- `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting
-
-#### `:bash-over-nrepl`
-Boolean flag to control bash command execution mode (default: `true`). This setting determines whether bash commands are executed over the nREPL connection or locally on the MCP server.
-
-**Available values:**
-- `true` (default) - Execute bash commands over nREPL connection with isolated session
-- `false` - Execute bash commands locally in the Clojure MCP server process
-
-**When to use each setting:**
-- `true` - Best for most development scenarios, as it allows you to only sandbox the nrepl server process
-- `false` - Useful when the nREPL server is not a Clojure process, i.e. CLJS, Babashka, Scittle
-
-**Technical details:**
-- When `true`, bash commands run in a separate nREPL session
-- Both modes apply consistent output truncation (8500 chars total, split between stdout/stderr)
-- Local execution may be faster for simple commands but requires the MCP server to have necessary tools installed
-
-#### `write-file-guard`
-Controls the file timestamp tracking behavior (default: `:partial-read`). This setting determines when file editing is allowed based on read operations.
-
-**Available values:**
-- `:partial-read` (default) - Both full and collapsed reads update timestamps. Allows editing after collapsed reads, providing more convenience with slightly less safety.
-- `:full-read` - Only full reads (`collapsed: false`) update timestamps. This is the safest option, ensuring the AI sees complete file content before editing.
-- `false` - Disables timestamp checking entirely. Files can be edited without any read requirement. Use with caution!
-
-**When to use each setting:**
-- `:partial-read` - Good for solo development when you want faster workflows but still want protection against external modifications
-- `:full-read` - Best for team environments or when working with files that may be modified externally
-- `false` - Only for rapid prototyping or when you're certain no external modifications will occur
-
-The timestamp tracking system prevents accidental overwrites when files are modified by external processes (other developers, editors, git operations, etc.).
-
-#### `scratch-pad-load`
-Boolean flag to automatically load the scratch pad on startup (default: `false`).
-
-**Available values:**
-- `false` (default) - Scratch pad is saved to disk but not loaded on startup
-- `true` - Loads existing data on startup
-
-**When to use each setting:**
-- `false` - Best for temporary planning and session-only data
-- `true` - When you want data to persist across sessions and server restarts
-
-#### `scratch-pad-file`
-Filename for scratch pad persistence (default: `"scratch_pad.edn"`).
-
-**Configuration:**
-- Specifies the filename within `.clojure-mcp/` directory
-
-#### `dispatch-agent-context`
-Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
-
-**Available values:**
-- `true` (default) - Adds `PROJECT_SUMMARY.md` (if available) and `./.clojure-mcp/code_index.txt` into context
-- Specifies a vector of specific files sent to `dispatch_agent`
-
-NOTE: May consume more API tokens or even exceed the context window of the LLM
-
-#### `emacs-notify` 
-Boolean flag to enable Emacs integration notifications.
-
-Emacs notify is only a toy for now... it switches focuses on the file
-being edited and highlights changes as they are happening.  There are
-probably much better ways to handle this with auto-revert and existing
-emacs libraries.
-
-**Prerequisites for Emacs Integration:**
-- `emacsclient` must be available in your system PATH
-- Emacs server must be running (start with `M-x server-start` or add `(server-start)` to your init file)
-- The integration allows the MCP server to communicate with your Emacs editor for enhanced development workflows
+Configuration is extensively documented [here](doc/CONFIG.md).
 
 ### Example Configuration
 
 ```edn
 {:allowed-directories ["."
-                       "src" 
-                       "test" 
+                       "src"
+                       "test"
                        "resources"
                        "dev"
                        "/absolute/path/to/shared/code"
@@ -1100,18 +1018,18 @@ emacs libraries.
  :write-file-guard :full-read
  :cljfmt true
  :bash-over-nrepl true
- :scratch-pad-load false  ; Default: false 
+ :scratch-pad-load false  ; Default: false
  :scratch-pad-file "scratch_pad.edn"}
 ```
 
 ### Configuration Details
 
-**Path Resolution**: 
+**Path Resolution**:
 - Relative paths (like `"src"`, `"../other-project"`) are resolved relative to your project root
 - Absolute paths (like `"/home/user/shared"`) are used as-is
 - The project root directory is automatically included in allowed directories
 
-**Security**: 
+**Security**:
 - Tools validate all file operations against the allowed directories
 - Attempts to access files outside allowed directories will fail with an error
 - This prevents accidental access to sensitive system files
@@ -1125,10 +1043,10 @@ emacs libraries.
 
 #### Development Setup
 ```edn
-{:allowed-directories ["." 
-                       "src" 
-                       "test" 
-                       "dev" 
+{:allowed-directories ["."
+                       "src"
+                       "test"
+                       "dev"
                        "resources"
                        "docs"]
  :write-file-guard :full-read
@@ -1153,7 +1071,7 @@ emacs libraries.
 
 #### Restricted Mode (Extra Security)
 ```edn
-{:allowed-directories ["src" 
+{:allowed-directories ["src"
                        "test"]
  :write-file-guard :full-read
  :cljfmt false        ; Preserve original formatting
@@ -1241,7 +1159,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 ### License Summary
 
 - ✅ **Use freely** for personal projects, internal business tools, and development
-- ✅ **Modify and distribute** - improvements and forks are welcome  
+- ✅ **Modify and distribute** - improvements and forks are welcome
 - ✅ **Commercial use** - businesses can use this internally without restrictions
 - ⚠️ **Network copyleft** - if you offer this as a service to others, you must open source your entire service stack
 - 📤 **Share improvements** - modifications must be shared under the same license
