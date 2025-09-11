@@ -16,6 +16,46 @@
       (log/warn "Bad file paths " (pr-str [dir path]))
       nil)))
 
+(defn- load-config-file
+  "Loads a single config file from the given path. Returns empty map if file doesn't exist."
+  [config-file-path]
+  (let [config-file (io/file config-file-path)]
+    (if (.exists config-file)
+      (try
+        (edn/read-string (slurp config-file))
+        (catch Exception e
+          (log/warn e "Failed to read config file:" (.getPath config-file))
+          {}))
+      {})))
+
+(defn- get-home-config-path
+  "Returns the path to the user home config file."
+  []
+  (io/file (System/getProperty "user.home") ".clojure-mcp" "config.edn"))
+
+(defn- load-home-config
+  "Loads configuration from ~/.clojure-mcp/config.edn.
+   Returns empty map if the file doesn't exist."
+  []
+  (let [home-config-file (get-home-config-path)]
+    (load-config-file (.getPath home-config-file))))
+
+(defn- deep-merge
+  "Deeply merges maps, with the second map taking precedence.
+   For non-map values, the second value wins."
+  [m1 m2]
+  (cond
+    (and (map? m1) (map? m2))
+    (merge-with deep-merge m1 m2)
+
+    :else m2))
+
+(defn- merge-configs
+  "Merges user home config (defaults) with project config (overrides).
+   Project config takes precedence over user config."
+  [user-config project-config]
+  (deep-merge user-config project-config))
+
 (defn process-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
   (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
@@ -44,23 +84,35 @@
       (assoc :nrepl-env-type (:nrepl-env-type config)))))
 
 (defn load-config
-  "Loads configuration from .clojure-mcp/config.edn in the given directory.
-   Reads the file directly from the filesystem."
+  "Loads configuration from both user home (~/.clojure-mcp/config.edn) and project directory.
+   User home config provides defaults, project config provides overrides.
+   Project config location is either cli-config-file or .clojure-mcp/config.edn in user-dir.
+   Reads files directly from the filesystem."
   [cli-config-file user-dir]
-  (let [config-file (if cli-config-file
-                      (io/file cli-config-file)
-                      (io/file user-dir ".clojure-mcp" "config.edn"))
-        config (if (.exists config-file)
-                 (try
-                   (edn/read-string (slurp config-file))
-                   (catch Exception e
-                     (log/warn e "Failed to read config file:" (.getPath config-file))
-                     {}))
-                 {})
-        processed-config (process-config config user-dir)]
-    (log/info "Config file:" (.getPath config-file) "exists:" (.exists config-file))
-    (log/info "Raw config:" config)
-    (log/info "Processed config:" processed-config)
+  ;; Load user home config first (provides defaults)
+  (let [home-config (load-home-config)
+        home-config-path (get-home-config-path)
+
+        ;; Load project config (provides overrides)
+        project-config-file (if cli-config-file
+                              (io/file cli-config-file)
+                              (io/file user-dir ".clojure-mcp" "config.edn"))
+        project-config (load-config-file (.getPath project-config-file))
+
+        ;; Merge configs (project overrides home)
+        merged-config (merge-configs home-config project-config)
+
+        ;; Process the merged config
+        processed-config (process-config merged-config user-dir)]
+
+    ;; Logging for debugging
+    (log/info "Home config file:" (.getPath home-config-path) "exists:" (.exists home-config-path))
+    (log/info "Home config:" home-config)
+    (log/info "Project config file:" (.getPath project-config-file) "exists:" (.exists project-config-file))
+    (log/info "Project config:" project-config)
+    (log/info "Merged config:" merged-config)
+    (log/info "Final processed config:" processed-config)
+
     processed-config))
 
 (defn get-config [nrepl-client-map k]
