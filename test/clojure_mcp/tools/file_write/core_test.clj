@@ -54,7 +54,13 @@
     (is (file-write-core/is-clojure-file? "C:\\Path\\To\\File.CLJ")) ; Case insensitive
     (is (not (file-write-core/is-clojure-file? "test.txt")))
     (is (not (file-write-core/is-clojure-file? "test.md")))
-    (is (not (file-write-core/is-clojure-file? "test.js")))))
+    (is (not (file-write-core/is-clojure-file? "test.js"))))
+
+  (testing "Detecting Babashka shebang"
+    (let [tmp (io/file *test-dir* "script.sh")]
+      (spit tmp "#!/usr/bin/env bb\n(println :hi)")
+      (is (file-write-core/is-clojure-file? (.getPath tmp)))
+      (.delete tmp))))
 
 (deftest write-text-file-test
   (testing "Creating a new text file"
