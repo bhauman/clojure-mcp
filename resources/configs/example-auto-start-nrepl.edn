@@ -1,0 +1,44 @@
+;; Example configuration for automatic nREPL server startup
+;; Place this in .clojure-mcp/config.edn in your project root
+;;
+;; IMPORTANT: This feature requires launching clojure-mcp from your project directory
+;; Perfect for Claude Code and other CLI-based LLM tools where you want automatic
+;; nREPL startup without managing separate processes
+
+{;; Automatically start an nREPL server when MCP server starts
+ ;; Must be a vector of strings representing the command and arguments
+ :start-nrepl-cmd ["clojure" "-M:nrepl"]
+
+ ;; Parse the port from nREPL output (default: true when :start-nrepl-cmd is provided)
+ ;; Set to false if you want to use a fixed port specified below
+ :parse-nrepl-port true
+
+ ;; Port is optional when :parse-nrepl-port is true
+ ;; Required when :parse-nrepl-port is false
+ ;; :port 7888
+
+ ;; Other common configurations
+ :allowed-directories ["." "src" "test" "resources"]
+ :write-file-guard :partial-read
+ :cljfmt true
+ :bash-over-nrepl true}
+
+;; Alternative configurations:
+
+;; For Leiningen projects (great for Claude Code):
+;; {:start-nrepl-cmd ["lein" "repl" ":headless"]
+;;  :parse-nrepl-port true}
+
+;; For Babashka:
+;; {:start-nrepl-cmd ["bb" "nrepl-server"]
+;;  :parse-nrepl-port true}
+
+;; With fixed port (no port parsing):
+;; {:start-nrepl-cmd ["clojure" "-M:nrepl"]
+;;  :parse-nrepl-port false
+;;  :port 7888}
+
+;; Claude Code usage:
+;; 1. Place this config in your-project/.clojure-mcp/config.edn
+;; 2. Open Claude Code in your project directory
+;; 3. The nREPL will start automatically when Claude Code connects
