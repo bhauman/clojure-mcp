@@ -8,6 +8,9 @@
         ;; for prompt templating
         pogonos/pogonos {:mvn/version "0.2.1"}
 
+        ;; for configuration validation
+        metosin/malli {:mvn/version "0.19.1"}
+
         ;; Clojure source manipulation
         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}
         dev.weavejester/cljfmt {:mvn/version "0.13.1"}
