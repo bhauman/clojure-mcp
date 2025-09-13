@@ -933,7 +933,7 @@ For a quick start: **[Creating Your Own Custom MCP Server](doc/custom-mcp-server
 Using the -X invocation requires EDN values.
 
 #### `:port`
-**Required** - The nREPL server port to connect to.
+**Optional** - The nREPL server port to connect to. Required unless using `:start-nrepl-cmd` with `:parse-nrepl-port` or relying on an existing `.nrepl-port` file.
 
 `:port 7888`
 
@@ -941,6 +941,18 @@ Using the -X invocation requires EDN values.
 **Optional** - The nREPL server host. Defaults to localhost if not specified.
 
 `:host "localhost"` or `:host "0.0.0.0"`
+
+#### `:start-nrepl-cmd`
+**Optional** - A command to automatically start an nREPL server if one is not already running. Must be specified as a vector of strings. The MCP server will start this process and manage its lifecycle.
+
+**Important**: This option requires launching `clojure-mcp` from your project directory (where your `deps.edn` or `project.clj` is located). The nREPL server will be started in the current working directory. This is particularly useful for Claude Code and other command-line LLM clients where you want automatic nREPL startup without manual process management.
+
+`:start-nrepl-cmd ["lein" "repl" ":headless"]` or `:start-nrepl-cmd ["clojure" "-M:nrepl"]`
+
+#### `:parse-nrepl-port`
+**Optional** - When `true` and used with `:start-nrepl-cmd`, automatically discovers the nREPL port from the command's stdout output. Defaults to `false`. The parser recognizes common nREPL port announcement formats.
+
+`:parse-nrepl-port true`
 
 #### `:config-file`
 **Optional** - Specify the location of a configuration file. Must be a path to an existing file.
@@ -968,11 +980,24 @@ Using the -X invocation requires EDN values.
 # Basic usage with just port
 clojure -X:mcp :port 7888
 
+# With automatic nREPL server startup and port discovery
+# Perfect for Claude Code - run this from your project directory
+clojure -X:mcp :start-nrepl-cmd '["lein" "repl" ":headless"]' :parse-nrepl-port true
+
+# For Claude Code with Clojure projects (from project directory)
+clojure -X:mcp :start-nrepl-cmd '["clojure" "-M:nrepl"]' :parse-nrepl-port true
+
+# Auto-start with explicit port (doesn't parse from output)
+clojure -X:mcp :port 7888 :start-nrepl-cmd '["clojure" "-M:nrepl"]'
+
 # With custom host and project directory
 clojure -X:mcp :port 7888 :host '"0.0.0.0"' :project-dir '"/path/to/project"'
 
 # Using a custom config file
 clojure -X:mcp :port 7888 :config-file '"/path/to/custom-config.edn"'
+
+# Using existing .nrepl-port file (no explicit port needed)
+clojure -X:mcp
 
 # Specifying Babashka environment
 clojure -X:mcp :port 7888 :nrepl-env-type :bb
