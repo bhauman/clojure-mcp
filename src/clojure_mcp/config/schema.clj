@@ -120,37 +120,51 @@
 (def AgentConfig
   "Schema for agent configurations"
   [:map {:closed true
-         :error/message "Agent config requires :id, :name, and :description. See README Agent Tools section"}
+         :error/message "Agent config requires :id, :name, and :description. See doc/configuring-agents.md"}
+
    ;; Required fields
-   [:id :keyword]
-   [:name :string]
-   [:description :string]
+   [:id {:description "Unique keyword identifier for the agent"}
+    :keyword]
+
+   [:name {:description "Tool name that appears in the MCP interface"}
+    :string]
+
+   [:description {:description "Human-readable description of the agent's purpose"}
+    :string]
 
    ;; System configuration
-   [:system-message {:optional true} :string] ;; The system prompt for the agent
+   [:system-message {:optional true
+                     :description "System prompt that defines the agent's behavior and personality"}
+    :string]
 
    ;; Model configuration
-   [:model {:optional true} :keyword] ;; Reference to a model config (e.g., :openai/gpt-4o)
+   [:model {:optional true
+            :description "AI model to use (keyword reference to :models config, e.g., :openai/gpt-4o)"}
+    :keyword]
 
    ;; Context configuration
-   [:context {:optional true}
-    [:or :boolean ;; true = default context, false = no context
-     [:sequential :string]]] ;; List of file paths for context
+   [:context {:optional true
+              :description "Context to provide: true (default), false (none), or file paths list"}
+    [:or :boolean [:sequential :string]]]
 
    ;; Tool configuration
-   [:enable-tools {:optional true}
-    [:or [:= :all] ;; :all = enable all available tools
-     [:sequential :keyword]]] ;; List of specific tool IDs to enable
-   [:disable-tools {:optional true}
-    [:maybe [:sequential :keyword]]] ;; List of tool IDs to disable
+   [:enable-tools {:optional true
+                   :description "Tools the agent can access: :all, specific list, or nil (no tools)"}
+    [:or [:= :all] [:sequential :keyword]]]
+
+   [:disable-tools {:optional true
+                    :description "Tools to exclude even if enabled (applied after enable-tools)"}
+    [:maybe [:sequential :keyword]]]
 
    ;; Memory configuration
-   [:memory-size {:optional true}
-    [:or [:= false] ;; false = stateless
-     [:int {:min 0}]]] ;; Integer = memory window size (0-9 = stateless, 10+ = persistent)
+   [:memory-size {:optional true
+                  :description "Memory behavior: false/nil/<10 = stateless, >=10 = persistent window"}
+    [:or [:= false] [:int {:min 0}]]]
 
    ;; File tracking configuration
-   [:track-file-changes {:optional true} :boolean]])
+   [:track-file-changes {:optional true
+                         :description "Whether to track and display file diffs (default: true)"}
+    :boolean]])
 
 ;; ==============================================================================
 ;; Resource Configuration Schemas
@@ -160,10 +174,20 @@
   "Schema for resource entries"
   [:map {:closed true
          :error/message "Resource entries must have :description and :file-path. See doc/configuring-resources.md"}
-   [:description :string]
-   [:file-path Path]
-   [:url {:optional true} [:maybe :string]]
-   [:mime-type {:optional true} [:maybe :string]]])
+
+   [:description {:description "Clear description of resource contents for LLM understanding"}
+    :string]
+
+   [:file-path {:description "Path to file (relative to project root or absolute)"}
+    Path]
+
+   [:url {:optional true
+          :description "Custom URL for resource (defaults to custom://kebab-case-name)"}
+    [:maybe :string]]
+
+   [:mime-type {:optional true
+                :description "MIME type (auto-detected from file extension if not specified)"}
+    [:maybe :string]]])
 
 ;; ==============================================================================
 ;; Prompt Configuration Schemas
@@ -277,3 +301,5 @@
    Preserves environment variable references [:env \"VAR_NAME\"] and boolean values."
   [config]
   config)
+
+

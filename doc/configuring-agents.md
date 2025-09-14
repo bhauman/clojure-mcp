@@ -16,10 +16,10 @@ The agent tool builder dynamically creates MCP tools from agent configurations d
 **Agents have NO tools by default.** You must explicitly specify which tools an agent can use via `:enable-tools`. This is a safety feature to prevent unintended access to powerful capabilities.
 
 Agents can now access ALL available tools, including:
-- Read-only tools (grep, read-file, etc.)
-- **File editing tools** (file-write, clojure-edit, etc.)
-- **Code execution tools** (clojure-eval, bash)
-- Agent tools (dispatch-agent, architect)
+- Read-only tools (grep, read_file, etc.)
+- **File editing tools** (file_write, clojure_edit, etc.)
+- **Code execution tools** (clojure_eval, bash)
+- Agent tools (dispatch_agent, architect)
 
 Always consider the security implications when granting tool access.
 
@@ -33,7 +33,7 @@ Add an `:agents` key to your `.clojure-mcp/config.edn`:
            :description "A custom agent for specific tasks"
            :system-message "You are a helpful assistant specialized in..."
            :context true
-           :enable-tools [:read-file :grep]  ; Must explicitly list tools
+           :enable-tools [:read_file :grep]  ; Must explicitly list tools
            :disable-tools nil}]}
 ```
 
@@ -65,6 +65,9 @@ Each agent configuration supports the following keys:
 - **`:memory-size`** - Controls conversation memory behavior:
   - `nil`, `false`, or `< 10` - **Stateless** (default): Clears memory on each chat
   - `>= 10` - **Persistent**: Accumulates messages up to limit, then resets completely
+- **`:track-file-changes`** - Whether to track and show file diffs (default: `true`)
+  - `true` - Shows diffs of file modifications made by the agent
+  - `false` - Disables file change tracking
 
 ## Available Tools for Agents
 
@@ -74,33 +77,33 @@ Agents can potentially access all MCP tools:
 | Tool ID | Description |
 |---------|-------------|
 | `:LS` | Directory tree view |
-| `:read-file` | Read file contents with pattern matching |
+| `:read_file` | Read file contents with pattern matching |
 | `:grep` | Search file contents |
-| `:glob-files` | Find files by pattern |
+| `:glob_files` | Find files by pattern |
 | `:think` | Reasoning tool |
-| `:clojure-inspect-project` | Project structure analysis |
+| `:clojure_inspect_project` | Project structure analysis |
 
 ### Evaluation Tools
 | Tool ID | Description |
 |---------|-------------|
-| `:clojure-eval` | Execute Clojure code in REPL |
+| `:clojure_eval` | Execute Clojure code in REPL |
 | `:bash` | Execute shell commands |
 
 ### File Editing Tools
 | Tool ID | Description |
 |---------|-------------|
-| `:file-write` | Create or overwrite files |
-| `:file-edit` | Edit files by text replacement |
-| `:clojure-edit` | Structure-aware Clojure editing |
-| `:clojure-edit-replace-sexp` | S-expression replacement |
+| `:file_write` | Create or overwrite files |
+| `:file_edit` | Edit files by text replacement |
+| `:clojure_edit` | Structure-aware Clojure editing |
+| `:clojure_edit_replace_sexp` | S-expression replacement |
 
 ### Agent Tools
 | Tool ID | Description |
 |---------|-------------|
-| `:dispatch-agent` | Launch sub-agents |
+| `:dispatch_agent` | Launch sub-agents |
 | `:architect` | Technical planning assistant |
-| `:scratch-pad` | Persistent data storage |
-| `:code-critique` | Code review feedback |
+| `:scratch_pad` | Persistent data storage |
+| `:code_critique` | Code review feedback |
 
 ## Tool Access Patterns
 
@@ -120,7 +123,7 @@ Agents can potentially access all MCP tools:
  :name "research_agent"
  :description "Can read but not modify"
  :system-message "You research and analyze code"
- :enable-tools [:read-file :grep :glob-files :clojure-inspect-project]}
+ :enable-tools [:read_file :grep :glob_files :clojure_inspect_project]}
 ```
 
 ### Write Access
@@ -129,7 +132,7 @@ Agents can potentially access all MCP tools:
  :name "code_writer"
  :description "Can create and modify files"
  :system-message "You write and refactor code. Always test before writing."
- :enable-tools [:read-file :grep :clojure-eval :file-write :clojure-edit]}
+ :enable-tools [:read_file :grep :clojure_eval :file_write :clojure_edit]}
 ```
 
 ### Full Access
@@ -139,7 +142,7 @@ Agents can potentially access all MCP tools:
  :description "Access to all tools - use with caution"
  :system-message "You have full system access. Confirm destructive operations."
  :enable-tools [:all]
- :disable-tools [:dispatch-agent]  ; Can still exclude specific tools
+ :disable-tools [:dispatch_agent]  ; Can still exclude specific tools
 }
 ```
 
@@ -184,7 +187,7 @@ Here's a comprehensive configuration with agents of varying capability levels:
            :model :anthropic/fast
            :context true
            :memory-size false  ; Explicitly stateless
-           :enable-tools [:grep :glob-files :read-file :clojure-inspect-project]
+           :enable-tools [:grep :glob_files :read_file :clojure_inspect_project]
            :disable-tools nil}
           
           ;; Documentation specialist - stateless
@@ -195,7 +198,7 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            and focus on practical usage."
            :context ["README.md" "doc/"]
            :memory-size nil  ; Stateless (same as omitting)
-           :enable-tools [:read-file :glob-files]}
+           :enable-tools [:read_file :glob_files]}
           
           ;; Test runner - can execute but not modify
           {:id :test-runner
@@ -205,8 +208,8 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            but cannot modify files."
            :context ["test/"]
            :memory-size 5  ; < 10 = stateless
-           :enable-tools [:read-file :grep :glob-files :clojure-eval :bash]
-           :disable-tools [:file-write :file-edit :clojure-edit]}
+           :enable-tools [:read_file :grep :glob_files :clojure_eval :bash]
+           :disable-tools [:file_write :file_edit :clojure_edit]}
           
           ;; Code writer - persistent memory for multi-step refactoring
           {:id :code-writer
@@ -218,10 +221,10 @@ Here's a comprehensive configuration with agents of varying capability levels:
            :model :openai/smart
            :context true
            :memory-size 50  ; Persistent - remembers recent edits
-           :enable-tools [:read-file :grep :glob-files 
-                          :clojure-eval :bash
-                          :file-write :file-edit 
-                          :clojure-edit :clojure-edit-replace-sexp]}
+           :enable-tools [:read_file :grep :glob_files 
+                          :clojure_eval :bash
+                          :file_write :file_edit 
+                          :clojure_edit :clojure_edit_replace_sexp]}
           
           ;; Full access agent with large memory
           {:id :admin-agent
@@ -480,11 +483,11 @@ Examples:
 {:enable-tools nil}  ; or omit entirely
 
 ;; Specific tools only
-{:enable-tools [:read-file :grep]}
+{:enable-tools [:read_file :grep]}
 
 ;; All tools except some
 {:enable-tools [:all]
- :disable-tools [:bash :file-write]}
+ :disable-tools [:bash :file_write]}
 ```
 
 ## Caching and Performance
@@ -507,7 +510,7 @@ Examples:
 ### No Tools Available
 - Remember: agents have no tools by default
 - Explicitly list tools in `:enable-tools`
-- Check tool IDs match exactly (e.g., `:read-file` not `:read_file`)
+- Check tool IDs match exactly (use underscores: `:read_file` not `:read-file`)
 
 ### Model Not Found
 - Verify model is defined in `:models` configuration
@@ -517,7 +520,7 @@ Examples:
 ### Tools Not Working
 - Verify tool IDs in `:enable-tools` match available tools
 - Check that tools aren't disabled in `:disable-tools`
-- Ensure the agent has the necessary tool combination (e.g., needs `:read-file` before `:clojure-edit`)
+- Ensure the agent has the necessary tool combination (e.g., needs `:read_file` before `:clojure_edit`)
 
 ### Memory Issues
 - **Agent doesn't remember previous conversation**: Check if `:memory-size` is `>= 10` for persistent memory
@@ -541,7 +544,7 @@ If you have existing agent configurations:
 ### Migration Steps
 1. Review existing agent configs
 2. Add explicit `:enable-tools` lists
-3. For read-only agents, add: `:enable-tools [:read-file :grep :glob-files ...]`
+3. For read-only agents, add: `:enable-tools [:read_file :grep :glob_files ...]`
 4. Test thoroughly before deploying
 
 ## Integration with MCP Server
