@@ -159,24 +159,6 @@
       (is (re-find #"model-name" (str errors))))))
 
 ;; ==============================================================================
-;; Coercion Tests
-;; ==============================================================================
-
-(deftest coercion-test
-  (testing "Preserves environment variable references"
-    (let [config {:models {:openai/test {:model-name "gpt-4"
-                                         :api-key [:env "API_KEY"]}}}
-          coerced (schema/coerce-config config)]
-      (is (= [:env "API_KEY"] (get-in coerced [:models :openai/test :api-key])))))
-
-  (testing "Preserves boolean values"
-    (let [config {:cljfmt false
-                  :bash-over-nrepl true}
-          coerced (schema/coerce-config config)]
-      (is (false? (:cljfmt coerced)))
-      (is (true? (:bash-over-nrepl coerced))))))
-
-;; ==============================================================================
 ;; Example Configuration File Tests
 ;; ==============================================================================
 

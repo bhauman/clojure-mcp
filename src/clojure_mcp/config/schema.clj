@@ -196,21 +196,36 @@
 (def PromptArg
   "Schema for prompt arguments"
   [:map {:closed true}
-   [:name :string]
-   [:description :string]
-   [:required? {:optional true} :boolean]])
+
+   [:name {:description "Parameter name used in Mustache template (e.g., {{name}})"}
+    :string]
+
+   [:description {:description "Description of what this parameter is for"}
+    :string]
+
+   [:required? {:optional true
+                :description "Whether this argument is required (defaults to false)"}
+    :boolean]])
 
 (def PromptEntry
   "Schema for prompt entries"
   [:map {:closed true
          :error/message "Prompt entries must have :description. See doc/configuring-prompts.md"}
-   [:description :string]
-   [:content {:optional true}
-    [:or
-     :string
-     [:map {:closed true} [:file-path Path]]]]
-   [:file-path {:optional true} Path] ;; Alternative to :content
-   [:args {:optional true} [:sequential PromptArg]]])
+
+   [:description {:description "Clear description of what the prompt does (shown to LLM when listing prompts)"}
+    :string]
+
+   [:content {:optional true
+              :description "Inline Mustache template content (use this OR :file-path)"}
+    :string]
+
+   [:file-path {:optional true
+                :description "Path to Mustache template file (use this OR :content)"}
+    Path] ;; Alternative to :content
+
+   [:args {:optional true
+           :description "Vector of argument definitions for the Mustache template"}
+    [:sequential PromptArg]]])
 
 ;; ==============================================================================
 ;; Main Configuration Schema
@@ -295,11 +310,6 @@
       (m/entries)
       (->> (map first))))
 
-(defn coerce-config
-  "Coerces configuration values to their correct types.
-   Currently a pass-through function as Malli validation doesn't auto-coerce.
-   Preserves environment variable references [:env \"VAR_NAME\"] and boolean values."
-  [config]
-  config)
+
 
 
