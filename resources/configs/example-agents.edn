@@ -14,7 +14,7 @@
            :system-message "You are a research specialist focused on finding code patterns, examples, and understanding project structure. Be thorough in your analysis and provide specific file locations and code snippets."
            :model :anthropic/claude-3-5-sonnet-20241022 ; Optional: specific model
            :context true ; Use default project context (PROJECT_SUMMARY.md and code index)
-           :enable-tools [:grep :glob-files :read-file :clojure-inspect-project] ; Must specify tools explicitly
+           :enable-tools [:grep :glob_files :read_file :clojure_inspect_project] ; Must specify tools explicitly
            :disable-tools nil}
 
           {:id :refactor-assistant
@@ -22,7 +22,7 @@
            :description "Agent specialized in analyzing code for refactoring opportunities"
            :system-message "You are a refactoring specialist. Analyze code for patterns that could be improved, suggest better abstractions, and identify duplicate code. Focus on readability and maintainability."
            :context ["PROJECT_SUMMARY.md" "doc/LLM_CODE_STYLE.md"] ; Specific files for context
-           :enable-tools [:read-file :grep :glob-files]
+           :enable-tools [:read_file :grep :glob_files]
            :disable-tools [:bash]}
 
           {:id :test-explorer
@@ -30,8 +30,8 @@
            :description "Agent for exploring and understanding test files"
            :system-message "You are a test exploration specialist. Help understand test structure, find relevant tests, and explain test patterns. Be concise and focus on test-specific insights."
            :context false ; No default context
-           :enable-tools [:read-file :glob-files :grep]
-           :disable-tools [:bash :clojure-inspect-project]}
+           :enable-tools [:read_file :glob_files :grep]
+           :disable-tools [:bash :clojure_inspect_project]}
 
           {:id :doc-reader
            :name "doc_reader"
@@ -39,7 +39,7 @@
            :system-message "You are a documentation specialist. Read and summarize documentation clearly and concisely. Focus on key concepts and practical usage."
            ;; model not specified - will use default
            :context ["README.md" "doc/"] ; Documentation-focused context
-           :enable-tools [:read-file :glob-files]
+           :enable-tools [:read_file :glob_files]
            :disable-tools [:grep :bash]}
 
           {:id :code-writer
@@ -48,8 +48,8 @@
            :system-message "You are a code writing assistant. You can create new files, edit existing ones, and refactor code. Always test code in the REPL before writing to files."
            :context true
            ;; Can evaluate code and write files
-           :enable-tools [:clojure-eval :file-write :file-edit :clojure-edit
-                          :clojure-edit-replace-sexp :read-file :grep :glob-files]
+           :enable-tools [:clojure_eval :file_write :file_edit :clojure_edit
+                          :clojure_edit_replace_sexp :read_file :grep :glob_files]
            :disable-tools nil}
 
           {:id :full-access-agent
@@ -59,7 +59,7 @@
            :context true
            ;; Special keyword :all enables all tools
            :enable-tools [:all] ; Gives access to every available tool
-           :disable-tools [:dispatch-agent]}] ; But still can disable specific ones
+           :disable-tools [:dispatch_agent]}] ; But still can disable specific ones
 
  ;; Optional: Define custom models for agents to use
  :models {:anthropic/claude-3-5-sonnet-20241022

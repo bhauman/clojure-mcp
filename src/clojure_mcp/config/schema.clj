@@ -121,19 +121,36 @@
   "Schema for agent configurations"
   [:map {:closed true
          :error/message "Agent config requires :id, :name, and :description. See README Agent Tools section"}
+   ;; Required fields
    [:id :keyword]
    [:name :string]
    [:description :string]
-   [:model {:optional true} :keyword]
-   [:system-prompt {:optional true} :string]
-   [:system-message {:optional true} :string] ;; Alternative to system-prompt
-   [:tools {:optional true} [:sequential :keyword]]
+
+   ;; System configuration
+   [:system-message {:optional true} :string] ;; The system prompt for the agent
+
+   ;; Model configuration
+   [:model {:optional true} :keyword] ;; Reference to a model config (e.g., :openai/gpt-4o)
+
+   ;; Context configuration
    [:context {:optional true}
-    [:or :boolean [:sequential :string]]] ;; Can be true, false, or list of files
+    [:or :boolean ;; true = default context, false = no context
+     [:sequential :string]]] ;; List of file paths for context
+
+   ;; Tool configuration
    [:enable-tools {:optional true}
-    [:or [:= :all] [:sequential :keyword]]] ;; Can be :all or list of tools
+    [:or [:= :all] ;; :all = enable all available tools
+     [:sequential :keyword]]] ;; List of specific tool IDs to enable
    [:disable-tools {:optional true}
-    [:maybe [:sequential :keyword]]]])
+    [:maybe [:sequential :keyword]]] ;; List of tool IDs to disable
+
+   ;; Memory configuration
+   [:memory-size {:optional true}
+    [:or [:= false] ;; false = stateless
+     [:int {:min 0}]]] ;; Integer = memory window size (0-9 = stateless, 10+ = persistent)
+
+   ;; File tracking configuration
+   [:track-file-changes {:optional true} :boolean]])
 
 ;; ==============================================================================
 ;; Resource Configuration Schemas

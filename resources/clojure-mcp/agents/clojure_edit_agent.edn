@@ -59,7 +59,6 @@ The agent will read the file, identify the locations to change based on context,
 
 Remember: Prefer structural editing tools over text-based editing for reliability and to maintain proper Clojure syntax."
  :context false
- :include-mentioned-files true
  :enable-tools :all
  :disable-tools [:scratch_pad]
  :track-file-changes true}

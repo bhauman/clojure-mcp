@@ -38,7 +38,7 @@
              :name "My Agent"
              :description "A custom agent"
              :model :openai/gpt4
-             :tools [:read-file :grep]}]
+             :enable-tools [:read-file :grep]}]
    :mcp-client "claude-desktop"
    :dispatch-agent-context true
    :enable-tools [:clojure-eval :read-file]
