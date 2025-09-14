@@ -234,8 +234,23 @@
       (log/error e "Failed to initialize MCP server")
       (throw e))))
 
-;; Setting up a server
-;; this could be in a new namespace
+(defn load-config-handling-validation-errors [config-file user-dir]
+  (try
+    (config/load-config config-file user-dir)
+    (catch Exception e
+      (if (= ::config/schema-error (-> e ex-data :type))
+        (let [{:keys [errors file-path]} (ex-data e)]
+          (println (str "\n❌ Configuration validation failed!\n"))
+          (println (str "File: " file-path "\n"))
+          (println "Errors found:")
+          (doseq [[k v] errors]
+            (let [msg (if (sequential? v) (first v) v)]
+              (println (str " 👉 " k " - " msg))))
+          (println "\nPlease fix these issues and try again.")
+          (println "See CONFIG.md for documentation.\n")
+          (System/exit 1))
+        ;; Other error - re-throw
+        (throw e)))))
 
 (defn fetch-config [nrepl-client-map config-file cli-env-type env-type project-dir]
   (let [user-dir (dialects/fetch-project-directory nrepl-client-map env-type project-dir)]
@@ -243,7 +258,8 @@
       (log/warn "Could not determine working directory")
       (throw (ex-info "No project directory!!" {})))
     (log/info "Working directory set to:" user-dir)
-    (let [config (config/load-config config-file user-dir)
+
+    (let [config (load-config-handling-validation-errors config-file user-dir)
           final-env-type (or cli-env-type
                              (if (contains? config :nrepl-env-type)
                                (:nrepl-env-type config)

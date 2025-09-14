@@ -4,9 +4,7 @@
    Provides comprehensive validation for the .clojure-mcp/config.edn file
    with human-readable error messages and spell-checking for typos."
   (:require [malli.core :as m]
-            [malli.error :as me]
-            [malli.util :as mu]
-            [malli.transform :as mt]))
+            [malli.error :as me]))
 
 ;; ==============================================================================
 ;; Basic Type Schemas
@@ -155,29 +153,6 @@
 ;; ==============================================================================
 ;; Validation Functions
 ;; ==============================================================================
-
-(defn validate-config
-  "Validates a configuration map against the schema.
-   Returns the config if valid, throws ex-info with human-readable errors if not."
-  [config]
-  (if (m/validate Config config)
-    config
-    (let [explanation (m/explain Config config)
-          ;; Malli provides readable errors with spell-checking
-          human-errors (-> explanation
-                           (me/with-spell-checking)
-                           (me/humanize))]
-      (throw (ex-info (str "Invalid configuration:\n"
-                           (pr-str human-errors))
-                      {:errors human-errors
-                       :config config
-                       :explanation explanation})))))
-
-(defn coerce-config
-  "Coerces and transforms configuration values to proper types.
-   Useful for handling string inputs that should be keywords, etc."
-  [config]
-  (m/decode Config config (mt/string-transformer)))
 
 (defn explain-config
   "Returns human-readable explanation of validation errors, or nil if valid.

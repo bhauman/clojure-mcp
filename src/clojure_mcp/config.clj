@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure-mcp.dialects :as dialects]
+   [clojure-mcp.config.schema :as schema]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]))
 
@@ -56,6 +57,34 @@
   [user-config project-config]
   (deep-merge user-config project-config))
 
+(defn validate-configs
+  "Validates a sequence of config files with their file paths.
+   Takes a sequence of maps with :config and :file-path keys.
+   Validates each config sequentially and throws on the first error found.
+   
+   Each map should have:
+   - :config    - The configuration map to validate
+   - :file-path - The path to the config file (for error reporting)
+   
+   Throws ExceptionInfo with:
+   - :type      ::schema-error
+   - :errors    - Validation errors from Malli
+   - :config    - The invalid config
+   - :file-path - Path to the file with errors (canonical path)"
+  [config-files]
+  (doseq [{:keys [config file-path]} config-files]
+    (when (seq config)
+      (when-let [errors (schema/explain-config config)]
+        (let [canonical-path (try
+                               (.getCanonicalPath (io/file file-path))
+                               (catch Exception _ file-path))] ; fallback to original if error
+          (throw (ex-info (str "Configuration validation failed: " canonical-path)
+                          {:type ::schema-error
+                           :errors errors
+                           :model schema/Config
+                           :config config
+                           :file-path canonical-path})))))))
+
 (defn process-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
   (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
@@ -86,8 +115,7 @@
 (defn load-config
   "Loads configuration from both user home (~/.clojure-mcp/config.edn) and project directory.
    User home config provides defaults, project config provides overrides.
-   Project config location is either cli-config-file or .clojure-mcp/config.edn in user-dir.
-   Reads files directly from the filesystem."
+   Validates both configs before merging."
   [cli-config-file user-dir]
   ;; Load user home config first (provides defaults)
   (let [home-config (load-home-config)
@@ -99,6 +127,21 @@
                               (io/file user-dir ".clojure-mcp" "config.edn"))
         project-config (load-config-file (.getPath project-config-file))
 
+        ;; Validate configs BEFORE merging
+        ;; This ensures we know which file has the error
+        ;; Use canonical paths for consistent error reporting
+        _ (validate-configs
+           (cond-> []
+             ;; Only validate home config if it exists and has content
+             (seq home-config)
+             (conj {:config home-config
+                    :file-path (.getCanonicalPath home-config-path)})
+
+             ;; Only validate project config if it exists and has content  
+             (seq project-config)
+             (conj {:config project-config
+                    :file-path (.getCanonicalPath project-config-file)})))
+
         ;; Merge configs (project overrides home)
         merged-config (merge-configs home-config project-config)
 
@@ -106,11 +149,12 @@
         processed-config (process-config merged-config user-dir)]
 
     ;; Logging for debugging
-    (log/info "Home config file:" (.getPath home-config-path) "exists:" (.exists home-config-path))
-    (log/info "Home config:" home-config)
-    (log/info "Project config file:" (.getPath project-config-file) "exists:" (.exists project-config-file))
-    (log/info "Project config:" project-config)
-    (log/info "Merged config:" merged-config)
+    (log/info "Home config file:" (.getCanonicalPath home-config-path) "exists:" (.exists home-config-path))
+    (when (seq home-config)
+      (log/debug "Home config validated successfully"))
+    (log/info "Project config file:" (.getCanonicalPath project-config-file) "exists:" (.exists project-config-file))
+    (when (seq project-config)
+      (log/debug "Project config validated successfully"))
     (log/info "Final processed config:" processed-config)
 
     processed-config))
