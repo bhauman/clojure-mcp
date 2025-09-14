@@ -25,24 +25,93 @@
 ;; ==============================================================================
 
 (def ThinkingConfig
-  "Schema for thinking configuration in models"
-  [:map {:closed true}
-   [:enabled :boolean]
+  "Schema for thinking/reasoning configuration in models"
+  [:map {:closed true
+         :error/message "Invalid thinking configuration. See model documentation."}
+   [:enabled {:optional true} :boolean]
    [:return {:optional true} :boolean]
    [:send {:optional true} :boolean]
-   [:budget-tokens {:optional true} [:int {:min 1}]]])
+   [:effort {:optional true} [:enum :low :medium :high]]
+   [:budget-tokens {:optional true} [:int {:min 1 :max 100000}]]])
 
 (def ModelConfig
   "Schema for individual model configurations"
   [:map {:closed true
          :error/message "Model config must have :model-name. See doc/model-configuration.md"}
+   ;; Provider identification
    [:provider {:optional true} [:enum :openai :anthropic :google]]
+
+   ;; Core parameters  
    [:model-name [:or :string EnvRef]]
-   [:temperature {:optional true} [:and :double [:>= 0] [:<= 2]]]
-   [:max-tokens {:optional true} [:int {:min 1}]]
    [:api-key {:optional true} [:or :string EnvRef]]
    [:base-url {:optional true} [:or :string EnvRef]]
-   [:thinking {:optional true} ThinkingConfig]])
+
+   ;; Common generation parameters
+   [:temperature {:optional true} [:and :double [:>= 0] [:<= 2]]]
+   [:max-tokens {:optional true} [:int {:min 1 :max 100000}]]
+   [:top-p {:optional true} [:and :double [:>= 0] [:<= 1]]]
+   [:top-k {:optional true} [:int {:min 1 :max 1000}]]
+   [:seed {:optional true} :int]
+   [:frequency-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
+   [:presence-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
+   [:stop-sequences {:optional true} [:sequential :string]]
+
+   ;; Connection and logging parameters
+   [:max-retries {:optional true} [:int {:min 0 :max 10}]]
+   [:timeout {:optional true} [:int {:min 1000 :max 600000}]] ; 1 sec to 10 min
+   [:log-requests {:optional true} :boolean]
+   [:log-responses {:optional true} :boolean]
+
+   ;; Thinking/reasoning configuration
+   [:thinking {:optional true} ThinkingConfig]
+
+   ;; Response format configuration
+   [:response-format {:optional true}
+    [:map {:closed true}
+     [:type [:enum :json :text]]
+     [:schema {:optional true} :map]]]
+
+   ;; Provider-specific: Anthropic
+   [:anthropic {:optional true}
+    [:map {:closed true}
+     [:version {:optional true} :string]
+     [:beta {:optional true} [:maybe :string]]
+     [:cache-system-messages {:optional true} :boolean]
+     [:cache-tools {:optional true} :boolean]]]
+
+   ;; Provider-specific: Google Gemini
+   [:google {:optional true}
+    [:map {:closed true}
+     [:allow-code-execution {:optional true} :boolean]
+     [:include-code-execution-output {:optional true} :boolean]
+     [:response-logprobs {:optional true} :boolean]
+     [:enable-enhanced-civic-answers {:optional true} :boolean]
+     [:logprobs {:optional true} [:int {:min 0 :max 10}]]
+     [:safety-settings {:optional true} :map]]]
+
+   ;; Provider-specific: OpenAI
+   [:openai {:optional true}
+    [:map {:closed true}
+     [:organization-id {:optional true} :string]
+     [:project-id {:optional true} :string]
+     [:max-completion-tokens {:optional true} [:int {:min 1 :max 100000}]]
+     [:logit-bias {:optional true} [:map-of :string :int]]
+     [:strict-json-schema {:optional true} :boolean]
+     [:user {:optional true} :string]
+     [:strict-tools {:optional true} :boolean]
+     [:parallel-tool-calls {:optional true} :boolean]
+     [:store {:optional true} :boolean]
+     [:metadata {:optional true} [:map-of :string :string]]
+     [:service-tier {:optional true} :string]]]
+
+   ;; Provider-specific: Gemini (alternate naming for Google)
+   [:gemini {:optional true}
+    [:map {:closed true}
+     [:allow-code-execution {:optional true} :boolean]
+     [:include-code-execution-output {:optional true} :boolean]
+     [:response-logprobs {:optional true} :boolean]
+     [:enable-enhanced-civic-answers {:optional true} :boolean]
+     [:logprobs {:optional true} [:int {:min 0 :max 10}]]]]])
 
 ;; ==============================================================================
 ;; Agent Configuration Schemas  
@@ -184,3 +253,10 @@
   (-> Config
       (m/entries)
       (->> (map first))))
+
+(defn coerce-config
+  "Coerces configuration values to their correct types.
+   Currently a pass-through function as Malli validation doesn't auto-coerce.
+   Preserves environment variable references [:env \"VAR_NAME\"] and boolean values."
+  [config]
+  config)
