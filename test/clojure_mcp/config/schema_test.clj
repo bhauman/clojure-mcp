@@ -77,9 +77,11 @@
     (is (schema/valid? {:dispatch-agent-context ["doc/overview.md" "README.md"]})))
 
   (testing "Config with environment variable references"
-    (is (schema/valid? {:models {:openai/test {:model-name [:env "MODEL_NAME"]
-                                               :api-key [:env "API_KEY"]
-                                               :base-url [:env "BASE_URL"]}}})))
+    ;; Disable env var validation for testing
+    (binding [schema/*validate-env-vars* false]
+      (is (schema/valid? {:models {:openai/test {:model-name [:env "MODEL_NAME"]
+                                                 :api-key [:env "API_KEY"]
+                                                 :base-url [:env "BASE_URL"]}}}))))
 
   (testing "Config with all nrepl-env-type values"
     (doseq [env-type [:clj :bb :basilisp :scittle]]
@@ -168,14 +170,16 @@
           example-files (when (.exists example-dir)
                           (filter #(str/ends-with? (.getName %) ".edn")
                                   (.listFiles example-dir)))]
-      (doseq [file example-files]
-        (testing (str "File: " (.getName file))
-          (let [config (edn/read-string (slurp file))]
-            (when-let [errors (schema/explain-config config)]
-              (println "Validation errors for" (.getName file) ":")
-              (println errors))
-            (is (schema/valid? config)
-                (str "Invalid config in " (.getName file)))))))))
+      ;; Disable env var validation for testing example files
+      (binding [schema/*validate-env-vars* false]
+        (doseq [file example-files]
+          (testing (str "File: " (.getName file))
+            (let [config (edn/read-string (slurp file))]
+              (when-let [errors (schema/explain-config config)]
+                (println "Validation errors for" (.getName file) ":")
+                (println errors))
+              (is (schema/valid? config)
+                  (str "Invalid config in " (.getName file))))))))))
 
 ;; ==============================================================================
 ;; Edge Cases

@@ -3,22 +3,42 @@
    
    Provides comprehensive validation for the .clojure-mcp/config.edn file
    with human-readable error messages and spell-checking for typos."
-  (:require [malli.core :as m]
-            [malli.error :as me]))
+  (:require
+   [clojure.string :as string]
+   [malli.core :as m]
+   [malli.error :as me]))
+
+(def ^:dynamic *validate-env-vars*
+  "When true, validates that environment variables actually exist and aren't blank.
+   Can be bound to false for testing."
+  true)
 
 ;; ==============================================================================
 ;; Basic Type Schemas
 ;; ==============================================================================
 
+(def NonBlankString
+  [:and
+   [:string {:min 1}]
+   [:fn {:error/message "String can't be blank"}
+    #(not (string/blank? %))]])
+
 (def Path
   "Schema for file system paths"
-  :string)
+  NonBlankString)
 
 (def EnvRef
   "Schema for environment variable references like [:env \"VAR_NAME\"]"
-  [:tuple {:description "Environment variable reference"}
-   [:= :env]
-   :string])
+  [:and
+   [:tuple {:description "Environment variable reference"}
+    [:= :env]
+    NonBlankString]
+   [:fn {:error/message "Environment variable can't be empty"}
+    (fn [[_ env-var]]
+      (or (not *validate-env-vars*)
+          (let [val (System/getenv env-var)]
+            (and val
+                 (not (string/blank? val))))))]])
 
 ;; ==============================================================================
 ;; Model Configuration Schemas
@@ -40,9 +60,9 @@
    [:provider {:optional true} [:enum :openai :anthropic :google]]
 
    ;; Core parameters  
-   [:model-name [:or :string EnvRef]]
-   [:api-key {:optional true} [:or :string EnvRef]]
-   [:base-url {:optional true} [:or :string EnvRef]]
+   [:model-name [:or NonBlankString EnvRef]]
+   [:api-key {:optional true} [:or NonBlankString EnvRef]]
+   [:base-url {:optional true} [:or NonBlankString EnvRef]]
 
    ;; Common generation parameters
    [:temperature {:optional true} [:and :double [:>= 0] [:<= 2]]]
@@ -52,7 +72,7 @@
    [:seed {:optional true} :int]
    [:frequency-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
    [:presence-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
-   [:stop-sequences {:optional true} [:sequential :string]]
+   [:stop-sequences {:optional true} [:sequential NonBlankString]]
 
    ;; Connection and logging parameters
    [:max-retries {:optional true} [:int {:min 0 :max 10}]]
@@ -72,8 +92,8 @@
    ;; Provider-specific: Anthropic
    [:anthropic {:optional true}
     [:map {:closed true}
-     [:version {:optional true} :string]
-     [:beta {:optional true} [:maybe :string]]
+     [:version {:optional true} NonBlankString]
+     [:beta {:optional true} [:maybe NonBlankString]]
      [:cache-system-messages {:optional true} :boolean]
      [:cache-tools {:optional true} :boolean]]]
 
@@ -90,26 +110,17 @@
    ;; Provider-specific: OpenAI
    [:openai {:optional true}
     [:map {:closed true}
-     [:organization-id {:optional true} :string]
-     [:project-id {:optional true} :string]
+     [:organization-id {:optional true} NonBlankString]
+     [:project-id {:optional true} NonBlankString]
      [:max-completion-tokens {:optional true} [:int {:min 1 :max 100000}]]
-     [:logit-bias {:optional true} [:map-of :string :int]]
+     [:logit-bias {:optional true} [:map-of NonBlankString :int]]
      [:strict-json-schema {:optional true} :boolean]
-     [:user {:optional true} :string]
+     [:user {:optional true} NonBlankString]
      [:strict-tools {:optional true} :boolean]
      [:parallel-tool-calls {:optional true} :boolean]
      [:store {:optional true} :boolean]
-     [:metadata {:optional true} [:map-of :string :string]]
-     [:service-tier {:optional true} :string]]]
-
-   ;; Provider-specific: Gemini (alternate naming for Google)
-   [:gemini {:optional true}
-    [:map {:closed true}
-     [:allow-code-execution {:optional true} :boolean]
-     [:include-code-execution-output {:optional true} :boolean]
-     [:response-logprobs {:optional true} :boolean]
-     [:enable-enhanced-civic-answers {:optional true} :boolean]
-     [:logprobs {:optional true} [:int {:min 0 :max 10}]]]]])
+     [:metadata {:optional true} [:map-of NonBlankString NonBlankString]]
+     [:service-tier {:optional true} NonBlankString]]]])
 
 ;; ==============================================================================
 ;; Agent Configuration Schemas  
@@ -124,15 +135,15 @@
     :keyword]
 
    [:name {:description "Tool name that appears in the MCP interface"}
-    :string]
+    NonBlankString]
 
    [:description {:description "Human-readable description of the agent's purpose"}
-    :string]
+    NonBlankString]
 
    ;; System configuration
    [:system-message {:optional true
                      :description "System prompt that defines the agent's behavior and personality"}
-    :string]
+    NonBlankString]
 
    ;; Model configuration
    [:model {:optional true
@@ -142,7 +153,7 @@
    ;; Context configuration
    [:context {:optional true
               :description "Context to provide: true (default), false (none), or file paths list"}
-    [:or :boolean [:sequential :string]]]
+    [:or :boolean [:sequential NonBlankString]]]
 
    ;; Tool configuration
    [:enable-tools {:optional true
@@ -172,18 +183,18 @@
   [:map {:closed true}
 
    [:description {:description "Clear description of resource contents for LLM understanding"}
-    :string]
+    NonBlankString]
 
    [:file-path {:description "Path to file (relative to project root or absolute)"}
     Path]
 
    [:url {:optional true
           :description "Custom URL for resource (defaults to custom://kebab-case-name)"}
-    [:maybe :string]]
+    [:maybe NonBlankString]]
 
    [:mime-type {:optional true
                 :description "MIME type (auto-detected from file extension if not specified)"}
-    [:maybe :string]]])
+    [:maybe NonBlankString]]])
 
 ;; ==============================================================================
 ;; Prompt Configuration Schemas
@@ -194,10 +205,10 @@
   [:map {:closed true}
 
    [:name {:description "Parameter name used in Mustache template (e.g., {{name}})"}
-    :string]
+    NonBlankString]
 
    [:description {:description "Description of what this parameter is for"}
-    :string]
+    NonBlankString]
 
    [:required? {:optional true
                 :description "Whether this argument is required (defaults to false)"}
@@ -208,11 +219,11 @@
   [:and
    [:map {:closed true}
     [:description {:description "Clear description of what the prompt does (shown to LLM when listing prompts)"}
-     :string]
+     NonBlankString]
 
     [:content {:optional true
                :description "Inline Mustache template content (use this OR :file-path)"}
-     :string]
+     NonBlankString]
 
     [:file-path {:optional true
                  :description "Path to Mustache template file (use this OR :content)"}
@@ -244,7 +255,7 @@
 
    ;; Scratch pad configuration
    [:scratch-pad-load {:optional true} :boolean]
-   [:scratch-pad-file {:optional true} :string]
+   [:scratch-pad-file {:optional true} NonBlankString]
 
    ;; Model and tool configuration
    [:models {:optional true} [:map-of :keyword ModelConfig]]
@@ -252,27 +263,27 @@
    [:agents {:optional true} [:sequential AgentConfig]]
 
    ;; MCP client hints
-   [:mcp-client {:optional true} [:maybe :string]]
+   [:mcp-client {:optional true} [:maybe NonBlankString]]
    [:dispatch-agent-context {:optional true}
     [:or :boolean [:sequential Path]]]
 
    ;; Component filtering
    [:enable-tools {:optional true}
-    [:maybe [:sequential [:or :keyword :string]]]]
+    [:maybe [:sequential [:or :keyword NonBlankString]]]]
    [:disable-tools {:optional true}
-    [:maybe [:sequential [:or :keyword :string]]]]
+    [:maybe [:sequential [:or :keyword NonBlankString]]]]
    [:enable-prompts {:optional true}
-    [:maybe [:sequential :string]]]
+    [:maybe [:sequential NonBlankString]]]
    [:disable-prompts {:optional true}
-    [:maybe [:sequential :string]]]
+    [:maybe [:sequential NonBlankString]]]
    [:enable-resources {:optional true}
-    [:maybe [:sequential :string]]]
+    [:maybe [:sequential NonBlankString]]]
    [:disable-resources {:optional true}
-    [:maybe [:sequential :string]]]
+    [:maybe [:sequential NonBlankString]]]
 
    ;; Custom resources and prompts
-   [:resources {:optional true} [:map-of :string ResourceEntry]]
-   [:prompts {:optional true} [:map-of :string PromptEntry]]])
+   [:resources {:optional true} [:map-of NonBlankString ResourceEntry]]
+   [:prompts {:optional true} [:map-of NonBlankString PromptEntry]]])
 
 ;; ==============================================================================
 ;; Validation Functions
