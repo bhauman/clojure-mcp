@@ -26,8 +26,7 @@
 
 (def ThinkingConfig
   "Schema for thinking/reasoning configuration in models"
-  [:map {:closed true
-         :error/message "Invalid thinking configuration. See model documentation."}
+  [:map {:closed true}
    [:enabled {:optional true} :boolean]
    [:return {:optional true} :boolean]
    [:send {:optional true} :boolean]
@@ -36,8 +35,7 @@
 
 (def ModelConfig
   "Schema for individual model configurations"
-  [:map {:closed true
-         :error/message "Model config must have :model-name. See doc/model-configuration.md"}
+  [:map {:closed true}
    ;; Provider identification
    [:provider {:optional true} [:enum :openai :anthropic :google]]
 
@@ -119,8 +117,7 @@
 
 (def AgentConfig
   "Schema for agent configurations"
-  [:map {:closed true
-         :error/message "Agent config requires :id, :name, and :description. See doc/configuring-agents.md"}
+  [:map {:closed true}
 
    ;; Required fields
    [:id {:description "Unique keyword identifier for the agent"}
@@ -172,8 +169,7 @@
 
 (def ResourceEntry
   "Schema for resource entries"
-  [:map {:closed true
-         :error/message "Resource entries must have :description and :file-path. See doc/configuring-resources.md"}
+  [:map {:closed true}
 
    [:description {:description "Clear description of resource contents for LLM understanding"}
     :string]
@@ -209,23 +205,26 @@
 
 (def PromptEntry
   "Schema for prompt entries"
-  [:map {:closed true
-         :error/message "Prompt entries must have :description. See doc/configuring-prompts.md"}
+  [:and
+   [:map {:closed true}
+    [:description {:description "Clear description of what the prompt does (shown to LLM when listing prompts)"}
+     :string]
 
-   [:description {:description "Clear description of what the prompt does (shown to LLM when listing prompts)"}
-    :string]
+    [:content {:optional true
+               :description "Inline Mustache template content (use this OR :file-path)"}
+     :string]
 
-   [:content {:optional true
-              :description "Inline Mustache template content (use this OR :file-path)"}
-    :string]
+    [:file-path {:optional true
+                 :description "Path to Mustache template file (use this OR :content)"}
+     Path] ;; Alternative to :content
 
-   [:file-path {:optional true
-                :description "Path to Mustache template file (use this OR :content)"}
-    Path] ;; Alternative to :content
-
-   [:args {:optional true
-           :description "Vector of argument definitions for the Mustache template"}
-    [:sequential PromptArg]]])
+    [:args {:optional true
+            :description "Vector of argument definitions for the Mustache template"}
+     [:sequential PromptArg]]]
+   [:fn {:error/message "Provide exactly one of :content or :file-path"}
+    (fn [{:keys [content file-path]}]
+      (and (not (and (some? content) (some? file-path)))
+           (or (some? content) (some? file-path))))]])
 
 ;; ==============================================================================
 ;; Main Configuration Schema

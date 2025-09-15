@@ -149,13 +149,13 @@
         processed-config (process-config merged-config user-dir)]
 
     ;; Logging for debugging
-    (log/info "Home config file:" (.getCanonicalPath home-config-path) "exists:" (.exists home-config-path))
+    (log/debug "Home config file:" (.getCanonicalPath home-config-path) "exists:" (.exists home-config-path))
     (when (seq home-config)
       (log/debug "Home config validated successfully"))
-    (log/info "Project config file:" (.getCanonicalPath project-config-file) "exists:" (.exists project-config-file))
+    (log/debug "Project config file:" (.getCanonicalPath project-config-file) "exists:" (.exists project-config-file))
     (when (seq project-config)
       (log/debug "Project config validated successfully"))
-    (log/info "Final processed config:" processed-config)
+    (log/debug "Final processed config:" processed-config)
 
     processed-config))
 

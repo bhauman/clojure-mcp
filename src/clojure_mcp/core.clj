@@ -240,15 +240,17 @@
     (catch Exception e
       (if (= ::config/schema-error (-> e ex-data :type))
         (let [{:keys [errors file-path]} (ex-data e)]
-          (println (str "\n❌ Configuration validation failed!\n"))
-          (println (str "File: " file-path "\n"))
-          (println "Errors found:")
-          (doseq [[k v] errors]
-            (let [msg (if (sequential? v) (first v) v)]
-              (println (str " 👉 " k " - " msg))))
-          (println "\nPlease fix these issues and try again.")
-          (println "See CONFIG.md for documentation.\n")
-          (System/exit 1))
+          (binding [*out* *err*]
+            (println (str "\n❌ Configuration validation failed!\n"))
+            (when file-path
+              (println (str "File: " file-path "\n")))
+            (println "Errors found:")
+            (doseq [[k v] errors]
+              (let [msg (if (sequential? v) (first v) v)]
+                (println (str " 👉 " k " - " msg))))
+            (println "\nPlease fix these issues and try again.")
+            (println "See CONFIG.md for documentation.\n"))
+          (throw e))
         ;; Other error - re-throw
         (throw e)))))
 
