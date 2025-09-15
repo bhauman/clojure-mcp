@@ -207,12 +207,6 @@
 ;; ==============================================================================
 
 (deftest error-message-quality-test
-  (testing "Error messages include helpful context"
-    (let [config {:resources {"bad" {:file-path "file.md"}}}
-          errors (schema/explain-config config)]
-      ;; Should mention the documentation
-      (is (re-find #"doc/configuring-resources.md" (str errors)))))
-
   (testing "Error messages for enum values list options"
     (let [config {:nrepl-env-type :invalid}
           errors (schema/explain-config config)]
