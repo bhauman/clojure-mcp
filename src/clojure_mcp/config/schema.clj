@@ -123,7 +123,7 @@
      [:organization-id {:optional true} NonBlankString]
      [:project-id {:optional true} NonBlankString]
      [:max-completion-tokens {:optional true} [:int {:min 1 :max 100000}]]
-     [:logit-bias {:optional true} [:map-of NonBlankString :int]]
+     [:logit-bias {:optional true} [:map-of NonBlankString [:int {:min -100 :max 100}]]]
      [:strict-json-schema {:optional true} :boolean]
      [:user {:optional true} NonBlankString]
      [:strict-tools {:optional true} :boolean]
@@ -163,12 +163,12 @@
    ;; Context configuration
    [:context {:optional true
               :description "Context to provide: true (default), false (none), or file paths list"}
-    [:or :boolean [:sequential NonBlankString]]]
+    [:or :boolean [:sequential Path]]]
 
    ;; Tool configuration
    [:enable-tools {:optional true
                    :description "Tools the agent can access: :all, specific list, or nil (no tools)"}
-    [:or [:= :all] [:sequential :keyword]]]
+    [:maybe [:or [:= :all] [:sequential :keyword]]]]
 
    [:disable-tools {:optional true
                     :description "Tools to exclude even if enabled (applied after enable-tools)"}
@@ -177,7 +177,7 @@
    ;; Memory configuration
    [:memory-size {:optional true
                   :description "Memory behavior: false/nil/<10 = stateless, >=10 = persistent window"}
-    [:or [:= false] [:int {:min 0}]]]
+    [:maybe [:or [:= false] [:int {:min 0}]]]]
 
    ;; File tracking configuration
    [:track-file-changes {:optional true
@@ -265,7 +265,7 @@
 
    ;; Scratch pad configuration
    [:scratch-pad-load {:optional true} :boolean]
-   [:scratch-pad-file {:optional true} NonBlankString]
+   [:scratch-pad-file {:optional true} Path]
 
    ;; Model and tool configuration
    [:models {:optional true} [:map-of :keyword ModelConfig]]
