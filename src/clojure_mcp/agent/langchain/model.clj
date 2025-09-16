@@ -1,7 +1,7 @@
 (ns clojure-mcp.agent.langchain.model
   (:require
    [clojure.string :as string]
-   [clojure-mcp.agent.langchain.model-spec :as spec]
+   [clojure-mcp.config.schema :as schema]
    [clojure-mcp.config :as config]
    [clojure.tools.logging :as log])
   (:import
@@ -403,8 +403,8 @@
                     (as-> cfg (ensure-api-key cfg (:provider cfg))))]
      ;; Validate if requested
      (when validate?
-       (spec/validate-model-key model-key)
-       (spec/validate-config-for-provider config))
+       (schema/validate-model-key model-key)
+       (schema/validate-config-for-provider config))
      (create-builder config))))
 
 (defn create-builder-from-config
@@ -427,7 +427,7 @@
                           (ensure-api-key final-provider))]
      ;; Validate if requested
      (when validate?
-       (spec/validate-config-for-provider final-config))
+       (schema/validate-config-for-provider final-config))
      (create-builder final-config))))
 
 (defn build-model
@@ -511,8 +511,8 @@
          final-config (ensure-api-key config-with-provider provider)]
      ;; Validate if requested
      (when validate?
-       (spec/validate-model-key model-key)
-       (spec/validate-config-for-provider final-config))
+       (schema/validate-model-key model-key)
+       (schema/validate-config-for-provider final-config))
      ;; Create builder
      (create-builder final-config))))
 

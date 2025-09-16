@@ -40,6 +40,16 @@
             (and val
                  (not (string/blank? val))))))]])
 
+(def IntOrDouble [:or :int :double])
+
+(def ModelNameOrEnum
+  "Schema for model names - can be a string or an enum object"
+  [:or
+   NonBlankString
+   EnvRef
+   [:fn {:error/message "Must be a valid model name object"}
+    #(instance? Enum %)]])
+
 ;; ==============================================================================
 ;; Model Configuration Schemas
 ;; ==============================================================================
@@ -60,18 +70,18 @@
    [:provider {:optional true} [:enum :openai :anthropic :google]]
 
    ;; Core parameters  
-   [:model-name [:or NonBlankString EnvRef]]
+   [:model-name ModelNameOrEnum]
    [:api-key {:optional true} [:or NonBlankString EnvRef]]
    [:base-url {:optional true} [:or NonBlankString EnvRef]]
 
    ;; Common generation parameters
-   [:temperature {:optional true} [:and :double [:>= 0] [:<= 2]]]
+   [:temperature {:optional true} [:and IntOrDouble [:>= 0] [:<= 2]]]
    [:max-tokens {:optional true} [:int {:min 1 :max 100000}]]
-   [:top-p {:optional true} [:and :double [:>= 0] [:<= 1]]]
+   [:top-p {:optional true} [:and IntOrDouble [:>= 0] [:<= 1]]]
    [:top-k {:optional true} [:int {:min 1 :max 1000}]]
    [:seed {:optional true} :int]
-   [:frequency-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
-   [:presence-penalty {:optional true} [:and :double [:>= -2] [:<= 2]]]
+   [:frequency-penalty {:optional true} [:and IntOrDouble [:>= -2] [:<= 2]]]
+   [:presence-penalty {:optional true} [:and IntOrDouble [:>= -2] [:<= 2]]]
    [:stop-sequences {:optional true} [:sequential NonBlankString]]
 
    ;; Connection and logging parameters
@@ -320,6 +330,37 @@
       (m/entries)
       (->> (map first))))
 
+;; ==============================================================================
+;; Model Validation Functions
+;; ==============================================================================
 
+(defn validate-model-key
+  "Validates that a model key has a namespace.
+   Returns the key if valid, throws an exception if invalid."
+  [model-key]
+  (when-not (and (keyword? model-key)
+                 (namespace model-key))
+    (throw (ex-info "Invalid model key"
+                    {:model-key model-key
+                     :type (type model-key)
+                     :namespace (namespace model-key)})))
+  model-key)
 
+(defn validate-model-config
+  "Validates a model configuration against the ModelConfig schema.
+   Returns the config if valid, throws an exception if invalid."
+  [config]
+  (if (m/validate ModelConfig config)
+    config
+    (throw (ex-info "Invalid configuration"
+                    {:config config
+                     :errors (-> (m/explain ModelConfig config)
+                                 (me/with-spell-checking)
+                                 (me/humanize))}))))
 
+(defn validate-config-for-provider
+  "Validates a model configuration. Provider is ignored since validation
+   is the same for all providers in the current schema.
+   Exists for backward compatibility with model_spec.clj."
+  [config]
+  (validate-model-config config))
