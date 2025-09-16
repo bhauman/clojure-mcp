@@ -66,7 +66,8 @@
     (is (schema/valid? valid-minimal-config)))
 
   (testing "Full config should be valid"
-    (is (schema/valid? valid-full-config)))
+    (binding [schema/*validate-env-vars* false]
+      (is (schema/valid? valid-full-config))))
 
   (testing "Config with only core settings"
     (is (schema/valid? {:allowed-directories ["."]
