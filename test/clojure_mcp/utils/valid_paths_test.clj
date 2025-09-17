@@ -102,6 +102,18 @@
     (is (= ".."
            (valid-paths/preprocess-path "..")))))
 
+(deftest clojure-file?-test
+  (testing "Detect Babashka shebang"
+    (let [tmp (io/file (System/getProperty "java.io.tmpdir") "bb-script.sh")]
+      (spit tmp "#!/usr/bin/env bb\n(println :hi)")
+      (is (valid-paths/clojure-file? (.getPath tmp)))
+      (.delete tmp)))
+  (testing "Regular bash script not detected"
+    (let [tmp (io/file (System/getProperty "java.io.tmpdir") "bash-script.sh")]
+      (spit tmp "#!/bin/bash\necho hi")
+      (is (not (valid-paths/clojure-file? (.getPath tmp))))
+      (.delete tmp))))
+
 (deftest validate-bash-command-paths-test
   (let [test-dir (.getCanonicalPath (io/file (System/getProperty "java.io.tmpdir")))
         home-dir (System/getProperty "user.home")]

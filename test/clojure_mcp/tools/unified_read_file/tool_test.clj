@@ -61,6 +61,10 @@
     (is (unified-read-file-tool/collapsible-clojure-file? "test.cljc"))
     (is (unified-read-file-tool/collapsible-clojure-file? "test.bb"))
     (is (unified-read-file-tool/collapsible-clojure-file? "/path/to/file.clj"))
+    (let [tmp (io/file *test-dir* "script.sh")]
+      (spit tmp "#!/usr/bin/env bb\n(println :hi)")
+      (is (unified-read-file-tool/collapsible-clojure-file? (.getPath tmp)))
+      (.delete tmp))
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.edn"))) ; EDN files not collapsible
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.txt")))
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.md")))
