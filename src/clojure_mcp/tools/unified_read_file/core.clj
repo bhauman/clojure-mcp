@@ -116,6 +116,7 @@
    - :truncated-by - The reason for truncation (e.g., 'max-lines')
    - :size - The file size in bytes
    - :line-count - The number of lines returned
+   - :total-line-count - The total number of lines in the file (only present when truncated)
    - :offset - The line offset used
    - :max-line-length - The max line length used
    - :line-lengths-truncated? - Whether any lines were truncated in length
@@ -143,6 +144,10 @@
                                        (str (subs line 0 max-line-length) "...")
                                        line))))))
                   truncated-by-lines? (and limit (> (count lines) limit))
+                  ;; If truncated, count total lines in file for accurate message
+                  total-line-count (when truncated-by-lines?
+                                     (with-open [rdr (io/reader file)]
+                                       (count (line-seq rdr))))
                   content-lines (if truncated-by-lines? (take limit lines) lines)
                   content (str/join "\n" content-lines)]
               {:content content
@@ -151,6 +156,7 @@
                :truncated-by (when truncated-by-lines? "max-lines")
                :size size
                :line-count (count content-lines)
+               :total-line-count total-line-count
                :offset offset
                :max-line-length max-line-length
                :line-lengths-truncated? (and max-line-length

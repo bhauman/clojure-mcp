@@ -65,3 +65,27 @@
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.txt")))
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.md")))
     (is (not (unified-read-file-tool/collapsible-clojure-file? "test.js")))))
+
+(deftest format-raw-file-truncation-message-test
+  (testing "Truncation message shows total line count, not file size"
+    (let [result {:content "line1\nline2\nline3"
+                  :path "/test/file.txt"
+                  :size 118628  ; File size in bytes (should NOT be shown)
+                  :line-count 3  ; Lines shown
+                  :total-line-count 2000  ; Total lines in file (should be shown)
+                  :truncated? true}
+          formatted (unified-read-file-tool/format-raw-file result 2000)
+          formatted-str (first formatted)]
+      (is (re-find #"showing 3 of 2000 lines" formatted-str)
+          "Should show total line count (2000), not file size (118628)")))
+
+  (testing "Non-truncated file doesn't show truncation message"
+    (let [result {:content "line1\nline2"
+                  :path "/test/file.txt"
+                  :size 1000
+                  :line-count 2
+                  :truncated? false}
+          formatted (unified-read-file-tool/format-raw-file result 2000)
+          formatted-str (first formatted)]
+      (is (not (re-find #"truncated" formatted-str))
+          "Should not show truncation message when not truncated"))))

@@ -253,12 +253,12 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
 (defn format-raw-file
   "Formats raw file content with markdown."
   [result max-lines]
-  (let [{:keys [content path size line-count offset truncated? line-lengths-truncated?]} result
+  (let [{:keys [content path size line-count offset truncated? line-lengths-truncated? total-line-count]} result
         file-type (last (str/split path #"\."))
         lang-hint (when file-type (str file-type))
         preamble (str "### " path "\n"
                       (when truncated?
-                        (str "File truncated (showing " line-count " of " size " lines)\n\n")))]
+                        (str "File truncated (showing " line-count " of " total-line-count " lines)\n\n")))]
     [(str preamble "```" lang-hint "\n" content "\n```")]))
 
 (defn format-text-collapsed-view

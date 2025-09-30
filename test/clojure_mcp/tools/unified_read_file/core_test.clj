@@ -63,21 +63,26 @@
       (is (= 2 (count (str/split (:content result) #"\n"))))
       (is (str/starts-with? (:content result) "Line 1"))
       (is (:truncated? result))
-      (is (= "max-lines" (:truncated-by result)))))
+      (is (= "max-lines" (:truncated-by result)))
+      (is (= 2 (:line-count result)))
+      (is (= 5 (:total-line-count result)))))
 
   (testing "Reading with offset and limit"
     (let [result (read-file-core/read-file (.getPath *test-file*) 1 2)]
       (is (map? result))
       (is (= 2 (count (str/split (:content result) #"\n"))))
       (is (str/starts-with? (:content result) "Line 2"))
-      (is (:truncated? result))))
+      (is (:truncated? result))
+      ;; total-line-count should be total lines in file, not remaining from offset
+      (is (= 5 (:total-line-count result)))))
 
   (testing "Reading with line length limit"
     (let [result (read-file-core/read-file (.getPath *large-test-file*) 0 5 :max-line-length 10)]
       (is (map? result))
       (is (= 5 (count (str/split (:content result) #"\n"))))
       (is (every? #(str/includes? % "...") (str/split (:content result) #"\n")))
-      (is (:line-lengths-truncated? result)))))
+      (is (:line-lengths-truncated? result))
+      (is (= 100 (:total-line-count result))))))
 
 (deftest read-file-error-test
   (testing "Reading non-existent file"
