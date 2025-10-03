@@ -166,7 +166,7 @@ I get out of it is far more than what I'm paying.
 
 ### Using with Claude Code and Other Code Assistants
 
-ClojureMCP can be used with alomst and LLM cleint like Claude Desktop,
+ClojureMCP can be used with almost any LLM client like Claude Desktop,
 Claude Code and many many more.
 
 I use ClojureMCP with Claude Desktop because I can read the tool
