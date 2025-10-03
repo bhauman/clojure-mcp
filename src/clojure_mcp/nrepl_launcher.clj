@@ -15,8 +15,8 @@
    Returns the port number as an integer or nil if not found."
   [output]
   (when output
-    (let [patterns [#"nREPL server started on port[^\d]*(\d+)" ; nREPL server started on port 12345
-                    #_#"(?i)port[^\d]*(\d+)" ; port 12345, port: 12345
+    (let [patterns [#"nREPL server started on port\s{1,10}(\d+)" ; nREPL server started on port 12345
+                    ;; remaining patterns unchanged
                     #":(\d{4,5})\b" ; :12345 (4-5 digit ports)
                     #"Started.*?(\d{4,5})\b" ; Started on 12345
                     #"Listening.*?(\d{4,5})\b"] ; Listening on 12345
