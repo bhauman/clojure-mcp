@@ -16,7 +16,7 @@
   [output]
   (when output
     (let [patterns [#"nREPL server started on port[^\d]*(\d+)" ; nREPL server started on port 12345
-                    #"(?i)port[^\d]*(\d+)" ; port 12345, port: 12345
+                    #_#"(?i)port[^\d]*(\d+)" ; port 12345, port: 12345
                     #":(\d{4,5})\b" ; :12345 (4-5 digit ports)
                     #"Started.*?(\d{4,5})\b" ; Started on 12345
                     #"Listening.*?(\d{4,5})\b"] ; Listening on 12345
