@@ -15,7 +15,7 @@
    Returns the port number as an integer or nil if not found."
   [output]
   (when output
-    (let [patterns [#"(?i)port\s{1,10}(\d+)\b" ; port 12345
+    (let [patterns [#"(?i)\bport\s{1,10}(\d{4,5})\b" ; port 12345
                     #":\s?(\d{4,5})\b" ; :12345 or : 12345 (4-5 digit ports)
                     #"(?i)Started on\s{1,10}(\d{4,5})\b" ; Started on 12345
                     #"(?i)Listening on\s{1,10}(\d{4,5})\b"] ; Listening on 12345
