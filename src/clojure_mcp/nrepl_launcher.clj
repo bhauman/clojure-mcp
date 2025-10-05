@@ -15,11 +15,10 @@
    Returns the port number as an integer or nil if not found."
   [output]
   (when output
-    (let [patterns [#"(?i)nrepl.*?port[^\d]*(\d+)" ; nREPL server started on port 12345
-                    #"(?i)port[^\d]*(\d+)" ; port 12345, port: 12345
-                    #":(\d{4,5})\b" ; :12345 (4-5 digit ports)
-                    #"Started.*?(\d{4,5})\b" ; Started on 12345
-                    #"Listening.*?(\d{4,5})\b"] ; Listening on 12345
+    (let [patterns [#"(?i)port\s{1,10}(\d+)\b" ; port 12345
+                    #":\s?(\d{4,5})\b" ; :12345 or : 12345 (4-5 digit ports)
+                    #"(?i)Started on\s{1,10}(\d{4,5})\b" ; Started on 12345
+                    #"(?i)Listening on\s{1,10}(\d{4,5})\b"] ; Listening on 12345
           line (str/trim output)]
       (some (fn [pattern]
               (when-let [match (re-find pattern line)]
