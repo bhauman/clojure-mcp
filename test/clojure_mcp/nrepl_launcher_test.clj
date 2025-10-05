@@ -26,7 +26,9 @@
         "port abc" ; non-numeric
         "port 123" ; too small (below 1024)
         "port 999999" ; too large (above 65535)
-        "random text"))
+        "random text"
+        ;; FlowStorm output should not match (issue #109)
+        "flow_storm.jobs$run_jobs$mem_reporter__4628@348137e8 function scheduled every 1000 millis"))
 
     (testing "handles case insensitive matching"
       (are [output expected] (= expected (launcher/parse-port-from-output output))
