@@ -3,6 +3,7 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.config :as config]
+   [clojure.string :as str]
    [clojure.tools.logging :as log]))
 
 (defmethod tool-system/tool-name :manage-prompts [_]
@@ -116,28 +117,28 @@ Example usage:
                         (if (empty? (:prompts result))
                           "No prompts saved yet."
                           (str "Saved prompts (" (:count result) "):\n"
-                               (clojure.string/join "\n"
-                                                    (map (fn [[k v]]
-                                                           (let [desc (if (map? v)
-                                                                        (or (:description v)
-                                                                            (:content v)
-                                                                            (str v))
-                                                                        (str v))
-                                                                 preview (subs desc 0 (min 60 (count desc)))]
-                                                             (str "- " k ": " preview
-                                                                  (when (> (count desc) 60) "..."))))
-                                                         (:prompts result)))))
+                               (str/join "\n"
+                                         (map (fn [[k v]]
+                                                (let [desc (if (map? v)
+                                                             (or (:description v)
+                                                                 (:content v)
+                                                                 (str v))
+                                                             (str v))
+                                                      preview (subs desc 0 (min 60 (count desc)))]
+                                                  (str "- " k ": " preview
+                                                       (when (> (count desc) 60) "..."))))
+                                              (:prompts result)))))
                         ;; get_prompt with result
                         (let [content (:prompt_content result)]
                           (str "Prompt: " (:prompt_name result) "\n\n"
                                (if (map? content)
-                                 (clojure.string/join "\n"
-                                                      [(when (:description content)
-                                                         (str "Description: " (:description content)))
-                                                       (when (:content content)
-                                                         (str "Content:\n" (:content content)))
-                                                       (when (:file-path content)
-                                                         (str "File: " (:file-path content)))])
+                                 (str/join "\n"
+                                           [(when (:description content)
+                                              (str "Description: " (:description content)))
+                                            (when (:content content)
+                                              (str "Content:\n" (:content content)))
+                                            (when (:file-path content)
+                                              (str "File: " (:file-path content)))])
                                  content))))
                       ;; Messages from add/remove operations or not found
                       (:message result))]
@@ -152,7 +153,7 @@ Example usage:
 
 (defn manage-prompts-tool
   "Returns the registration map for the manage-prompts tool.
-   
+
    Parameters:
    - nrepl-client-atom: Atom containing the nREPL client"
   [nrepl-client-atom]
