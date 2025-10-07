@@ -2,6 +2,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [clojure.pprint :as pprint]
    [clojure-mcp.dialects :as dialects]
    [clojure-mcp.config.schema :as schema]
    [clojure.edn :as edn]
@@ -34,12 +35,45 @@
   []
   (io/file (System/getProperty "user.home") ".clojure-mcp" "config.edn"))
 
-(defn- load-home-config
+(defn load-home-config
   "Loads configuration from ~/.clojure-mcp/config.edn.
    Returns empty map if the file doesn't exist."
   []
   (let [home-config-file (get-home-config-path)]
     (load-config-file (.getPath home-config-file))))
+
+(defn save-config-file
+  "Saves a config map to the specified path in EDN format.
+   Creates parent directories if they don't exist."
+  [config-map file-path]
+  (let [file (io/file file-path)
+        parent (.getParentFile file)]
+    (when (and parent (not (.exists parent)))
+      (.mkdirs parent))
+    (try
+      (spit file (with-out-str (pprint/pprint config-map)))
+      (log/info "Config saved to:" (.getPath file))
+      true
+      (catch Exception e
+        (log/error e "Failed to save config file:" (.getPath file))
+        false))))
+
+(defn- get-project-config-path
+  "Returns the path to the project config file in the given working directory."
+  [working-dir]
+  (io/file working-dir ".clojure-mcp" "config.edn"))
+
+(defn load-project-config
+  "Loads configuration from .clojure-mcp/config.edn in the given working directory.
+   Returns empty map if the file doesn't exist."
+  [working-dir]
+  (let [project-config-file (get-project-config-path working-dir)]
+    (load-config-file (.getPath project-config-file))))
+
+(defn save-project-config
+  "Saves a config map to the project's config file."
+  [config-map working-dir]
+  (save-config-file config-map (get-project-config-path working-dir)))
 
 (defn- deep-merge
   "Deeply merges maps, with the second map taking precedence.
@@ -61,11 +95,11 @@
   "Validates a sequence of config files with their file paths.
    Takes a sequence of maps with :config and :file-path keys.
    Validates each config sequentially and throws on the first error found.
-   
+
    Each map should have:
    - :config    - The configuration map to validate
    - :file-path - The path to the config file (for error reporting)
-   
+
    Throws ExceptionInfo with:
    - :type      ::schema-error
    - :errors    - Validation errors from Malli
@@ -137,7 +171,7 @@
              (conj {:config home-config
                     :file-path (.getCanonicalPath home-config-path)})
 
-             ;; Only validate project config if it exists and has content  
+             ;; Only validate project config if it exists and has content
              (seq project-config)
              (conj {:config project-config
                     :file-path (.getCanonicalPath project-config-file)})))
@@ -331,13 +365,13 @@
 
 (defn tool-id-enabled?
   "Check if a tool should be enabled based on :enable-tools and :disable-tools config.
-   
+
    Logic:
    - If :enable-tools is nil, all tools are enabled (unless in :disable-tools)
    - If :enable-tools is [], no tools are enabled
    - If :enable-tools is provided, only those tools are enabled
    - :disable-tools is then applied to remove tools from the enabled set
-   
+
    Both config lists can contain strings or keywords - they are normalized to keywords."
   [nrepl-client-map tool-id]
   (let [enable-tools (get-enable-tools nrepl-client-map)
@@ -365,13 +399,13 @@
 
 (defn prompt-name-enabled?
   "Check if a prompt should be enabled based on :enable-prompts and :disable-prompts config.
-   
+
    Logic:
    - If :enable-prompts is nil, all prompts are enabled (unless in :disable-prompts)
    - If :enable-prompts is [], no prompts are enabled
    - If :enable-prompts is provided, only those prompts are enabled
    - :disable-prompts is then applied to remove prompts from the enabled set
-   
+
    Prompt names are converted to keywords for comparison.
    Both config lists can contain strings or keywords."
   [nrepl-client-map prompt-name]
@@ -398,13 +432,13 @@
 
 (defn resource-name-enabled?
   "Check if a resource should be enabled based on :enable-resources and :disable-resources config.
-   
+
    Logic:
    - If :enable-resources is nil, all resources are enabled (unless in :disable-resources)
    - If :enable-resources is [], no resources are enabled
    - If :enable-resources is provided, only those resources are enabled
    - :disable-resources is then applied to remove resources from the enabled set
-   
+
    Resource names are used as strings for comparison.
    Both config lists should contain strings."
   [nrepl-client-map resource-name]
@@ -444,5 +478,3 @@
    Uses set-config* to perform the actual update."
   [nrepl-client-atom k v]
   (swap! nrepl-client-atom set-config* k v))
-
-

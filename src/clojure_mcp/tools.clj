@@ -30,7 +30,8 @@
 
 (def experimental-tool-syms
   "Symbols for experimental tool creation functions"
-  ['clojure-mcp.tools.scratch-pad.tool/scratch-pad-tool])
+  ['clojure-mcp.tools.scratch-pad.tool/scratch-pad-tool
+   'clojure-mcp.tools.manage-prompts.tool/manage-prompts-tool])
 
 ;; Note: introspection tools are already included in read-only-tool-syms
 ;; This is kept for documentation purposes but not used in all-tool-syms
@@ -111,7 +112,7 @@
 
 (defn build-custom-tools
   "Build a custom set of tools from provided symbols.
-   
+
    Example:
    (build-custom-tools nrepl-client-atom
      ['clojure-mcp.tools.eval.tool/eval-code
@@ -122,7 +123,7 @@
 
 (defn filter-tools
   "Filters tools based on enable/disable lists.
-   
+
    Args:
    - all-tools: Vector of all available tools
    - enable-tools: Can be:
@@ -130,7 +131,7 @@
                    - :all: returns all tools (minus disabled)
                    - [...]: returns only specified tools (minus disabled)
    - disable-tools: List of tool IDs to disable
-   
+
    Returns: Filtered vector of tools"
   [all-tools enable-tools disable-tools]
   (cond
