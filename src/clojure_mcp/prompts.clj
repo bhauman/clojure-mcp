@@ -280,6 +280,28 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                                                          (.getPath file)
                                                          (.getMessage e))}]})))))))})
 
+(def save-new-prompt
+  {:name "save_new_prompt"
+   :description "Asks the user for a new prompt and a name, and saves them to their user config"
+   :arguments [{:name "prompt_name"
+                :description "Name for this prompt"
+                :required? true}
+               {:name "prompt_text"
+                :description "Text content for this prompt"
+                :required? true}]
+   :prompt-fn (fn [_ request-args clj-result-k]
+                (let [prompt-name (get request-args "prompt_name")
+                      prompt-text (get request-args "prompt_text")]
+                  (clj-result-k
+                   {:description (str "Create prompt: " prompt-name)
+                    :messages [{:role :user
+                                :content (format
+                                          "Save %s in the `.clojure-mcp` project folder, in the `config.edn` file under the `:prompts` key using the STRING key %s, using the following format:
+`:description` - \"Custom user-added prompt\"
+`:content` - %s
+"
+                                          prompt-name prompt-name prompt-text)}]})))})
+
 (defn create-prompt-from-config
   "Creates a prompt from configuration map.
    Config should have :description, :args, and either :file-path or :content.
@@ -338,6 +360,7 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                 (str
                  (load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
                  (load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
+   save-new-prompt
    (create-project-summary working-dir)
    chat-session-summary
    resume-chat-session
