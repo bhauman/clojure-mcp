@@ -283,24 +283,27 @@ After doing this provide a very brief (8 lines) summary of where we are and then
 (def save-new-prompt
   {:name "save_new_prompt"
    :description "Asks the user for a new prompt and a name, and saves them to their user config"
-   :arguments [{:name "prompt_name"
-                :description "Name for this prompt"
-                :required? true}
-               {:name "prompt_text"
-                :description "Text content for this prompt"
-                :required? true}]
    :prompt-fn (fn [_ request-args clj-result-k]
-                (let [prompt-name (get request-args "prompt_name")
-                      prompt-text (get request-args "prompt_text")]
-                  (clj-result-k
-                   {:description (str "Create prompt: " prompt-name)
-                    :messages [{:role :user
-                                :content (format
-                                          "Save %s in the `.clojure-mcp` project folder, in the `config.edn` file under the `:prompts` key using the STRING key %s, using the following format:
+                (clj-result-k
+                 {:description "Help user create/update a custom prompt"
+                  :messages [{:role :user
+                              :content "Here is how you create a new prompt:
+1. In the `.clojure-mcp` project folder, find the `config.edn` file.
+2. Under the `:prompts` key will be a map of strings (which name the prompts) and maps (which define the prompts).
+3. Note that each prompt has a description and content, and may also have arguments.
+4. Read each prompt, and ask the user if they want to create a new prompt or edit an existing prompt.
+5. Ask the user what they want the prompt to do.
+6. Help the user compose the content of the prompt, including any arguments, if required.
+7. If this is a new prompt, save it as described below.
+8. If this is an existing prompt, update the existing prompt.
+
+How to save a prompt:
+
+Save prompt in the `.clojure-mcp` project folder, in the `config.edn` file under the `:prompts` key using the STRING name of the prompt as the key,
+and using the following format:
 `:description` - \"Custom user-added prompt\"
 `:content` - %s
-"
-                                          prompt-name prompt-name prompt-text)}]})))})
+`:args` - vector of args, where each arg is a map of `:name`, `:description`, and a `:required?` flag."}]}))})
 
 (defn create-prompt-from-config
   "Creates a prompt from configuration map.
