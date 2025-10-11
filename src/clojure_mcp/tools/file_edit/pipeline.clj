@@ -23,6 +23,8 @@
 (s/def ::old-string string?)
 (s/def ::new-string string?)
 (s/def ::nrepl-client-atom (s/nilable #(instance? clojure.lang.Atom %)))
+
+(s/def ::dry-run (s/nilable #{"diff" "new-source"}))
 ;; Pipeline specific steps
 
 ;; Using check-file-modified from form-edit/pipeline instead
@@ -117,15 +119,16 @@
    - file-path: Path to the file to edit
    - old-string: String to replace
    - new-string: New string to insert
-   - nrepl-client-atom: Atom containing the nREPL client (optional)
-   - config: Optional tool configuration map
+   - dry-run: Optional string, either \"diff\" or \"new-source\" to skip actual file write
+   - config: Optional tool configuration map with :nrepl-client-atom
    
    Returns:
    - A context map with the result of the operation"
-  [file-path old-string new-string {:keys [nrepl-client-atom] :as config}]
+  [file-path old-string new-string dry-run {:keys [nrepl-client-atom] :as config}]
   (let [initial-ctx {::form-pipeline/file-path file-path
                      ::old-string old-string
                      ::new-string new-string
+                     ::dry-run dry-run
                      ::form-pipeline/nrepl-client-atom nrepl-client-atom
                      ::form-pipeline/config config}]
     ;; Pipeline for existing file edit
@@ -147,9 +150,14 @@
      format-clojure-content ;; Format Clojure files automatically
      form-pipeline/determine-file-type ;; This will mark as "update"
      form-pipeline/generate-diff ;; Generate diff between old and new
-     form-pipeline/save-file ;; Save the file
-     form-pipeline/update-file-timestamp ;; Update the timestamp after save
-     form-pipeline/highlight-form))) ;; Update the timestamp after save ;; Update the timestamp after save
+     ;; Skip file operations if dry-run is set
+     (fn [ctx]
+       (if (::dry-run ctx)
+         ctx
+         (-> ctx
+             form-pipeline/save-file
+             form-pipeline/update-file-timestamp
+             form-pipeline/highlight-form)))))) ;; Update the timestamp after save ;; Update the timestamp after save
 
 ;; Format result for tool consumption
 (defn format-result
@@ -159,17 +167,25 @@
    - ctx: The final context map from the pipeline
    
    Returns:
-   - A map with :error, :message, and :diff keys, and potentially :repaired"
+   - A map with :error, :message, and :diff or :new-source keys, and potentially :repaired"
   [ctx]
   (if (::form-pipeline/error ctx)
     {:error true
      :message (::form-pipeline/message ctx)}
-    (cond-> {:error false
-             :diff (::form-pipeline/diff ctx)
-             :type (::form-pipeline/type ctx)}
-      ;; Include repaired flag if present
-      (::form-pipeline/repaired ctx)
-      (assoc :repaired true))))
+    (let [dry-run (::dry-run ctx)]
+      (cond-> {:error false
+               :type (::form-pipeline/type ctx)}
+        ;; Include repaired flag if present
+        (::form-pipeline/repaired ctx)
+        (assoc :repaired true)
+
+        ;; Return new-source if dry-run is "new-source"
+        (= dry-run "new-source")
+        (assoc :new-source (::form-pipeline/output-source ctx))
+
+        ;; Otherwise return diff (default behavior and for "diff" dry-run)
+        (not= dry-run "new-source")
+        (assoc :diff (::form-pipeline/diff ctx))))))
 
 (comment
   ;; === Examples of using the file-edit pipeline directly ===
