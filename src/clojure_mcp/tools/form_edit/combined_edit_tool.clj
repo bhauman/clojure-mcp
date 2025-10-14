@@ -154,21 +154,21 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
 
 ;; Execute tool implementation
 (defmethod tool-system/execute-tool :clojure-edit-form [{:keys [nrepl-client-atom] :as tool} inputs]
-  (let [{:keys [file_path form_name form_type operation content]} inputs
+  (let [{:keys [file_path form_name form_type operation content dry-run]} inputs
         edit-type (case operation
                     "replace" :replace
                     "insert_before" :before
                     "insert_after" :after)
-        result (pipeline/edit-form-pipeline file_path form_name form_type content edit-type tool)
+        result (pipeline/edit-form-pipeline file_path form_name form_type content edit-type dry-run tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 
 ;; Format results implementation
-(defmethod tool-system/format-results :clojure-edit-form [_ {:keys [error message diff]}]
+(defmethod tool-system/format-results :clojure-edit-form [_ {:keys [error message diff new-source]}]
   (if error
     {:result [message]
      :error true}
-    {:result [diff]
+    {:result [(or new-source diff)]
      :error false}))
 
 ;; Tool registration function

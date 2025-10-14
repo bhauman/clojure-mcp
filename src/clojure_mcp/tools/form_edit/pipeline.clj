@@ -43,14 +43,15 @@
 
 (s/def ::nrepl-client-atom (s/nilable #(instance? clojure.lang.Atom %)))
 
-;; Context map that flows through the pipeline
+(s/def ::dry-run (s/nilable #{"diff" "new-source"}))
+
 (s/def ::context
   (s/keys :req [::file-path]
           :opt [::source ::old-content ::new-source-code ::top-level-def-name
                 ::top-level-def-type ::edit-type ::error ::message
                 ::zloc ::offsets ::lint-result ::docstring
                 ::comment-substring ::new-content ::expand-symbols
-                ::diff ::type ::output-source ::nrepl-client-atom]))
+                ::diff ::type ::output-source ::nrepl-client-atom ::dry-run]))
 
 ;; Pipeline helper functions
 
@@ -536,16 +537,27 @@
    - ctx: The final context map from the pipeline
    
    Returns:
-   - A map with :error, :message, and possibly :offsets and :result keys"
+   - A map with :error, :message, and possibly :diff or :new-source, and :offsets keys"
   [ctx]
   (if (::error ctx)
     {:error true
      :message (::message ctx)}
-    (let [result-map {:error false}]
+    (let [dry-run (::dry-run ctx)
+          result-map {:error false}]
       (cond-> result-map
         (::offsets ctx) (assoc :offsets (::offsets ctx))
-        (::output-source ctx) (assoc :result [(::output-source ctx)])
-        (::diff ctx) (assoc :diff (::diff ctx))))))
+
+        ;; Return new-source if dry-run is "new-source"
+        (= dry-run "new-source")
+        (assoc :new-source (::output-source ctx))
+
+        ;; Otherwise return diff (default behavior and for "diff" dry-run)
+        (and (::diff ctx) (not= dry-run "new-source"))
+        (assoc :diff (::diff ctx))
+
+        ;; Legacy: include :result if output-source exists
+        (and (::output-source ctx) (not dry-run))
+        (assoc :result [(::output-source ctx)])))))
 
 ;; Pipeline function definitions
 
@@ -558,16 +570,17 @@
    - form-type: Type of form (e.g., 'defn', 'defmethod')
    - content-str: New content to insert
    - edit-type: Type of edit (:replace, :before, :after)
-   - nrepl-client-atom: Atom containing the nREPL client (optional)
-   - config: Optional tool configuration map
+   - dry-run: Optional string, either \"diff\" or \"new-source\" to skip actual file write
+   - config: Optional tool configuration map with :nrepl-client-atom
    
    Returns a context map with the result of the operation"
-  [file-path form-name form-type content-str edit-type {:keys [nrepl-client-atom] :as config}]
+  [file-path form-name form-type content-str edit-type dry-run {:keys [nrepl-client-atom] :as config}]
   (let [ctx {::file-path file-path
              ::top-level-def-name form-name
              ::top-level-def-type form-type
              ::new-source-code content-str
              ::edit-type edit-type
+             ::dry-run dry-run
              ::nrepl-client-atom nrepl-client-atom
              ::config config}]
     (thread-ctx
@@ -587,9 +600,15 @@
      format-source
      determine-file-type
      generate-diff
-     save-file
-     update-file-timestamp
-     highlight-form)))
+     ;; Skip file operations if dry-run is set
+     (fn [ctx]
+       (log/info [:CONTEXT (pr-str (keys ctx))])
+       (if (::dry-run ctx)
+         ctx
+         (-> ctx
+             save-file
+             update-file-timestamp
+             highlight-form))))))
 
 (defn docstring-edit-pipeline
   "Pipeline for editing a docstring in a file.
