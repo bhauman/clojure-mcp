@@ -59,10 +59,7 @@ Before using this tool:
    :properties {:file_path {:type :string
                             :description "The absolute path to the file to write (must be absolute, not relative)"}
                 :content {:type :string
-                          :description "The content to write to the file"}
-                :dry_run {:type :string
-                          :enum ["diff" "new-source"]
-                          :description "Optional: Preview mode. 'diff' returns unified diff without writing, 'new-source' returns complete file content without writing"}}
+                          :description "The content to write to the file"}}
    :required [:file_path :content]})
 
 (defmethod tool-system/validate-inputs :file-write [{:keys [nrepl-client-atom]} inputs]
