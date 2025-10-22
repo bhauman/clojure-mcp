@@ -59,11 +59,14 @@ Before using this tool:
    :properties {:file_path {:type :string
                             :description "The absolute path to the file to write (must be absolute, not relative)"}
                 :content {:type :string
-                          :description "The content to write to the file"}}
+                          :description "The content to write to the file"}
+                :dry_run {:type :string
+                          :enum ["diff" "new-source"]
+                          :description "Optional: Preview mode. 'diff' returns unified diff without writing, 'new-source' returns complete file content without writing"}}
    :required [:file_path :content]})
 
 (defmethod tool-system/validate-inputs :file-write [{:keys [nrepl-client-atom]} inputs]
-  (let [{:keys [file_path content]} inputs
+  (let [{:keys [file_path content dry_run]} inputs
         nrepl-client (and nrepl-client-atom @nrepl-client-atom)]
     (when-not file_path
       (throw (ex-info "Missing required parameter: file_path" {:inputs inputs})))
@@ -88,10 +91,11 @@ Before using this tool:
 
       ;; Return validated inputs with normalized path
       {:file-path validated-path
-       :content content})))
+       :content content
+       :dry_run dry_run})))
 
 (defmethod tool-system/execute-tool :file-write [{:keys [nrepl-client-atom]} inputs]
-  (let [{:keys [file-path content]} inputs
+  (let [{:keys [file-path content dry_run]} inputs
         ;; Capture original content - empty string for new files
         _ (when nrepl-client-atom
             (let [file (io/file file-path)]
@@ -105,9 +109,9 @@ Before using this tool:
                  nrepl-client-atom
                  file-path
                  ""))))
-        result (core/write-file nrepl-client-atom file-path content)]
+        result (core/write-file nrepl-client-atom file-path content dry_run)]
     ;; Update the timestamp if write was successful and we have a client atom
-    (when (and nrepl-client-atom (not (:error result)))
+    (when (and nrepl-client-atom (not (:error result)) (not dry_run))
       (file-timestamps/update-file-timestamp-to-current-mtime! nrepl-client-atom file-path))
     result))
 
@@ -116,16 +120,20 @@ Before using this tool:
     ;; If there's an error, return the error message
     {:result [(:message result)]
      :error true}
-    ;; Otherwise, format a successful result
-    (let [file-type (if (core/is-clojure-file? (:file-path result)) "Clojure" "Text")
-          response (str file-type " file " (:type result) "d: " (:file-path result))]
-      (if (seq (:diff result))
-        ;; If there's a diff, include it in the response
-        {:result [(str response "\nChanges:\n" (:diff result))]
-         :error false}
-        ;; Otherwise, just show the success message
-        {:result [response]
-         :error false}))))
+    ;; Check if this is a dry_run with new-source
+    (if-let [new-source (:new-source result)]
+      {:result [new-source]
+       :error false}
+      ;; Otherwise, format a successful result
+      (let [file-type (if (core/is-clojure-file? (:file-path result)) "Clojure" "Text")
+            response (str file-type " file " (:type result) "d: " (:file-path result))]
+        (if (seq (:diff result))
+          ;; If there's a diff, include it in the response
+          {:result [(str response "\nChanges:\n" (:diff result))]
+           :error false}
+          ;; Otherwise, just show the success message
+          {:result [response]
+           :error false})))))
 
 ;; Backward compatibility function that returns the registration map
 (defn file-write-tool

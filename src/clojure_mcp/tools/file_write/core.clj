@@ -2,22 +2,22 @@
   "Core implementation for the file-write tool.
    This namespace contains the pure functionality without any MCP-specific code."
   (:require
-    [clojure.java.io :as io]
-    [clojure-mcp.tools.form-edit.pipeline :as pipeline]
-    [clojure-mcp.utils.diff :as diff-utils]
-    [clojure-mcp.linting :as linting]
-    [clojure-mcp.utils.valid-paths :as valid-paths]
-    [rewrite-clj.zip :as z]))
+   [clojure.java.io :as io]
+   [clojure-mcp.tools.form-edit.pipeline :as pipeline]
+   [clojure-mcp.utils.diff :as diff-utils]
+   [clojure-mcp.linting :as linting]
+   [clojure-mcp.utils.valid-paths :as valid-paths]
+   [rewrite-clj.zip :as z]))
 
-  (defn is-clojure-file?
-    "Check if a file is a Clojure-related file based on its extension or Babashka shebang.
+(defn is-clojure-file?
+  "Check if a file is a Clojure-related file based on its extension or Babashka shebang.
 
      Parameters:
      - file-path: Path to the file to check
 
      Returns true for Clojure extensions (.clj, .cljs, .cljc, .edn, .bb) or files with a `bb` shebang."
-    [file-path]
-    (boolean (valid-paths/clojure-file? file-path)))
+  [file-path]
+  (boolean (valid-paths/clojure-file? file-path)))
 
 (defn write-clojure-file
   "Write content to a Clojure file, with linting, formatting, and diffing.
@@ -25,10 +25,11 @@
    Parameters:
    - file-path: Validated path to the file to write
    - content: Content to write to the file
+   - dry_run: Optional preview mode ('diff' or 'new-source')
    
    Returns:
    - A map with :error, :type, :file-path, and :diff keys"
-  [nrepl-client-atom file-path content]
+  [nrepl-client-atom file-path content dry_run]
   (let [file (io/file file-path)
         file-exists? (.exists file)
         old-content (if file-exists? (slurp file) "")
@@ -50,16 +51,28 @@
                 pipeline/format-source ;; Format the content
                 pipeline/generate-diff ;; Generate diff between old and new content
                 pipeline/determine-file-type ;; Determine if creating or updating
-                pipeline/save-file)] ;; Save the file and get offsets
+                ;; Conditionally skip file save if dry_run is set
+                (fn [ctx]
+                  (if dry_run
+                    ctx
+                    (pipeline/save-file ctx))))]
 
     ;; Format the result for tool consumption
     (if (::pipeline/error result)
       {:error true
        :message (::pipeline/message result)}
-      {:error false
-       :type (::pipeline/type result)
-       :file-path (::pipeline/file-path result)
-       :diff (::pipeline/diff result)})))
+      (cond
+        ;; Return new-source for dry_run="new-source"
+        (= dry_run "new-source")
+        {:error false
+         :new-source (::pipeline/output-source result)}
+
+        ;; Return diff for dry_run="diff" or normal operation
+        :else
+        {:error false
+         :type (::pipeline/type result)
+         :file-path (::pipeline/file-path result)
+         :diff (::pipeline/diff result)}))))
 
 (defn write-text-file
   "Write content to a non-Clojure text file, with diffing but no linting or formatting.
@@ -67,10 +80,11 @@
    Parameters:
    - file-path: Validated path to the file to write
    - content: Content to write to the file
+   - dry_run: Optional preview mode ('diff' or 'new-source')
    
    Returns:
    - A map with :error, :type, :file-path, and :diff keys"
-  [file-path content]
+  [file-path content dry_run]
   (try
     (let [file (io/file file-path)
           file-exists? (.exists file)
@@ -82,13 +96,20 @@
                    (diff-utils/generate-unified-diff old-content content))
                  "")]
 
-      ;; Write the content directly
-      (spit file content)
+      ;; Return new-source if dry_run="new-source"
+      (if (= dry_run "new-source")
+        {:error false
+         :new-source content}
 
-      {:error false
-       :type (if file-exists? "update" "create")
-       :file-path file-path
-       :diff diff})
+        (do
+          ;; Write the content only if not in dry_run mode
+          (when-not dry_run
+            (spit file content))
+
+          {:error false
+           :type (if file-exists? "update" "create")
+           :file-path file-path
+           :diff diff})))
     (catch Exception e
       {:error true
        :message (str "Error writing file: " (.getMessage e))})))
@@ -101,10 +122,11 @@
    Parameters:
    - file-path: Validated path to the file to write
    - content: Content to write to the file
+   - dry_run: Optional preview mode ('diff' or 'new-source')
    
    Returns:
    - A map with :error, :type, :file-path, and :diff keys"
-  [nrepl-client-atom file-path content]
+  [nrepl-client-atom file-path content dry_run]
   (if (is-clojure-file? file-path)
-    (write-clojure-file nrepl-client-atom file-path content)
-    (write-text-file file-path content)))
+    (write-clojure-file nrepl-client-atom file-path content dry_run)
+    (write-text-file file-path content dry_run)))

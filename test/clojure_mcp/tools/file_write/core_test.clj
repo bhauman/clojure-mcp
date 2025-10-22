@@ -66,7 +66,7 @@
   (testing "Creating a new text file"
     (let [new-file (io/file *test-dir* "new-text-file.txt")
           content "This is a brand new file."
-          result (file-write-core/write-text-file (.getPath new-file) content)]
+          result (file-write-core/write-text-file (.getPath new-file) content nil)]
       (is (not (:error result)))
       (is (= "create" (:type result)))
       (is (= (.getPath new-file) (:file-path result)))
@@ -79,7 +79,7 @@
     (let [path (.getPath *test-txt-file*)
           original-content (slurp *test-txt-file*)
           new-content "This is updated content.\nWith new lines."
-          result (file-write-core/write-text-file path new-content)]
+          result (file-write-core/write-text-file path new-content nil)]
       (is (not (:error result)))
       (is (= "update" (:type result)))
       (is (= path (:file-path result)))
@@ -93,7 +93,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   (.getPath new-file)
-                  content)]
+                  content
+                  nil)]
       (is (not (:error result)))
       (is (= "create" (:type result)))
       (is (= (.getPath new-file) (:file-path result)))
@@ -107,7 +108,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   path
-                  new-content)]
+                  new-content
+                  nil)]
       (is (not (:error result)))
       (is (= "update" (:type result)))
       (is (= path (:file-path result)))
@@ -120,7 +122,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   path
-                  unformatted-content)]
+                  unformatted-content
+                  nil)]
       (is (not (:error result)))
       (is (= "update" (:type result)))
       (is (not (str/includes? (slurp *test-clj-file*) "poorly-formatted-fn[x]")))
@@ -132,7 +135,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   path
-                  content-with-missing-paren)]
+                  content-with-missing-paren
+                  nil)]
       (is (not (:error result)))
       (is (= "update" (:type result)))
       (let [saved-content (slurp *test-clj-file*)]
@@ -146,7 +150,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   path
-                  content-with-mismatched-brackets)]
+                  content-with-mismatched-brackets
+                  nil)]
       (is (not (:error result)))
       (is (= "update" (:type result)))
       (let [saved-content (slurp *test-clj-file*)]
@@ -161,7 +166,8 @@
           result (file-write-core/write-clojure-file
                   test-utils/*nrepl-client-atom*
                   path
-                  content-with-syntax-error)]
+                  content-with-syntax-error
+                  nil)]
       ;; The test should fail with a specific error
       (is (:error result) "Should have error for non-repairable syntax error")
       (when (:message result)
@@ -176,7 +182,8 @@
           content "(ns dispatch.test)"
           result (file-write-core/write-file test-utils/*nrepl-client-atom*
                                              (.getPath clj-file)
-                                             content)]
+                                             content
+                                             nil)]
       (is (not (:error result)))
       (is (= "create" (:type result)))
       (is (.exists clj-file))
@@ -187,7 +194,8 @@
           content "Plain text content"
           result (file-write-core/write-file test-utils/*nrepl-client-atom*
                                              (.getPath txt-file)
-                                             content)]
+                                             content
+                                             nil)]
       (is (not (:error result)))
       (is (= "create" (:type result)))
       (is (.exists txt-file))
