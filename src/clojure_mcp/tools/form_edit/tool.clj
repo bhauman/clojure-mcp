@@ -164,7 +164,7 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
 
 (defmethod tool-system/execute-tool :clojure-edit-replace-form [{:keys [nrepl-client-atom] :as tool} inputs]
   (let [{:keys [file_path form_name form_type content]} inputs
-        result (pipeline/edit-form-pipeline file_path form_name form_type content :replace tool)
+        result (pipeline/edit-form-pipeline file_path form_name form_type content :replace nil tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 
@@ -256,7 +256,7 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
 
 (defmethod tool-system/execute-tool :clojure-edit-insert-before-form [{:keys [nrepl-client-atom] :as tool} inputs]
   (let [{:keys [file_path form_name form_type content]} inputs
-        result (pipeline/edit-form-pipeline file_path form_name form_type content :before tool)
+        result (pipeline/edit-form-pipeline file_path form_name form_type content :before nil tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 
@@ -348,7 +348,7 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
 
 (defmethod tool-system/execute-tool :clojure-edit-insert-after-form [{:keys [nrepl-client-atom] :as tool} inputs]
   (let [{:keys [file_path form_name form_type content]} inputs
-        result (pipeline/edit-form-pipeline file_path form_name form_type content :after tool)
+        result (pipeline/edit-form-pipeline file_path form_name form_type content :after nil tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 

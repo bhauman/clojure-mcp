@@ -294,6 +294,7 @@
                            "defn"
                            "(defn example-fn [x y]\n  (* x y))"
                            :replace
+                           nil
                            *nrepl-client-atom*)
           result (sut/format-result pipeline-result)
           file-content (slurp file-path)]
@@ -316,6 +317,7 @@
                            "comment"
                            "(comment some test comment)"
                            :replace
+                           nil
                            *nrepl-client-atom*)]
       (is (true? (::sut/error pipeline-result)))
       (is (string? (::sut/message pipeline-result)))
