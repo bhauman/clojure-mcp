@@ -81,8 +81,8 @@ To make a file edit, provide the file_path, old_string (the text to replace), an
              :new_string new_string))))
 
 (defmethod tool-system/execute-tool :file-edit [{:keys [nrepl-client-atom] :as tool} inputs]
-  (let [{:keys [file_path old_string new_string dry-run]} inputs
-        result (pipeline/file-edit-pipeline file_path old_string new_string dry-run tool)]
+  (let [{:keys [file_path old_string new_string dry_run]} inputs
+        result (pipeline/file-edit-pipeline file_path old_string new_string dry_run tool)]
     (pipeline/format-result result)))
 
 (defmethod tool-system/format-results :file-edit [_ {:keys [error message diff new-source type repaired]}]

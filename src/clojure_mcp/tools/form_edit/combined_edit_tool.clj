@@ -126,7 +126,7 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
 ;; Validate inputs implementation
 (defmethod tool-system/validate-inputs :clojure-edit-form [{:keys [nrepl-client-atom]} inputs]
   (let [file-path (validate-file-path inputs nrepl-client-atom)
-        {:keys [form_identifier form_type operation content dry-run]} inputs
+        {:keys [form_identifier form_type operation content dry_run]} inputs
         form_name form_identifier]
     (when-not form_identifier
       (throw (ex-info "Missing required parameter: form_identifier"
@@ -149,16 +149,16 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
      :form_type form_type
      :operation operation
      :content content
-     :dry-run dry-run}))
+     :dry_run dry_run}))
 
 ;; Execute tool implementation
 (defmethod tool-system/execute-tool :clojure-edit-form [{:keys [nrepl-client-atom] :as tool} inputs]
-  (let [{:keys [file_path form_name form_type operation content dry-run]} inputs
+  (let [{:keys [file_path form_name form_type operation content dry_run]} inputs
         edit-type (case operation
                     "replace" :replace
                     "insert_before" :before
                     "insert_after" :after)
-        result (pipeline/edit-form-pipeline file_path form_name form_type content edit-type dry-run tool)
+        result (pipeline/edit-form-pipeline file_path form_name form_type content edit-type dry_run tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 

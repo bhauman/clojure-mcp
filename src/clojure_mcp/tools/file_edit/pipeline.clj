@@ -124,11 +124,11 @@
    
    Returns:
    - A context map with the result of the operation"
-  [file-path old-string new-string dry-run {:keys [nrepl-client-atom] :as config}]
+  [file-path old-string new-string dry_run {:keys [nrepl-client-atom] :as config}]
   (let [initial-ctx {::form-pipeline/file-path file-path
                      ::old-string old-string
                      ::new-string new-string
-                     ::dry-run dry-run
+                     ::dry-run dry_run
                      ::form-pipeline/nrepl-client-atom nrepl-client-atom
                      ::form-pipeline/config config}]
     ;; Pipeline for existing file edit
@@ -172,7 +172,7 @@
   (if (::form-pipeline/error ctx)
     {:error true
      :message (::form-pipeline/message ctx)}
-    (let [dry-run (::dry-run ctx)]
+    (let [dry_run (::dry-run ctx)]
       (cond-> {:error false
                :type (::form-pipeline/type ctx)}
         ;; Include repaired flag if present
@@ -180,11 +180,11 @@
         (assoc :repaired true)
 
         ;; Return new-source if dry-run is "new-source"
-        (= dry-run "new-source")
+        (= dry_run "new-source")
         (assoc :new-source (::form-pipeline/output-source ctx))
 
         ;; Otherwise return diff (default behavior and for "diff" dry-run)
-        (not= dry-run "new-source")
+        (not= dry_run "new-source")
         (assoc :diff (::form-pipeline/diff ctx))))))
 
 (comment

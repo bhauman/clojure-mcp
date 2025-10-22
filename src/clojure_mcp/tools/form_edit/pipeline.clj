@@ -542,21 +542,21 @@
   (if (::error ctx)
     {:error true
      :message (::message ctx)}
-    (let [dry-run (::dry-run ctx)
+    (let [dry_run (::dry-run ctx)
           result-map {:error false}]
       (cond-> result-map
         (::offsets ctx) (assoc :offsets (::offsets ctx))
 
         ;; Return new-source if dry-run is "new-source"
-        (= dry-run "new-source")
+        (= dry_run "new-source")
         (assoc :new-source (::output-source ctx))
 
         ;; Otherwise return diff (default behavior and for "diff" dry-run)
-        (and (::diff ctx) (not= dry-run "new-source"))
+        (and (::diff ctx) (not= dry_run "new-source"))
         (assoc :diff (::diff ctx))
 
         ;; Legacy: include :result if output-source exists
-        (and (::output-source ctx) (not dry-run))
+        (and (::output-source ctx) (not dry_run))
         (assoc :result [(::output-source ctx)])))))
 
 ;; Pipeline function definitions
@@ -574,13 +574,13 @@
    - config: Optional tool configuration map with :nrepl-client-atom
    
    Returns a context map with the result of the operation"
-  [file-path form-name form-type content-str edit-type dry-run {:keys [nrepl-client-atom] :as config}]
+  [file-path form-name form-type content-str edit-type dry_run {:keys [nrepl-client-atom] :as config}]
   (let [ctx {::file-path file-path
              ::top-level-def-name form-name
              ::top-level-def-type form-type
              ::new-source-code content-str
              ::edit-type edit-type
-             ::dry-run dry-run
+             ::dry-run dry_run
              ::nrepl-client-atom nrepl-client-atom
              ::config config}]
     (thread-ctx
