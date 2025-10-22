@@ -65,11 +65,13 @@
         ;; Return new-source for dry_run="new-source"
         (= dry_run "new-source")
         {:error false
+         :dry_run "new-source"
          :new-source (::pipeline/output-source result)}
 
         ;; Return just diff for dry_run="diff"
         (= dry_run "diff")
         {:error false
+         :dry_run "diff"
          :diff (::pipeline/diff result)}
 
         ;; Return full result for normal operation
@@ -105,11 +107,13 @@
         ;; Return new-source if dry_run="new-source"
         (= dry_run "new-source")
         {:error false
+         :dry_run "new-source"
          :new-source content}
 
         ;; Return just diff for dry_run="diff"
         (= dry_run "diff")
         {:error false
+         :dry_run "diff"
          :diff diff}
 
         ;; Normal operation - write and return full result
