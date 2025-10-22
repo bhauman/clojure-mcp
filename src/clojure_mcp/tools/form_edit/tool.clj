@@ -545,7 +545,7 @@ For reliable results, use a unique substring that appears in only one comment bl
 (defmethod tool-system/validate-inputs :clojure-update-sexp
   [{:keys [nrepl-client-atom multi-op]} inputs]
   (let [file-path (validate-file-path inputs nrepl-client-atom)
-        {:keys [match_form new_form operation replace_all whitespace_sensitive]} inputs]
+        {:keys [match_form new_form operation replace_all whitespace_sensitive dry_run]} inputs]
     (when-not match_form
       (throw (ex-info "Missing required parameter: match_form"
                       {:inputs inputs})))
@@ -567,16 +567,9 @@ For reliable results, use a unique substring that appears in only one comment bl
       (throw (ex-info "Bad parameter: match-form can not be a blank string."
                       {:inputs inputs})))
 
-    ;; TODO we can get more sophisticated here...  we are handling
-    ;; code repairs deeper inside the actually tools evaluation and
-    ;; this prevents it.  Also I think we can actually do comment
-    ;; replacement now but we might need special handling for that.
-
-    ;; Special handling for empty string
     (when-not (str/blank? match_form)
       (try
         (let [parsed (p/parse-string-all match_form)]
-            ;; Check if there's at least one non-whitespace, non-comment node
           (when (zero? (count (n/child-sexprs parsed)))
             (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
                             {:inputs inputs}))))
@@ -587,13 +580,11 @@ For reliable results, use a unique substring that appears in only one comment bl
                             {:inputs inputs}))))))
 
     (when-not (str/blank? new_form)
-      ;; Validate that new_form is valid Clojure code
       (try
         (p/parse-string-all new_form)
         (catch Exception e
           (throw (ex-info (str "Invalid Clojure code in new_form: " (.getMessage e))
                           {:inputs inputs})))))
-    ;; Return validated inputs
     {:file_path file-path
      :match_form match_form
      :new_form new_form
@@ -601,11 +592,11 @@ For reliable results, use a unique substring that appears in only one comment bl
      :replace_all (boolean (if (#{"insert_before" "insert_after"} operation)
                              false
                              (or replace_all false)))
-     :whitespace_sensitive (boolean (or whitespace_sensitive false))}))
+     :whitespace_sensitive (boolean (or whitespace_sensitive false))
+     :dry_run dry_run}))
 
 (defmethod tool-system/execute-tool :clojure-update-sexp [{:keys [multi-op nrepl-client-atom] :as tool} inputs]
-  (let [{:keys [file_path match_form new_form operation replace_all whitespace_sensitive]} inputs
-        ;; Convert operation string to keyword for the pipeline
+  (let [{:keys [file_path match_form new_form operation replace_all whitespace_sensitive dry_run]} inputs
         operation-kw (if-not multi-op
                        :replace
                        (condp = operation
@@ -613,15 +604,15 @@ For reliable results, use a unique substring that appears in only one comment bl
                          "insert_before" :insert-before
                          "insert_after" :insert-after))
         result (pipeline/sexp-edit-pipeline
-                file_path match_form new_form operation-kw replace_all whitespace_sensitive tool)
+                file_path match_form new_form operation-kw replace_all whitespace_sensitive dry_run tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 
-(defmethod tool-system/format-results :clojure-update-sexp [_ {:keys [error message diff]}]
+(defmethod tool-system/format-results :clojure-update-sexp [_ {:keys [error message diff new-source]}]
   (if error
     {:result [message]
      :error true}
-    {:result [diff]
+    {:result [(or new-source diff)]
      :error false}))
 
 ;; Function to register the tool

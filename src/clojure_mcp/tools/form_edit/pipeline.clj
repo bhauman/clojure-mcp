@@ -786,17 +786,19 @@
    - operation: The operation to perform (:replace, :insert-before, :insert-after)
    - replace-all: Whether to apply the operation to all occurrences
    - whitespace-sensitive: Whether to match forms exactly as written
+   - dry_run: Optional string, either \"diff\" or \"new-source\" to skip actual file write
    - config: Optional tool configuration map with nrepl-client-atom
    
    Returns:
    - A context map with the result of the operation"
-  [file-path match-form new-form operation replace-all whitespace-sensitive {:keys [nrepl-client-atom] :as config}]
+  [file-path match-form new-form operation replace-all whitespace-sensitive dry_run {:keys [nrepl-client-atom] :as config}]
   (let [ctx {::file-path file-path
              ::match-form match-form
              ::new-form new-form
              ::operation operation
              ::replace-all replace-all
              ::whitespace-sensitive whitespace-sensitive
+             ::dry-run dry_run
              ::nrepl-client-atom nrepl-client-atom
              ::config config}]
     (thread-ctx
@@ -814,9 +816,13 @@
      format-source
      determine-file-type
      generate-diff
-     save-file
-     update-file-timestamp
-     highlight-form)))
+     (fn [ctx]
+       (if (::dry-run ctx)
+         ctx
+         (-> ctx
+             save-file
+             update-file-timestamp
+             highlight-form))))))
 
 (comment
   ;; Example usage of the pipelines
