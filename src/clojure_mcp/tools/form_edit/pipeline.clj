@@ -600,9 +600,7 @@
      format-source
      determine-file-type
      generate-diff
-     ;; Skip file operations if dry-run is set
      (fn [ctx]
-       (log/info [:CONTEXT (pr-str (keys ctx))])
        (if (::dry-run ctx)
          ctx
          (-> ctx
