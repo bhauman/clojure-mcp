@@ -67,7 +67,12 @@
         {:error false
          :new-source (::pipeline/output-source result)}
 
-        ;; Return diff for dry_run="diff" or normal operation
+        ;; Return just diff for dry_run="diff"
+        (= dry_run "diff")
+        {:error false
+         :diff (::pipeline/diff result)}
+
+        ;; Return full result for normal operation
         :else
         {:error false
          :type (::pipeline/type result)
@@ -96,16 +101,21 @@
                    (diff-utils/generate-unified-diff old-content content))
                  "")]
 
-      ;; Return new-source if dry_run="new-source"
-      (if (= dry_run "new-source")
+      (cond
+        ;; Return new-source if dry_run="new-source"
+        (= dry_run "new-source")
         {:error false
          :new-source content}
 
-        (do
-          ;; Write the content only if not in dry_run mode
-          (when-not dry_run
-            (spit file content))
+        ;; Return just diff for dry_run="diff"
+        (= dry_run "diff")
+        {:error false
+         :diff diff}
 
+        ;; Normal operation - write and return full result
+        :else
+        (do
+          (spit file content)
           {:error false
            :type (if file-exists? "update" "create")
            :file-path file-path

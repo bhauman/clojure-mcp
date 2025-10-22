@@ -113,24 +113,33 @@ Before using this tool:
     result))
 
 (defmethod tool-system/format-results :file-write [_ result]
-  (if (:error result)
+  (cond
     ;; If there's an error, return the error message
+    (:error result)
     {:result [(:message result)]
      :error true}
+
     ;; Check if this is a dry_run with new-source
-    (if-let [new-source (:new-source result)]
-      {:result [new-source]
-       :error false}
-      ;; Otherwise, format a successful result
-      (let [file-type (if (core/is-clojure-file? (:file-path result)) "Clojure" "Text")
-            response (str file-type " file " (:type result) "d: " (:file-path result))]
-        (if (seq (:diff result))
-          ;; If there's a diff, include it in the response
-          {:result [(str response "\nChanges:\n" (:diff result))]
-           :error false}
-          ;; Otherwise, just show the success message
-          {:result [response]
-           :error false})))))
+    (:new-source result)
+    {:result [(:new-source result)]
+     :error false}
+
+    ;; Check if this is a dry_run with diff only (no file-path)
+    (and (:diff result) (not (:file-path result)))
+    {:result [(:diff result)]
+     :error false}
+
+    ;; Otherwise, format a successful result with preamble
+    :else
+    (let [file-type (if (core/is-clojure-file? (:file-path result)) "Clojure" "Text")
+          response (str file-type " file " (:type result) "d: " (:file-path result))]
+      (if (seq (:diff result))
+        ;; If there's a diff, include it in the response
+        {:result [(str response "\nChanges:\n" (:diff result))]
+         :error false}
+        ;; Otherwise, just show the success message
+        {:result [response]
+         :error false}))))
 
 ;; Backward compatibility function that returns the registration map
 (defn file-write-tool
