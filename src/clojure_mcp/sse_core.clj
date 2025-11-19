@@ -3,7 +3,7 @@
    [clojure-mcp.core :as core]
    [clojure-mcp.config :as config]
    [clojure-mcp.nrepl-launcher :as nrepl-launcher]
-   [clojure.tools.logging :as log])
+   [taoensso.timbre :as log])
   (:import
    [io.modelcontextprotocol.server.transport
     HttpServletSseServerTransportProvider]

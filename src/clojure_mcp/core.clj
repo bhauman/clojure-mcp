@@ -2,7 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as log]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
             [clojure-mcp.dialects :as dialects]

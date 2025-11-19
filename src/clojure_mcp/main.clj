@@ -1,5 +1,6 @@
 (ns clojure-mcp.main
   (:require [clojure-mcp.core :as core]
+            [clojure-mcp.logging :as logging]
             [clojure-mcp.prompts :as prompts]
             [clojure-mcp.resources :as resources]
             [clojure-mcp.tools :as tools]))
@@ -33,6 +34,11 @@
   (tools/build-all-tools nrepl-client-atom))
 
 (defn start-mcp-server [opts]
+  ;; Configure logging before starting the server
+  (logging/configure-logging!
+   {:log-file (get opts :log-file "logs/clojure-mcp.log")
+    :enable-logging? (get opts :enable-logging? true)
+    :log-level (get opts :log-level :debug)})
   (core/build-and-start-mcp-server
    opts
    {:make-tools-fn make-tools

@@ -2,7 +2,7 @@
   "Creates ChatModelListener instances from Clojure functions that work with EDN data"
   (:require
    [clojure-mcp.agent.langchain.message-conv :as msg-conv]
-   [clojure.tools.logging :as log])
+   [taoensso.timbre :as log])
   (:import
    [dev.langchain4j.model.chat.listener
     ChatModelListener

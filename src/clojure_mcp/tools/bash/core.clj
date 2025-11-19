@@ -4,7 +4,7 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.edn :as edn]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure-mcp.nrepl :as nrepl]
    [clojure-mcp.tools.eval.core :as eval-core])
   (:import

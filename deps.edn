@@ -2,7 +2,6 @@
  :deps {org.clojure/clojure {:mvn/version "1.12.1"}
         org.clojure/data.json {:mvn/version "2.5.1"}
         nrepl/nrepl {:mvn/version "1.3.1"}
-        org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.clojure/tools.cli {:mvn/version "1.1.230"}
         org.clj-commons/pretty {:mvn/version "3.6.7"}
 
@@ -27,22 +26,22 @@
         dev.langchain4j/langchain4j-anthropic {:mvn/version "1.8.0"}
         dev.langchain4j/langchain4j-google-ai-gemini {:mvn/version "1.8.0"}
 
-        ;; in order to use the stdio server you have to handle logging somehow
-        ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
+        com.taoensso/timbre {:mvn/version "6.8.0"}
+
+        ;; Suppress logging from Java libraries (MCP SDK, LangChain4j, etc.)
+        org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
 
         ;; native Java diff library
         io.github.java-diff-utils/java-diff-utils {:mvn/version "4.15"}}
  :aliases
 
  {:mcp
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main/start-mcp-server
+  {:exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888}}
 
   :mcp-sse
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; optional 
-                jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
+  {:extra-deps {jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
                 org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
                 org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
    :exec-fn clojure-mcp.sse-main/start-sse-mcp-server
@@ -52,31 +51,26 @@
                :mcp-sse-port 8078}}
 
   :mcp-figwheel
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
+  {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
    :exec-args {:port 7888 :figwheel-build "dev"}}
 
   :mcp-shadow
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
+  {:exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    :exec-args {:port 7888 :shadow-build "app"}}
 
   ;; dual shadow and project nrepl setup
   :mcp-shadow-dual
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
 
-  ;; below are dev set ups that need a logback.xml file
+  ;; below are dev set ups
   :prompt-cli
-  {:extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
-   :main-opts ["-m" "clojure-mcp.prompt-cli"]}
+  {:main-opts ["-m" "clojure-mcp.prompt-cli"]}
 
   :dev-mcp
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
-   :extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888
@@ -84,35 +78,28 @@
                ;; :start-nrepl-cmd ["clojure" "-M:nrepl"]
                }}
 
-  ;; DEV setup needs logback.xml
   :dev-mcp-figwheel
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
-   :extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :figwheel-build "dev"}}
 
-  ;; DEV setup needs logback.xml
   :dev-mcp-shadow
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
-   :extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app"}}
 
   :dev-mcp-shadow-dual
-  {:extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
-   :extra-paths ["dev" "test"]
+  {:extra-paths ["dev" "test"]
    :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
    ;; it needs an nrepl port to talk to
    :exec-args {:port 7888 :shadow-build "app" :shadow-port 7889}}
 
   :nrepl {:extra-paths ["test" "dev"]
-          :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
           :main-opts ["-m" "nrepl.cmdline" "--port" "7888"]}
 
   :dkr-nrepl {:extra-paths ["test" "dev"]
-              :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}
               :main-opts ["-m" "nrepl.cmdline" "--port" "7888"
                           ;; for Docker
                           "--bind" "0.0.0.0"]}
@@ -120,18 +107,16 @@
   ;; dev cycle
   :test
   {:extra-paths ["test" "dev"]
-   :exec-fn cognitect.test-runner/test
-   :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}
-                org.clojure/test.check {:mvn/version "1.1.1"}
+   :exec-fn clojure-mcp.test-helper/run-tests-with-exec
+   :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                 nrepl/nrepl {:mvn/version "1.3.1"} ;; Add nrepl server for testing
                 io.github.cognitect-labs/test-runner
                 {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-   :main-opts ["-m" "cognitect.test-runner"]}
+   :main-opts ["-e" "(require 'clojure-mcp.test-helper)" "-m" "cognitect.test-runner"]}
 
   :index
   {:exec-fn clojure-mcp.code-indexer/map-project
    :exec-args {}
-   :extra-deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}}
    ;; Override with: clojure -X:index :dirs '["src" "lib"]' :include-tests true :out-file '"my-index.txt"'
    }
 

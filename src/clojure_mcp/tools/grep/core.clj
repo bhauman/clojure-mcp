@@ -5,7 +5,7 @@
    [clojure.string :as str]
    [clojure.java.shell :as shell]
    [clojure.java.io :as io]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
  ;; Cache tool availability to avoid repeated shell calls
 (def ^:private tool-availability (atom {}))

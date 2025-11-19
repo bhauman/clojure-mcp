@@ -6,7 +6,7 @@
    [clojure-mcp.delimiter :as delimiter]
    [clojure-mcp.sexp.paren-utils :as paren-utils]
    [clojure.string :as string]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 ;; Eval results formatting
 ;; The goal is to make it clear for the LLM to understand

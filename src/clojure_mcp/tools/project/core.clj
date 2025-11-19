@@ -9,7 +9,7 @@
    [clojure-mcp.tools.glob-files.core :as glob]
    [clojure-mcp.utils.valid-paths :as vpaths]
    [clojure-mcp.utils.file :as file-utils]
-   [clojure.tools.logging :as log])
+   [taoensso.timbre :as log])
   (:import [java.io File]
            [java.nio.file Paths]))
 

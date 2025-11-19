@@ -2,7 +2,7 @@
   "A generalized agent library that can be parameterized with system prompts,
    context, tools, memory, and models."
   (:require [clojure.string :as string]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.tools.project.core :as project-core]

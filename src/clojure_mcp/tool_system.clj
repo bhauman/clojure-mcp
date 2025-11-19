@@ -5,7 +5,7 @@
   (:require
    [clojure.string :as string]
    [clojure.walk :as walk]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 ;; Core multimethods for tool behavior
 

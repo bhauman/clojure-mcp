@@ -5,7 +5,7 @@
    and initialization sequences specific to each dialect."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as log]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.utils.file :as file-utils]))
 

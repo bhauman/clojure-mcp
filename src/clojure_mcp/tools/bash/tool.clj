@@ -6,7 +6,7 @@
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.bash.core :as core]
    [clojure-mcp.nrepl :as nrepl]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.java.io :as io]
    [clojure.string :as str]))
 

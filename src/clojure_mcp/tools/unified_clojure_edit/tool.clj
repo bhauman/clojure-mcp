@@ -6,7 +6,7 @@
             [clojure-mcp.tools.form-edit.pipeline :as pipeline]
             [clojure-mcp.delimiter :as delimiter]
             [clojure-mcp.utils.valid-paths :as valid-paths]
-            [clojure.tools.logging :as log]
+            [taoensso.timbre :as log]
             [clojure.string :as str]))
 
 ;; Tool name and description

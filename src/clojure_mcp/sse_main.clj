@@ -1,14 +1,20 @@
 (ns clojure-mcp.sse-main
   "Example of a custom MCP server using Server-Sent Events (SSE) transport.
-   
+
    This demonstrates reusing the standard tools, prompts, and resources
    from main.clj while using a different transport mechanism (SSE instead
    of stdio). The SSE transport allows web-based clients to connect."
   (:require
+   [clojure-mcp.logging :as logging]
    [clojure-mcp.main :as main]
    [clojure-mcp.sse-core :as sse-core]))
 
 (defn start-sse-mcp-server [opts]
+  ;; Configure logging before starting the server
+  (logging/configure-logging!
+   {:log-file (get opts :log-file "logs/clojure-mcp.log")
+    :enable-logging? (get opts :enable-logging? true)
+    :log-level (get opts :log-level :debug)})
   (sse-core/build-and-start-mcp-server
    opts
    {:make-tools-fn main/make-tools

@@ -1,6 +1,6 @@
 (ns clojure-mcp.tools.figwheel.tool
   (:require
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.string :as string]
    [clojure-mcp.nrepl :as nrepl]
    [clojure-mcp.tool-system :as tool-system]

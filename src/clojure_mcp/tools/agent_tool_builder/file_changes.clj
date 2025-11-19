@@ -5,7 +5,7 @@
    [clojure-mcp.utils.diff :as diff-utils]
    [clojure-mcp.utils.file :as file-utils]
    [clojure.string :as str]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 (defn reset-changed-files!
   "Reset the changed-files map to empty.

@@ -4,7 +4,7 @@
    [clojure-mcp.config.schema :as schema]
    [clojure-mcp.utils.file :as file-utils]
    [clojure.edn :as edn]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 (defn- relative-to [dir path]
   (try

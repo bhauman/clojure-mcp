@@ -10,7 +10,7 @@
    [clojure-mcp.tools.unified-read-file.core :as core]
    [clojure-mcp.file-content :as file-content]
    [clojure-mcp.config :as config]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.string :as str]))
 
 ;; Factory function to create the tool configuration

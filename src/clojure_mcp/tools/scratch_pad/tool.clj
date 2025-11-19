@@ -4,7 +4,7 @@
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.scratch-pad.core :as core]
    [clojure-mcp.utils.file :as file-utils]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.walk :as walk]
    [clojure.pprint :as pprint]
    [clojure.java.io :as io]

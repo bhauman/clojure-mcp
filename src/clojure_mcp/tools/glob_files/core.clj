@@ -4,7 +4,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.java.shell :as shell]
-            [clojure.tools.logging :as log])
+            [taoensso.timbre :as log])
   (:import
    (java.nio.file FileVisitResult FileSystems Files Paths SimpleFileVisitor)))
 

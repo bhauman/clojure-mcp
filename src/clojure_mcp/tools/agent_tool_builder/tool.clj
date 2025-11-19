@@ -5,7 +5,7 @@
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.agent-tool-builder.core :as core]
    [clojure-mcp.tools.agent-tool-builder.default-agents :as default-agents]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 (defn create-single-agent-tool
   "Creates a tool registration for a single agent configuration.

@@ -2,7 +2,7 @@
   (:require
    [clojure.data.json :as json]
    [clojure-mcp.agent.langchain.schema :as schema]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.string :as string]
    [clojure.pprint])
   (:import

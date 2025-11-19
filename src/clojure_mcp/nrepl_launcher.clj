@@ -5,7 +5,7 @@
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [clojure.string :as str]
-            [clojure.tools.logging :as log])
+            [taoensso.timbre :as log])
   (:import [java.io BufferedReader]
            [java.util.concurrent TimeUnit]))
 

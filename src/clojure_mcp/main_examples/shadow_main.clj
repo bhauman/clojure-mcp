@@ -11,8 +11,9 @@
    - Dual connection: Connect to a separate Shadow CLJS nREPL server"
   (:require
    [clojure-mcp.core :as core]
+   [clojure-mcp.logging :as logging]
    [clojure-mcp.nrepl :as nrepl]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure-mcp.main :as main]
    [clojure-mcp.tools.eval.tool :as eval-tool]))
 
@@ -82,6 +83,11 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
           (shadow-eval-tool nrepl-client-atom config))))
 
 (defn start-mcp-server [opts]
+  ;; Configure logging before starting the server
+  (logging/configure-logging!
+   {:log-file (get opts :log-file "logs/clojure-mcp.log")
+    :enable-logging? (get opts :enable-logging? true)
+    :log-level (get opts :log-level :debug)})
   (core/build-and-start-mcp-server
    opts
    {:make-tools-fn (fn [nrepl-client-atom working-directory]

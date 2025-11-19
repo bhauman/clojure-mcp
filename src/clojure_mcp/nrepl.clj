@@ -4,7 +4,7 @@
    [nrepl.core :as nrepl]
    [nrepl.misc :as nrepl.misc]
    [nrepl.transport]
-   [clojure.tools.logging :as log]
+   [taoensso.timbre :as log]
    [clojure.edn]))
 
 ;; callback system

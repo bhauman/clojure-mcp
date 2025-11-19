@@ -8,7 +8,7 @@
    [clojure-mcp.tools :as tools]
    [clojure-mcp.tools.agent-tool-builder.file-changes :as file-changes]
    [clojure.string :as str]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 (defn build-agent-from-config
   "Builds an agent from a configuration map.

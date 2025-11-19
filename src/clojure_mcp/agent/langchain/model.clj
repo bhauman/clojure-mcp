@@ -2,7 +2,7 @@
   (:require
    [clojure-mcp.config.schema :as schema]
    [clojure-mcp.config :as config]
-   [clojure.tools.logging :as log])
+   [taoensso.timbre :as log])
   (:import
    [dev.langchain4j.model.anthropic
     AnthropicChatModel

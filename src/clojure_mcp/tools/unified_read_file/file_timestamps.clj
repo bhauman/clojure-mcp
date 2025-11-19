@@ -3,7 +3,7 @@
   (:require
    [clojure-mcp.tools.unified-read-file.core :as core]
    [clojure.java.io :as io]
-   [clojure.tools.logging :as log]))
+   [taoensso.timbre :as log]))
 
 (defn get-file-timestamps
   "Gets the current file timestamps map from the nrepl-client.
