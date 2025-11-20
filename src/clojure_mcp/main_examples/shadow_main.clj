@@ -30,7 +30,7 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
 
 **IMPORTANT**: This repl is intended for CLOJURESCRIPT CODE only.")
 
-(defn start-shadow-repl [nrepl-client-atom cljs-session {:keys [shadow-build shadow-watch]}]
+(defn start-shadow-repl [nrepl-client-atom {:keys [shadow-build shadow-watch]}]
   (let [start-code (format
                     ;; TODO we need to check if its already running
                     ;; here and only initialize if it isn't
@@ -39,16 +39,13 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
                       "(do (shadow/repl %s) %s)")
                     (pr-str (keyword (name shadow-build)))
                     (pr-str (keyword (name shadow-build))))]
-    (nrepl/eval-code-msg
-     @nrepl-client-atom start-code {:session cljs-session}
-     (->> identity
-          (nrepl/out-err #(log/info %) #(log/info %))
-          (nrepl/value #(log/info %))
-          (nrepl/done (fn [_] (log/info "done")))
-          (nrepl/error (fn [args]
-                         (log/info (pr-str args))
-                         (log/info "ERROR in shadow start")))))
-    cljs-session))
+    (log/info "Starting Shadow CLJS...")
+    (try
+      (nrepl/eval-code @nrepl-client-atom start-code :session-type :shadow)
+      (log/info "Shadow CLJS started (or command sent)")
+      (catch Exception e
+        (log/error e "ERROR in shadow start")))
+    :shadow))
 
 ;; when having a completely different connection for cljs
 (defn shadow-eval-tool-secondary-connection-tool [nrepl-client-atom {:keys [shadow-port _shadow-build _shadow-watch] :as config}]
@@ -56,19 +53,17 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
         cljs-nrepl-client-atom (atom cljs-nrepl-client-map)]
     (start-shadow-repl
      cljs-nrepl-client-atom
-     (nrepl/eval-session cljs-nrepl-client-map)
      config)
-    (-> (eval-tool/eval-code cljs-nrepl-client-atom)
+    (-> (eval-tool/eval-code cljs-nrepl-client-atom {:session-type :shadow})
         (assoc :name tool-name)
         (assoc :description description))))
 
 ;; when sharing the clojure and cljs repl
 (defn shadow-eval-tool [nrepl-client-atom {:keys [_shadow-build _shadow-watch] :as config}]
-  (let [cljs-session (nrepl/new-session @nrepl-client-atom)
-        _ (start-shadow-repl nrepl-client-atom cljs-session config)]
-    (-> (eval-tool/eval-code nrepl-client-atom {:nrepl-session cljs-session})
-        (assoc :name tool-name)
-        (assoc :description description))))
+  (start-shadow-repl nrepl-client-atom config)
+  (-> (eval-tool/eval-code nrepl-client-atom {:session-type :shadow})
+      (assoc :name tool-name)
+      (assoc :description description)))
 
 ;; So we can set up shadow two ways
 ;; 1. as a single repl connection using the shadow clojure connection for cloj eval

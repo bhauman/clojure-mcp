@@ -9,11 +9,11 @@
   "Creates the evaluation tool configuration"
   ([nrepl-client-atom]
    (create-eval-tool nrepl-client-atom {}))
-  ([nrepl-client-atom {:keys [nrepl-session] :as _config}]
+  ([nrepl-client-atom {:keys [session-type] :as _config}]
    (cond-> {:tool-type ::clojure-eval
             :nrepl-client-atom nrepl-client-atom
             :timeout 20000}
-     nrepl-session (assoc :session nrepl-session))))
+     session-type (assoc :session-type session-type))))
 
 ;; Implement the required multimethods for the eval tool
 (defmethod tool-system/tool-description ::clojure-eval [_]
@@ -65,11 +65,11 @@ Examples:
     ;; Return validated inputs (could do more validation/coercion here)
     inputs))
 
-(defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom session timeout]}
+(defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom timeout session-type]}
                                                     {:keys [timeout_ms] :as inputs}]
   ;; Delegate to core implementation with repair
   (core/evaluate-with-repair @nrepl-client-atom (cond-> inputs
-                                                  session (assoc :session session)
+                                                  session-type (assoc :session-type session-type)
                                                   (nil? timeout_ms) (assoc :timeout_ms timeout))))
 
 (defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as _eval-result}]

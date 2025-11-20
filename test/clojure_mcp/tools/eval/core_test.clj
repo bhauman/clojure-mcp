@@ -14,14 +14,15 @@
   (let [server (nrepl-server/start-server :port 0)
         port (:port server)
         client (nrepl/create {:port port})]
-    (nrepl/start-polling client)
-    (nrepl/eval-code client "(require 'clojure.repl)" identity)
+    ;; nrepl/start-polling is now a no-op or removed, so we skip it.
+    ;; nrepl/eval-code is blocking and returns results.
+    (nrepl/eval-code client "(require 'clojure.repl)")
     (binding [*nrepl-server* server
               *nrepl-client* client]
       (try
         (f)
         (finally
-          (nrepl/stop-polling client)
+          ;; nrepl/stop-polling is now a no-op or removed.
           (nrepl-server/stop-server server))))))
 
 (use-fixtures :once test-nrepl-fixture)

@@ -16,14 +16,12 @@
         port (:port server)
         client (clojure-mcp.nrepl/create {:port port})
         client-atom (atom client)]
-    (clojure-mcp.nrepl/start-polling client)
-    (clojure-mcp.nrepl/eval-code client "(require 'clojure.repl)" identity)
+    (clojure-mcp.nrepl/eval-code client "(require 'clojure.repl)")
     (binding [*nrepl-server* server
               *nrepl-client-atom* client-atom]
       (try
         (f)
         (finally
-          (clojure-mcp.nrepl/stop-polling client)
           (nrepl.server/stop-server server))))))
 
 (use-fixtures :once test-nrepl-fixture)

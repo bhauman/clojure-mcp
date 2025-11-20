@@ -166,7 +166,7 @@ EDN parsing failed: %s\nRaw result: %s"
          opts)))
 
 (defn execute-bash-command-nrepl
-  [nrepl-client-atom {:keys [command working-directory timeout-ms session] :as _args}]
+  [nrepl-client-atom {:keys [command working-directory timeout-ms session-type] :as _args}]
   (log/debug "Using nREPL bash command: " command)
   ;; timeout-ms is now required - should be provided by tool
   (assert timeout-ms "timeout-ms is required")
@@ -183,7 +183,7 @@ EDN parsing failed: %s\nRaw result: %s"
                 @nrepl-client-atom
                 (cond-> {:code clj-shell-code
                          :timeout-ms eval-timeout-ms}
-                  session (assoc :session session)))
+                  session-type (assoc :session-type session-type)))
         output-map (into {} (:outputs result))
         inner-value (:value output-map)]
     (when (:error result)

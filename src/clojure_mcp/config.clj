@@ -110,9 +110,7 @@
       (assoc :nrepl-env-type (:nrepl-env-type config)))))
 
 (defn load-config
-  "Loads configuration from both user home (~/.clojure-mcp/config.edn) and project directory.
-   User home config provides defaults, project config provides overrides.
-   Validates both configs before merging."
+  "Loads the configuration from user home and project directories."
   [cli-config-file user-dir]
   ;; Load user home config first (provides defaults)
   (let [home-config (load-home-config)

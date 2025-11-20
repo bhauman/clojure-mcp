@@ -40,6 +40,20 @@
     (or (paren-utils/parinfer-repair code) code)
     code))
 
+(defn- process-responses [responses]
+  (let [outputs (atom [])
+        error-occurred (atom false)]
+    (doseq [msg responses]
+      (when (:out msg) (swap! outputs conj [:out (:out msg)]))
+      (when (:err msg) (swap! outputs conj [:err (:err msg)]))
+      (when (:value msg) (swap! outputs conj [:value (:value msg)]))
+      (when (:ex msg)
+        (reset! error-occurred true)
+        (swap! outputs conj [:err (:ex msg)]))
+      (when (some #{"error" "eval-error"} (:status msg))
+        (reset! error-occurred true)))
+    {:outputs @outputs :error @error-occurred}))
+
 (defn evaluate-code
   "Evaluates Clojure code using the nREPL client.
    
@@ -52,59 +66,40 @@
    Returns:
    - A map with :outputs (raw outputs), :error (boolean flag)"
   [nrepl-client opts]
-  (let [{:keys [code timeout_ms session]} opts
+  (let [{:keys [code timeout_ms session-type]} opts
         timeout-ms (or timeout_ms 20000)
-        outputs (atom [])
-        error-occurred (atom false)
-        form-str code
-        add-output! (fn [prefix value] (swap! outputs conj [prefix value]))
-        result-promise (promise)]
+        form-str code]
 
-    ;; Evaluate the code
     ;; Push to eval history if available
     (when-let [state (::nrepl/state nrepl-client)]
-      (swap! state update :clojure-mcp.repl-tools/eval-history conj form-str)
+      (swap! state update :clojure-mcp.repl-tools/eval-history conj form-str))
 
-    ;; Evaluate the code, using the namespace parameter if provided
-      (try
-        (nrepl/eval-code-msg
-         nrepl-client form-str
-         (if session {:session session} {})
-         (->> identity
-              (nrepl/out-err
-               #(add-output! :out %)
-               #(add-output! :err %))
-              (nrepl/value #(add-output! :value %))
-              (nrepl/done (fn [_]
-                            (deliver result-promise
-                                     {:outputs @outputs
-                                      :error @error-occurred})))
-              (nrepl/error (fn [{:keys [exception]}]
-                             (reset! error-occurred true)
-                             (add-output! :err exception)
-                             (deliver result-promise
-                                      {:outputs @outputs
-                                       :error true})))))
-        (catch Exception e
-            ;; prevent connection errors from confusing the LLM
-          (log/error e "Error when trying to eval on the nrepl connection")
-          (throw
-           (ex-info
-            (str "Internal Error: Unable to reach the nREPL "
-                 "thus we are unable to execute the bash command.")
-            {:error-type :connection-error}
-            e))))
-
-        ;; Wait for the result and return it
-      (let [tmb (Object.)
-            res (deref result-promise timeout-ms tmb)]
-        (if-not (= tmb res)
-          res
+    (try
+      (let [fut (future
+                  (try
+                    (let [responses (nrepl/eval-code nrepl-client form-str :session-type (or session-type :default))]
+                      (process-responses responses))
+                    (catch Exception e
+                      (log/error e "Error during nREPL eval")
+                      {:outputs [[:err (str "Internal Error: " (.getMessage e))]] :error true})))
+            res (deref fut timeout-ms :timeout)]
+        (if (= res :timeout)
           (do
+            (future-cancel fut)
             (nrepl/interrupt nrepl-client)
             {:outputs [[:err (str "Eval timed out after " timeout-ms "ms.")]
                        [:err "Perhaps, you had an infinite loop or an eval that ran too long."]]
-             :error true}))))))
+             :error true})
+          res))
+      (catch Exception e
+        ;; prevent connection errors from confusing the LLM
+        (log/error e "Error when trying to eval on the nrepl connection")
+        (throw
+         (ex-info
+          (str "Internal Error: Unable to reach the nREPL "
+               "thus we are unable to execute the bash command.")
+          {:error-type :connection-error}
+          e))))))
 
 (defn evaluate-with-repair
   "Evaluates Clojure code with automatic repair of delimiter errors.
