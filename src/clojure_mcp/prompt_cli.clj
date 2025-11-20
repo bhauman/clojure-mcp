@@ -15,7 +15,8 @@
             [clojure-mcp.agent.langchain.chat-listener :as listener]
             [clojure-mcp.agent.langchain.message-conv :as msg-conv]
             [clojure-mcp.tool-format :as tool-format]
-            [clojure-mcp.utils.file :as file-utils])
+            [clojure-mcp.utils.file :as file-utils]
+            [clojure-mcp.logging :as logging])
   (:import [dev.langchain4j.data.message ChatMessageSerializer ChatMessageDeserializer]
            [java.time LocalDateTime]
            [java.time.format DateTimeFormatter])
@@ -223,10 +224,12 @@
   "Execute a prompt against the parent agent"
   [{:keys [prompt model config dir port resume]}]
   (try
+    ;; Disable logging to prevent output to stdout
+    (logging/configure-logging! {:enable-logging? false})
+
     ;; Connect to nREPL and initialize with configuration
     (println (str "Connecting to nREPL server on port " port "..."))
     (let [nrepl-client-map (nrepl/create {:port port})
-          _ (nrepl/start-polling nrepl-client-map)
 
           ;; Detect environment type
           env-type (dialects/detect-nrepl-env-type nrepl-client-map)

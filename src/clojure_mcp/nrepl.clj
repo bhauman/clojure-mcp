@@ -1,283 +1,99 @@
 (ns clojure-mcp.nrepl
   (:require
-   [clojure.main]
    [nrepl.core :as nrepl]
-   [nrepl.misc :as nrepl.misc]
-   [nrepl.transport]
-   [taoensso.timbre :as log]
-   [clojure.edn]))
+   [nrepl.misc :as nrepl.misc]))
 
-;; callback system
-(defn add-callback! [{:keys [::state]} id f]
-  (swap! state assoc-in [:id-callbacks id] f))
-
-(defn remove-callback! [{:keys [::state]} id]
-  (swap! state update :id-callbacks dissoc id))
-
-(defn set-current-eval-id! [{:keys [::state]} id]
-  (swap! state assoc :current-eval-id id))
-
-(defn remove-current-eval-id! [{:keys [::state]}]
-  (swap! state dissoc :current-eval-id))
-
-(defn dispatch-response! [{:keys [::state]} msg]
-  (doseq [f (vals (get @state :id-callbacks))]
-    (f msg)))
-
-;; message callback-api
-(defn new-id [] (nrepl.misc/uuid))
-
-(defn select-key [key shouldbe k]
-  (fn [msg]
-    (when (= (get msg key) shouldbe)
-      (k msg))))
-
-(defn on-key [key callback k]
-  (fn [msg]
-    (when-let [v (get msg key)]
-      (callback v))
-    (k msg)))
-
-(defn session-id [session' id' k]
-  (->> k
-       (select-key :id id')
-       (select-key :session session')))
-
-(defn out-err [print-out print-err k]
-  (->> k
-       (on-key :out print-out)
-       (on-key :err print-err)))
-
-(defn value [callback k]
-  (on-key :value callback k))
-
-(defn handle-statuses [pred callback k]
-  (fn [{:keys [status] :as msg}]
-    (when (some pred status)
-      (callback msg))
-    (k msg)))
-
-(defn done [callback k]
-  (handle-statuses #{"done" "interrupt"} callback k))
-
-(defn error [callback k]
-  (handle-statuses #{"error" "eval-error"} callback k))
-
-(defn need-input [callback k]
-  (handle-statuses #{"need-input"} callback k))
-
-(defn send-msg! [{:keys [::state] :as service} {:keys [session id] :as msg} callback]
-  (assert session)
-  (assert id)
-  (add-callback!
-   service id
-   (->> callback
-        (error (fn [_] (remove-callback! service id)))
-        (done (fn [_] (remove-callback! service id)))
-        (session-id session id)))
-  (tap> msg)
-  (nrepl.transport/send (:conn @state) msg))
-
-(defn eval-session [{:keys [::state]}]
-  (get @state :session))
-
-(defn tool-session [{:keys [::state]}]
-  (get @state :tool-session))
-
-;; session state management in general is getting a little messy
-;; parallel evals seem possible
-(defn ns-session
-  "returns session for when the use wants to temporarily change to a ns
-  All requests to this session are intended to have the ns declared."
-  [{:keys [::state]}]
-  (get @state :ns-session))
-
-(defn current-ns
-  ([{:keys [::state]} session]
-   (get-in @state [:current-ns session]))
-  ([{:keys [::state]} session new-ns]
-   (swap! state assoc-in [:current-ns session] new-ns)))
-
-(defn new-message [service msg]
-  (merge
-   {:session (eval-session service)
-    :id (new-id)}
-   msg))
-
-(defn new-tool-message [service msg]
-  (new-message
-   service
-   (merge {:session (tool-session service)}
-          msg)))
-
-(def truncation-length 10000) ;; 20000 roughly 250 lines
-
-(defn eval-code-msg
-  [service code-str msg' k]
-  (let [msg (merge
-             msg'
-             {:op "eval"
-              :code code-str
-              :nrepl.middleware.print/print "nrepl.util.print/pprint"
-              ;; need to be able to set this magic number
-              :nrepl.middleware.print/quota truncation-length})
-        {:keys [id session] :as message} (new-message service msg)
-        prom (promise)
-        finish (fn [_]
-                 (deliver prom ::done)
-                 (remove-current-eval-id! service))]
-    (set-current-eval-id! service id)
-    (send-msg! service
-               message
-               (->> k
-                    (on-key :ns #(current-ns service session %))
-                    (done finish)
-                    (error finish)))
-    prom))
-
-(defn eval-code-help [service code-str k]
-  (eval-code-msg service code-str {} k))
-
-(defn eval-code [service code-str k]
-  @(eval-code-help service code-str k))
-
-(defn interrupt [{:keys [::state] :as service}]
-  ;; TODO having a timeout and then calling the
-  ;; callback with a done message could prevent
-  ;; terminal lockup in extreme cases
-  (let [{:keys [current-eval-id]} @state]
-    (when current-eval-id
-      (send-msg!
-       service
-       (new-message service {:op "interrupt" :interrupt-id current-eval-id})
-       identity))))
-
-(defn lookup [service symbol]
-  (let [prom (promise)]
-    (send-msg! service
-               (new-tool-message service {:op "lookup" :sym symbol})
-               (->> identity
-                    (done #(deliver prom
-                                    (some-> %
-                                            :info
-                                            not-empty
-                                            (update :arglists clojure.edn/read-string))))))
-    (deref prom 400 nil)))
-
-(defn completions [service prefix]
-  (let [prom (promise)]
-    (send-msg! service
-               (new-tool-message service {:op "completions" :prefix prefix})
-               (->> identity
-                    (done #(deliver prom (get % :completions)))))
-    (deref prom 400 nil)))
-
-(defn tool-eval-code [service code-str]
-  (let [prom (promise)]
-    (send-msg! service
-               (new-tool-message service {:op "eval" :code code-str})
-               (->> identity
-                    (value #(deliver prom %))))
-    (deref prom 400 nil)))
-
-(defn ls-middleware [service]
-  (let [prom (promise)]
-    (send-msg! service
-               (new-tool-message service {:op "ls-middleware"})
-               (->> identity
-                    (on-key :middleware #(deliver prom %))))
-    (deref prom 400 nil)))
-
-(defn describe [service]
-  (let [prom (promise)]
-    (send-msg! service
-               (new-tool-message service {:op "describe"})
-               (->> identity
-                    (done #(deliver prom %))))
-    (deref prom 600 nil)))
-
-(defn new-session [service]
-  (let [prom (promise)]
-    (send-msg! service
-               ;; this will clone the tool session
-               (new-tool-message service {:op "clone"})
-               (->> identity
-                    (done #(deliver prom (get % :new-session)))))
-    (deref prom 600 nil)))
-
-(defn send-input [service input]
-  (send-msg! service
-             (new-message service {:op "stdin" :stdin (when input
-                                                        (str input "\n"))})
-             identity))
-
-(defn stop-polling [{:keys [::state]}]
-  (swap! state dissoc :response-poller))
-
-(defn polling? [{:keys [::state]}]
-  (:response-poller @state))
-
-(declare create)
-
-(defn poll-for-responses [{:keys [::state] :as options} _conn]
-  (let [retries (atom 60)]
-    (loop []
-      (when (polling? options)
-        (let [continue
-              (try
-                (when-let [resp (nrepl.transport/recv (:conn @state) 100)]
-                  (reset! retries 60)
-                  #_(tap> resp)
-                  (dispatch-response! options resp))
-                :success
-                (catch java.io.IOException e
-                  (log/error e "nREPL connection failure 1")
-                  :retry)
-                (catch Throwable e
-                  (log/error e "nREPL connection failure 2")
-                  (some-> options :repl/error (reset! e))
-                  :retry))]
-          (cond
-            (= :retry continue)
-            (if (< 0 @retries)
-              (do (Thread/sleep 1000)
-                  (log/info (str "nRPEL Trying to reconnect to " (:port options)))
-                  (try
-                    (create options)
-                    (catch Exception e
-                      (log/error e "Reconnect failed")))
-                  (swap! retries dec)
-                  (recur))
-              (stop-polling options))
-            (= :success continue)
-            (recur)))))))
-
-(defn start-polling [{:keys [::state] :as service}]
-  (let [response-poller (Thread. ^Runnable (bound-fn [] (poll-for-responses service (:conn @state))))]
-    (swap! state assoc :response-poller response-poller)
-    (doto ^Thread response-poller
-      (.setName "Rebel Readline nREPL response poller")
-      (.setDaemon true)
-      (.start))))
+(defn- get-state [service]
+  (get service ::state))
 
 (defn create
   ([] (create nil))
   ([config]
-   (let [conn (apply nrepl/connect
-                     (flatten (seq (select-keys config [:port :host :tls-keys-file]))))
-         client (nrepl/client conn Long/MAX_VALUE)
-         session (nrepl/new-session client)
-         tool-session (nrepl/new-session client)
-         ;; ns-session always has an ns declared in evals
-         ns-session (nrepl/new-session client)
-         state (::state config (atom {}))]
-     (swap! state assoc
-            :conn conn
-            :client client
-            :session session
-            :ns-session ns-session
-            :tool-session tool-session)
-     (assoc config
-            :repl/error (atom nil)
-            ::state state))))
+   (let [port (:port config)
+         initial-state {:ports (if port {port {:sessions {}}} {})}
+         state (atom initial-state)]
+     (assoc config ::state state))))
 
+(defn- connect [service]
+  (let [{:keys [host port]} service]
+    (nrepl/connect :host (or host "localhost") :port port)))
+
+(defn- get-stored-session [service session-type]
+  (let [port (:port service)
+        state @(get-state service)]
+    (get-in state [:ports port :sessions session-type])))
+
+(defn- update-stored-session! [service session-type session-id]
+  (let [port (:port service)]
+    (swap! (get-state service) assoc-in [:ports port :sessions session-type] session-id)))
+
+(defn- session-valid? [client session-id]
+  (try
+    (let [sessions (-> (nrepl/message client {:op "ls-sessions"})
+                       nrepl/combine-responses
+                       :sessions)]
+      (contains? (set sessions) session-id))
+    (catch Exception _ false)))
+
+(defn- ensure-session! [client service session-type]
+  (let [stored-id (get-stored-session service session-type)]
+    (if (and stored-id (session-valid? client stored-id))
+      stored-id
+      (let [new-id (nrepl/new-session client)]
+        (update-stored-session! service session-type new-id)
+        new-id))))
+
+(defn current-ns
+  "Returns the current namespace for the given session type."
+  [service session-type]
+  (let [port (:port service)
+        state @(get-state service)]
+    (get-in state [:ports port :current-ns session-type])))
+
+(defn- update-current-ns! [service session-type new-ns]
+  (let [port (:port service)]
+    (swap! (get-state service) assoc-in [:ports port :current-ns session-type] new-ns)))
+
+(def truncation-length 10000)
+
+(defn eval-code
+  "Evaluates code synchronously using a new connection.
+   Returns a sequence of response messages."
+  [service code & {:keys [session-type] :or {session-type :default}}]
+  (with-open [conn (connect service)]
+    (let [client (nrepl/client conn Long/MAX_VALUE)
+          session-id (ensure-session! client service session-type)
+          id (nrepl.misc/uuid)
+          msg {:op "eval"
+               :code code
+               :session session-id
+               :id id
+               :nrepl.middleware.print/print "nrepl.util.print/pprint"
+               :nrepl.middleware.print/quota truncation-length}]
+      (swap! (get-state service) assoc :current-eval-id id)
+      (try
+        (let [responses (doall (nrepl/message client msg))]
+          ;; Update current-ns if present in any response
+          (doseq [resp responses]
+            (when-let [new-ns (:ns resp)]
+              (update-current-ns! service session-type new-ns)))
+          responses)
+        (finally
+          (swap! (get-state service) dissoc :current-eval-id))))))
+
+(defn interrupt [service]
+  (let [state (get-state service)
+        id (:current-eval-id @state)]
+    (when id
+      (with-open [conn (connect service)]
+        (let [client (nrepl/client conn 1000)
+              ;; Assuming default session for interrupt for now as per typical usage
+              session-id (get-stored-session service :default)]
+          (nrepl/message client {:op "interrupt" :session session-id :interrupt-id id}))))))
+
+(defn describe
+  "Returns the nREPL server's description, synchronously."
+  [service]
+  (with-open [conn (connect service)]
+    (let [client (nrepl/client conn 10000)]
+      (nrepl/combine-responses (nrepl/message client {:op "describe"})))))

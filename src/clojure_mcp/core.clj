@@ -273,7 +273,6 @@
    
    This function handles the complete setup process including:
    - Creating the nREPL client connection
-   - Starting the polling mechanism
    - Loading required namespaces and helpers (if Clojure environment)
    - Setting up the working directory
    - Loading configuration
@@ -285,10 +284,7 @@
   (try
     (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type))
           cli-env-type (:nrepl-env-type initial-config)
-          _ (do
-              (log/info "nREPL client map created")
-              (nrepl/start-polling nrepl-client-map)
-              (log/info "Started polling nREPL"))
+          _ (log/info "nREPL client map created")
           ;; Detect environment type early
           ;; TODO this needs to be sorted out
           env-type (dialects/detect-nrepl-env-type nrepl-client-map)
@@ -314,7 +310,6 @@
    (log/info "Creating additional nREPL connection" initial-config)
    (try
      (let [nrepl-client-map (nrepl/create initial-config)]
-       (nrepl/start-polling nrepl-client-map)
        ;; copy config
        ;; maybe we should create this just like the normal nrelp connection?
        ;; we should introspect the project and get a working directory
@@ -331,15 +326,12 @@
   "Convenience higher-level API function to gracefully shut down MCP and nREPL servers.
    
    This function handles the complete shutdown process including:
-   - Stopping nREPL polling if a client exists in nrepl-client-atom
    - Gracefully closing the MCP server
    - Proper error handling and logging"
   [nrepl-client-atom]
   (log/info "Shutting down servers")
   (try
     (when-let [client @nrepl-client-atom]
-      (log/info "Stopping nREPL polling")
-      (nrepl/stop-polling client)
       ;; Clean up auto-started nREPL process if present
       (when-let [nrepl-process (:nrepl-process client)]
         (log/info "Cleaning up auto-started nREPL process")

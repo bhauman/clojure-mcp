@@ -8,31 +8,27 @@
    [clojure-mcp.tools.eval.core :as eval-core]))
 
 (defn start-figwheel [nrepl-client-atom build]
-  (let [figwheel-session (nrepl/new-session @nrepl-client-atom)
-        start-code (format
+  (let [start-code (format
                     ;; TODO we need to check if its already running
                     ;; here and only initialize if it isn't
                     "(do (require (quote figwheel.main)) (figwheel.main/start %s))"
                     (pr-str build))]
-    (nrepl/eval-code-msg
-     @nrepl-client-atom start-code {:session figwheel-session}
-     (->> identity
-          (nrepl/out-err #(log/info %) #(log/info %))
-          (nrepl/value #(log/info %))
-          (nrepl/done (fn [_] (log/info "done")))
-          (nrepl/error (fn [args]
-                         (log/info (pr-str args))
-                         (log/info "ERROR in figwheel start")))))
-    figwheel-session))
+    (log/info "Starting Figwheel...")
+    (try
+      (nrepl/eval-code @nrepl-client-atom start-code :session-type :figwheel)
+      (log/info "Figwheel started (or command sent)")
+      (catch Exception e
+        (log/error e "ERROR in figwheel start")))
+    :figwheel))
 
 (defn create-figwheel-eval-tool
   "Creates the evaluation tool configuration"
   [nrepl-client-atom {:keys [figwheel-build] :as _config}]
-  (let [figwheel-session (start-figwheel nrepl-client-atom figwheel-build)]
-    {:tool-type ::figwheel-eval
-     :nrepl-client-atom nrepl-client-atom
-     :timeout 30000
-     :session figwheel-session}))
+  (start-figwheel nrepl-client-atom figwheel-build)
+  {:tool-type ::figwheel-eval
+   :nrepl-client-atom nrepl-client-atom
+   :timeout 30000
+   :session-type :figwheel})
 
 ;; delegate schema validate-inputs and format-results to clojure-eval
 (derive ::figwheel-eval ::eval-tool/clojure-eval)
@@ -71,16 +67,16 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
 
 **IMPORTANT**: This repl is intended for CLOJURESCRIPT CODE only.")
 
-(defmethod tool-system/execute-tool ::figwheel-eval [{:keys [nrepl-client-atom session]} inputs]
-  (assert session)
+(defmethod tool-system/execute-tool ::figwheel-eval [{:keys [nrepl-client-atom session-type]} inputs]
+  (assert session-type)
   (assert (:code inputs))
   ;; :code has to exist at this point
   (let [code (:code inputs (get inputs "code"))]
     ;; *ns* doesn't work on ClojureScript and its confusing for the LLM
     (if (= (string/trim code) "*ns*")
-      {:outputs [[:value (nrepl/current-ns @nrepl-client-atom session)]]
+      {:outputs [[:value (nrepl/current-ns @nrepl-client-atom session-type)]]
        :error false}
-      (eval-core/evaluate-with-repair @nrepl-client-atom (assoc inputs :session session)))))
+      (eval-core/evaluate-with-repair @nrepl-client-atom (assoc inputs :session-type session-type)))))
 
 ;; config needs :fig
 (defn figwheel-eval [nrepl-client-atom config]

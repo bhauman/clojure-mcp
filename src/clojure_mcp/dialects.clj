@@ -6,6 +6,7 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [taoensso.timbre :as log]
+            [nrepl.core :as nrepl-core]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.utils.file :as file-utils]))
 
@@ -79,8 +80,10 @@
   ;; default to fetching from the nrepl
   (when-let [exp (fetch-project-directory-exp nrepl-env-type)]
     (try
-      (edn/read-string
-       (nrepl/tool-eval-code nrepl-client-map exp))
+      (let [result-value (->> (nrepl/eval-code nrepl-client-map exp :session-type :tools)
+                              nrepl-core/combine-responses
+                              :value)]
+        result-value)
       (catch Exception e
         (log/warn e "Failed to fetch project directory")
         nil))))
@@ -93,10 +96,14 @@
   "Fetches the project directory for the given nREPL client.
    If project-dir is provided in opts, returns it directly.
    Otherwise, evaluates environment-specific expression to get it."
-  [nrepl-client-map nrepl-env-type project-dir]
-  (if project-dir
-    (.getCanonicalPath (io/file project-dir))
-    (fetch-project-directory-helper nrepl-env-type nrepl-client-map)))
+  [nrepl-client-map nrepl-env-type project-dir-arg]
+  (if project-dir-arg
+    (.getCanonicalPath (io/file project-dir-arg))
+    (let [raw-result (fetch-project-directory-helper nrepl-env-type nrepl-client-map)]
+      ;; nrepl sometimes returns strings with extra quotes and in a vector
+      (if (and (vector? raw-result) (= 1 (count raw-result)) (string? (first raw-result)))
+        (clojure.string/replace (first raw-result) #"^\"|\"$" "")
+        raw-result))))
 
 ;; High-level wrapper functions that execute the expressions
 
@@ -107,7 +114,7 @@
   (log/debug "Initializing Clojure environment")
   (when-let [init-exps (not-empty (initialize-environment-exp nrepl-env-type))]
     (doseq [exp init-exps]
-      (nrepl/eval-code nrepl-client-map exp identity)))
+      (nrepl/eval-code nrepl-client-map exp)))
   nrepl-client-map)
 
 (defn load-repl-helpers
@@ -115,7 +122,7 @@
   [nrepl-client-map nrepl-env-type]
   (when-let [helper-exps (not-empty (load-repl-helpers-exp nrepl-env-type))]
     (doseq [exp helper-exps]
-      (nrepl/tool-eval-code nrepl-client-map exp)))
+      (nrepl/eval-code nrepl-client-map exp :session-type :tools)))
   nrepl-client-map)
 
 (defn detect-nrepl-env-type [nrepl-client-map]

@@ -10,17 +10,6 @@
    [clojure.java.io :as io]
    [clojure.string :as str]))
 
-(defn create-bash-over-nrepl-session [nrepl-client]
-  (or
-   (try
-     (nrepl/new-session nrepl-client)
-     (catch Exception e
-       (log/error e "Could not create separate session for bash tool")
-       nil))
-   (do
-     (log/debug "Could not create separate session for bash tool")
-     nil)))
-
 ;; Factory function to create the tool configuration
 (defn create-bash-tool
   "Creates the bash tool configuration.
@@ -38,8 +27,7 @@
         ;; Check bash-over-nrepl from tool config or global config
         bash-over-nrepl (get tool-config :bash-over-nrepl
                              (config/get-bash-over-nrepl nrepl-client))
-        session (when bash-over-nrepl
-                  (create-bash-over-nrepl-session nrepl-client))
+        session-type (when bash-over-nrepl :tools)
         ;; Extract default-timeout-ms from config and rename it
         timeout_ms (or (:default-timeout-ms tool-config)
                        (:timeout_ms defaults))]
@@ -49,7 +37,7 @@
      (dissoc tool-config :default-timeout-ms) ; Remove config key
      {:tool-type :bash
       :nrepl-client-atom nrepl-client-atom
-      :nrepl-session session})))
+      :nrepl-session-type session-type})))
 
 ;; Implement the required multimethods for the bash tool
 (defmethod tool-system/tool-name :bash [_]
@@ -128,12 +116,11 @@ in the response to determine command success.")
         working_directory (assoc :working-directory validated-dir)
         timeout_ms (assoc :timeout-ms timeout_ms)))))
 
-(defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session]} inputs]
+(defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session-type]} inputs]
   (let [nrepl-client @nrepl-client-atom]
-    (if nrepl-session
-      ;; Execute over nREPL with session (session exists if bash-over-nrepl is true)
-      (let [inputs-with-session (assoc inputs :session nrepl-session)]
-        (core/execute-bash-command-nrepl nrepl-client-atom inputs-with-session))
+    (if nrepl-session-type
+      ;; Execute over nREPL with session type
+      (core/execute-bash-command-nrepl nrepl-client-atom (assoc inputs :session-type nrepl-session-type))
       ;; Execute locally
       (core/execute-bash-command nrepl-client inputs))))
 
