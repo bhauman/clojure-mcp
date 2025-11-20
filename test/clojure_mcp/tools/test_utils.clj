@@ -17,14 +17,12 @@
         port (:port server)
         client (nrepl/create {:port port})
         client-atom (atom client)]
-    (nrepl/start-polling client)
-    (nrepl/eval-code client "(require 'clojure.repl)" identity)
+    (nrepl/eval-code client "(require 'clojure.repl)")
     (binding [*nrepl-server* server
               *nrepl-client-atom* client-atom]
       (try
         (f)
         (finally
-          (nrepl/stop-polling client)
           (nrepl-server/stop-server server))))))
 
 (defn cleanup-test-file [f]

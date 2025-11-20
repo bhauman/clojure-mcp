@@ -27,15 +27,13 @@
                                   {:nrepl-user-dir user-dir
                                    :allowed-directories [user-dir]})
         client-atom (atom client-with-config)]
-    (nrepl/start-polling client-with-config)
-    (nrepl/eval-code client-with-config "(require 'clojure.repl)" identity)
-    (nrepl/eval-code client-with-config "(require 'clojure.edn)" identity)
+    (nrepl/eval-code client-with-config "(require 'clojure.repl)")
+    (nrepl/eval-code client-with-config "(require 'clojure.edn)")
     (binding [*nrepl-server* server
               *client-atom* client-atom]
       (try
         (f)
         (finally
-          (nrepl/stop-polling client-with-config)
           (nrepl-server/stop-server server))))))
 
 (use-fixtures :once setup-nrepl-client)
