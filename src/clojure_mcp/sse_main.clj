@@ -12,11 +12,11 @@
 (defn start-sse-mcp-server [opts]
   ;; Configure logging before starting the server
   (logging/configure-logging!
-   {:log-file (get opts :log-file "logs/clojure-mcp.log")
-    :enable-logging? (get opts :enable-logging? true)
+   {:log-file (get opts :log-file logging/default-log-file)
+    :enable-logging? (get opts :enable-logging? false)
     :log-level (get opts :log-level :debug)})
   (sse-core/build-and-start-mcp-server
-   opts
+   (dissoc opts :log-file :log-level :enable-logging?)
    {:make-tools-fn main/make-tools
     :make-prompts-fn main/make-prompts
     :make-resources-fn main/make-resources}))

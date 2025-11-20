@@ -6,6 +6,8 @@
    production modes."
   (:require [taoensso.timbre :as timbre]))
 
+(def default-log-file ".clojure-mcp/clojure-mcp.log")
+
 (defn configure-logging!
   "Configure Timbre logging with the given options.
 
@@ -25,17 +27,19 @@
    Production mode with logging suppressed:
    (configure-logging! {:enable-logging? false})"
   [{:keys [log-file enable-logging? log-level]
-    :or {log-file "logs/clojure-mcp.log"
-         enable-logging? true
+    :or {log-file default-log-file
+         enable-logging? false
          log-level :debug}}]
   (timbre/set-config!
-   {:appenders {:spit (assoc
-                       (timbre/spit-appender {:fname log-file})
-                       :enabled? enable-logging?
-                       :min-level (or log-level :report)
-                       :ns-filter (if enable-logging?
-                                    {:allow #{"clojure-mcp.*"}}
-                                    {:deny #{"*"}}))}}))
+   {:appenders (if enable-logging?
+                 {:spit (assoc
+                         (timbre/spit-appender {:fname log-file})
+                         :enabled? enable-logging?
+                         :min-level (or log-level :report)
+                         :ns-filter (if enable-logging?
+                                      {:allow #{"clojure-mcp.*"}}
+                                      {:deny #{"*"}}))}
+                 {})}))
 
 (defn configure-dev-logging!
   "Configure logging for development mode with debug level.
