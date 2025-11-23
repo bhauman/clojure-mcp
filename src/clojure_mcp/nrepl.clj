@@ -1,7 +1,9 @@
 (ns clojure-mcp.nrepl
   (:require
    [nrepl.core :as nrepl]
-   [nrepl.misc :as nrepl.misc]))
+   [nrepl.misc :as nrepl.misc]
+   [nrepl.transport :as transport])
+  (:import [java.io Closeable]))
 
 (defn- get-state [service]
   (get service ::state))
@@ -17,6 +19,24 @@
 (defn- connect [service]
   (let [{:keys [host port]} service]
     (nrepl/connect :host (or host "localhost") :port port)))
+
+(defn open-connection
+  "Opens an nREPL transport and client pair for the given service.
+  Callers are responsible for closing via `close-connection`."
+  ([service]
+   (open-connection service Long/MAX_VALUE))
+  ([service timeout-ms]
+   (let [transport (connect service)
+         client (nrepl/client transport timeout-ms)]
+     {:transport transport
+      :client client})))
+
+(defn close-connection [{:keys [transport]}]
+  (when transport
+    (.close ^Closeable transport)))
+
+(defn new-eval-id []
+  (nrepl.misc/uuid))
 
 (defn- get-stored-session [service session-type]
   (let [port (:port service)
@@ -43,6 +63,13 @@
         (update-stored-session! service session-type new-id)
         new-id))))
 
+(defn ensure-session
+  "Ensures a session exists for the given session-type using the provided connection map."
+  ([service conn]
+   (ensure-session service conn :default))
+  ([service {:keys [client]} session-type]
+   (ensure-session! client service session-type)))
+
 (defn current-ns
   "Returns the current namespace for the given session type."
   [service session-type]
@@ -56,40 +83,56 @@
 
 (def truncation-length 10000)
 
+(defn eval-code*
+  "Low-level eval helper that executes using an existing connection map.
+  Returns a map containing the responses plus the session/id used."
+  [service {:keys [client]} code {:keys [session-type session-id eval-id] :as _opts}]
+  (let [session-type (or session-type :default)
+        session-id (or session-id (ensure-session! client service session-type))
+        eval-id (or eval-id (new-eval-id))
+        msg {:op "eval"
+             :code code
+             :session session-id
+             :id eval-id
+             :nrepl.middleware.print/print "nrepl.util.print/pprint"
+             :nrepl.middleware.print/quota truncation-length}
+        responses (doall (nrepl/message client msg))]
+    ;; Update current-ns if present in any response
+    (doseq [resp responses]
+      (when-let [new-ns (:ns resp)]
+        (update-current-ns! service session-type new-ns)))
+    {:responses responses
+     :session-id session-id
+     :eval-id eval-id
+     :session-type session-type}))
+
 (defn eval-code
   "Evaluates code synchronously using a new connection.
    Returns a sequence of response messages."
-  [service code & {:keys [session-type] :or {session-type :default}}]
-  (with-open [conn (connect service)]
-    (let [client (nrepl/client conn Long/MAX_VALUE)
-          session-id (ensure-session! client service session-type)
-          id (nrepl.misc/uuid)
-          msg {:op "eval"
-               :code code
-               :session session-id
-               :id id
-               :nrepl.middleware.print/print "nrepl.util.print/pprint"
-               :nrepl.middleware.print/quota truncation-length}]
-      (swap! (get-state service) assoc :current-eval-id id)
-      (try
-        (let [responses (doall (nrepl/message client msg))]
-          ;; Update current-ns if present in any response
-          (doseq [resp responses]
-            (when-let [new-ns (:ns resp)]
-              (update-current-ns! service session-type new-ns)))
-          responses)
-        (finally
-          (swap! (get-state service) dissoc :current-eval-id))))))
+  [service code & {:keys [session-type]}]
+  (let [conn (open-connection service)]
+    (try
+      (let [{:keys [responses]} (eval-code* service conn code {:session-type session-type})]
+        responses)
+      (finally
+        (close-connection conn)))))
 
-(defn interrupt [service]
-  (let [state (get-state service)
-        id (:current-eval-id @state)]
-    (when id
-      (with-open [conn (connect service)]
-        (let [client (nrepl/client conn 1000)
-              ;; Assuming default session for interrupt for now as per typical usage
-              session-id (get-stored-session service :default)]
-          (nrepl/message client {:op "interrupt" :session session-id :interrupt-id id}))))))
+(defn interrupt*
+  "Sends an interrupt over an existing connection using the provided session/id."
+  [{:keys [transport]} session-id eval-id]
+  (when (and transport session-id eval-id)
+    (transport/send transport {:op "interrupt"
+                               :session session-id
+                               :interrupt-id eval-id})))
+
+(defn interrupt
+  "Interrupts an eval by creating a short-lived connection."
+  [service session-id eval-id]
+  (let [conn (open-connection service 1000)]
+    (try
+      (interrupt* conn session-id eval-id)
+      (finally
+        (close-connection conn)))))
 
 (defn describe
   "Returns the nREPL server's description, synchronously."

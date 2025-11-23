@@ -5,8 +5,6 @@
    [clojure-mcp.config :as config]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.bash.core :as core]
-   [clojure-mcp.nrepl :as nrepl]
-   [taoensso.timbre :as log]
    [clojure.java.io :as io]
    [clojure.string :as str]))
 
@@ -146,4 +144,3 @@ in the response to determine command success.")
    - nrepl-client-atom: Atom containing the nREPL client"
   [nrepl-client-atom]
   (tool-system/registration-map (create-bash-tool nrepl-client-atom)))
-

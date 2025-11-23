@@ -15,10 +15,8 @@
                        ::config/config {:allowed-directories [(System/getProperty "user.dir")]
                                         :nrepl-user-dir (System/getProperty "user.dir")
                                         :bash-over-nrepl true}}
-          client-atom (atom mock-client)]
-
-      ;; Create a bash tool with mock config
-      (let [bash-tool-config (bash-tool/create-bash-tool client-atom)]
+          client-atom (atom mock-client)
+          bash-tool-config (bash-tool/create-bash-tool client-atom)]
 
         ;; Mock the evaluate-code function to capture its arguments
         (with-redefs [clojure-mcp.tools.eval.core/evaluate-code
@@ -41,4 +39,4 @@
             ;; Verify the result is properly formatted
             (is (map? result))
             (is (= 0 (:exit-code result)))
-            (is (= "test" (:stdout result)))))))))
+            (is (= "test" (:stdout result))))))))

@@ -3,8 +3,8 @@
    
    Supports different Clojure-like environments by providing expressions
    and initialization sequences specific to each dialect."
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [taoensso.timbre :as log]
             [nrepl.core :as nrepl-core]
             [clojure-mcp.nrepl :as nrepl]
@@ -102,7 +102,7 @@
     (let [raw-result (fetch-project-directory-helper nrepl-env-type nrepl-client-map)]
       ;; nrepl sometimes returns strings with extra quotes and in a vector
       (if (and (vector? raw-result) (= 1 (count raw-result)) (string? (first raw-result)))
-        (clojure.string/replace (first raw-result) #"^\"|\"$" "")
+        (str/replace (first raw-result) #"^\"|\"$" "")
         raw-result))))
 
 ;; High-level wrapper functions that execute the expressions
