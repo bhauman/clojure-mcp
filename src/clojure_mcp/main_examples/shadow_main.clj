@@ -56,6 +56,7 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
      config)
     (-> (eval-tool/eval-code cljs-nrepl-client-atom {:session-type :shadow})
         (assoc :name tool-name)
+        (assoc :id (keyword tool-name))
         (assoc :description description))))
 
 ;; when sharing the clojure and cljs repl
@@ -63,6 +64,7 @@ JavaScript interop is fully supported including `js/console.log`, `js/setTimeout
   (start-shadow-repl nrepl-client-atom config)
   (-> (eval-tool/eval-code nrepl-client-atom {:session-type :shadow})
       (assoc :name tool-name)
+      (assoc :id (keyword tool-name))
       (assoc :description description)))
 
 ;; So we can set up shadow two ways
