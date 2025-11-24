@@ -18,7 +18,7 @@ We use a local proxy wrapper that:
 
 1. **Run the setup script:**
    ```bash
-   source setup-claude-code-env.sh
+   source claude-code-setup/setup-claude-code-env.sh
    ```
 
    This will:
@@ -39,9 +39,9 @@ We use a local proxy wrapper that:
 
 ## Files
 
-- **`proxy-wrapper.py`** - Python script that acts as a local proxy wrapper
-- **`setup-claude-code-env.sh`** - Setup script to configure the environment
-- **`CLAUDE_CODE_SETUP.md`** - This documentation file
+- **`claude-code-setup/proxy-wrapper.py`** - Python script that acts as a local proxy wrapper
+- **`claude-code-setup/setup-claude-code-env.sh`** - Setup script to configure the environment
+- **`CLAUDE_CODE_WEB_SETUP.md`** - This documentation file
 
 ## Manual Setup (if needed)
 
@@ -50,7 +50,7 @@ If you need to manually configure the environment:
 ### 1. Start the Proxy Wrapper
 
 ```bash
-python3 proxy-wrapper.py 8888 > /tmp/proxy.log 2>&1 &
+python3 claude-code-setup/proxy-wrapper.py 8888 > /tmp/proxy.log 2>&1 &
 ```
 
 ### 2. Configure Maven
@@ -120,13 +120,13 @@ curl -x http://127.0.0.1:8888 -I https://repo1.maven.org/maven2/
 
 ```bash
 pkill -f proxy-wrapper.py
-python3 proxy-wrapper.py 8888 > /tmp/proxy.log 2>&1 &
+python3 claude-code-setup/proxy-wrapper.py 8888 > /tmp/proxy.log 2>&1 &
 ```
 
 ### Use a different port
 
 ```bash
-PROXY_PORT=9999 source setup-claude-code-env.sh
+PROXY_PORT=9999 source claude-code-setup/setup-claude-code-env.sh
 ```
 
 ## Credits
