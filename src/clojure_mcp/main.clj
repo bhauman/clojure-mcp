@@ -33,7 +33,14 @@
 (defn ^:deprecated my-tools [nrepl-client-atom]
   (tools/build-all-tools nrepl-client-atom))
 
-(defn start-mcp-server [opts]
+(defn start-mcp-server
+  "Entry point for MCP server startup.
+
+   When :project-dir is NOT provided, requires a REPL connection to discover
+   the project directory. When :project-dir IS provided, REPL is optional.
+
+   REPL initialization happens lazily on first eval-code call."
+  [opts]
   ;; Configure logging before starting the server
   (logging/configure-logging!
    {:log-file (get opts :log-file logging/default-log-file)
@@ -44,6 +51,24 @@
    {:make-tools-fn make-tools
     :make-prompts-fn make-prompts
     :make-resources-fn make-resources}))
+
+(defn start
+  "Entry point for running from project directory.
+
+   Sets :project-dir to current working directory unless :not-cwd is true.
+   This allows running without an immediate REPL connection - REPL initialization
+   happens lazily when first needed.
+
+   Options:
+   - :not-cwd - If true, does NOT set project-dir to cwd (default: false)
+   - :port - Optional nREPL port (REPL is optional when project-dir is set)
+   - All other options supported by start-mcp-server"
+  [opts]
+  (let [not-cwd? (get opts :not-cwd false)
+        opts' (if not-cwd?
+                opts
+                (assoc opts :project-dir (System/getProperty "user.dir")))]
+    (start-mcp-server opts')))
 
 ;; not sure if this is even needed
 

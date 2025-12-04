@@ -2,7 +2,8 @@
   "Implementation of the eval tool using the tool-system multimethod approach."
   (:require
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.eval.core :as core]))
+   [clojure-mcp.tools.eval.core :as core]
+   [clojure-mcp.nrepl :as nrepl]))
 
 ;; Factory function to create the tool configuration
 (defn create-eval-tool
@@ -26,6 +27,8 @@ If you send multiple expressions they will all be evaluated individually and the
 If the returned value is too long it will be truncated.
 
 IMPORTANT: When using `require` to reload namespaces ALWAYS use `:reload` to ensure you get the latest version of files.
+
+PORT PARAMETER: You can optionally specify a different nREPL port to evaluate on. This is useful when you have multiple nREPL servers running (e.g., a Clojure server and a ClojureScript server via shadow-cljs). The port will be lazily initialized on first use.
 
 REPL helper functions are automatically loaded in the 'clj-mcp.repl-tools' namespace, providing convenient namespace and symbol exploration:
 
@@ -51,26 +54,46 @@ Examples:
    :properties {:code {:type :string
                        :description "The Clojure code to evaluate."}
                 :timeout_ms {:type :integer
-                             :description "Optional timeout in milliseconds for evaluation."}}
+                             :description "Optional timeout in milliseconds for evaluation."}
+                :port {:type :integer
+                       :description "Optional nREPL port to evaluate on. If not specified, uses the default port. Useful for evaluating on different nREPL servers (e.g., ClojureScript via shadow-cljs)."}}
    :required [:code]})
 
-(defmethod tool-system/validate-inputs ::clojure-eval [_ inputs]
-  (let [{:keys [code timeout_ms]} inputs]
+(defmethod tool-system/validate-inputs ::clojure-eval [{:keys [nrepl-client-atom]} inputs]
+  (let [{:keys [code timeout_ms port]} inputs]
     (when-not code
       (throw (ex-info (str "Missing required parameter: code " (pr-str inputs))
                       {:inputs inputs})))
     (when (and timeout_ms (not (number? timeout_ms)))
       (throw (ex-info (str "Error parameter must be number: timeout_ms " (pr-str inputs))
                       {:inputs inputs})))
-    ;; Return validated inputs (could do more validation/coercion here)
+    (when (and port (not (pos-int? port)))
+      (throw (ex-info (str "Error parameter must be positive integer: port " (pr-str inputs))
+                      {:inputs inputs})))
+    ;; Check that a port is available (either provided or configured)
+    (let [service @nrepl-client-atom
+          effective-port (or port (:port service))]
+      (when-not effective-port
+        (throw (ex-info "No nREPL port available. Please provide :port parameter or start server with a port configured."
+                        {:inputs inputs}))))
+    ;; Return validated inputs
     inputs))
 
 (defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom timeout session-type]}
-                                                    {:keys [timeout_ms] :as inputs}]
-  ;; Delegate to core implementation with repair
-  (core/evaluate-with-repair @nrepl-client-atom (cond-> inputs
-                                                  session-type (assoc :session-type session-type)
-                                                  (nil? timeout_ms) (assoc :timeout_ms timeout))))
+                                                    {:keys [timeout_ms port] :as inputs}]
+  ;; Get client for the specified port (or use base if no port specified)
+  ;; Ensures lazy initialization happens for non-default ports
+  (let [base-client @nrepl-client-atom
+        client (if port
+                 (nrepl/with-port-initialized base-client port)
+                 (do
+                   ;; For default port, ensure it's initialized (should already be, but safe)
+                   (nrepl/ensure-port-initialized! base-client)
+                   base-client))]
+    ;; Delegate to core implementation with repair
+    (core/evaluate-with-repair client (cond-> inputs
+                                        session-type (assoc :session-type session-type)
+                                        (nil? timeout_ms) (assoc :timeout_ms timeout)))))
 
 (defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as _eval-result}]
   ;; The core implementation now returns a map with :outputs (raw outputs), :error (boolean), and :repaired (boolean)

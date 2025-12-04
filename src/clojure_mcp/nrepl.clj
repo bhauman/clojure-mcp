@@ -1,18 +1,33 @@
 (ns clojure-mcp.nrepl
   (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
    [nrepl.core :as nrepl]
    [nrepl.misc :as nrepl.misc]
-   [nrepl.transport :as transport])
+   [nrepl.transport :as transport]
+   [clojure-mcp.dialects :as dialects]
+   [taoensso.timbre :as log])
   (:import [java.io Closeable]))
 
 (defn- get-state [service]
   (get service ::state))
 
+(defn- make-port-entry
+  "Creates a new port entry with default values."
+  []
+  {:sessions {}
+   :current-ns {}
+   :env-type nil
+   :initialized? false
+   :project-dir nil})
+
 (defn create
+  "Creates an nREPL service map with state tracking.
+   If port is provided, creates an initial entry for that port."
   ([] (create nil))
   ([config]
    (let [port (:port config)
-         initial-state {:ports (if port {port {:sessions {}}} {})}
+         initial-state {:ports (if port {port (make-port-entry)} {})}
          state (atom initial-state)]
      (assoc config ::state state))))
 
@@ -81,6 +96,61 @@
   (let [port (:port service)]
     (swap! (get-state service) assoc-in [:ports port :current-ns session-type] new-ns)))
 
+;; -----------------------------------------------------------------------------
+;; Per-port state accessors for env-type, initialized?, and project-dir
+;; -----------------------------------------------------------------------------
+
+(defn get-port-env-type
+  "Returns the env-type for the service's current port, or nil if not yet detected."
+  [service]
+  (let [port (:port service)
+        state @(get-state service)]
+    (get-in state [:ports port :env-type])))
+
+(defn set-port-env-type!
+  "Sets the env-type for the service's current port."
+  [service env-type]
+  (let [port (:port service)]
+    (swap! (get-state service) assoc-in [:ports port :env-type] env-type)))
+
+(defn port-initialized?
+  "Returns true if the service's current port has been initialized."
+  [service]
+  (let [port (:port service)
+        state @(get-state service)]
+    (get-in state [:ports port :initialized?] false)))
+
+(defn set-port-initialized!
+  "Marks the service's current port as initialized."
+  [service]
+  (let [port (:port service)]
+    (swap! (get-state service) assoc-in [:ports port :initialized?] true)))
+
+(defn get-port-project-dir
+  "Returns the project directory for the service's current port, or nil."
+  [service]
+  (let [port (:port service)
+        state @(get-state service)]
+    (get-in state [:ports port :project-dir])))
+
+(defn set-port-project-dir!
+  "Sets the project directory for the service's current port."
+  [service project-dir]
+  (let [port (:port service)]
+    (swap! (get-state service) assoc-in [:ports port :project-dir] project-dir)))
+
+(defn ensure-port-entry!
+  "Ensures the port has an entry in the state atom. Used for lazy port addition.
+   Returns the service unchanged."
+  [service]
+  (let [port (:port service)]
+    (swap! (get-state service) update :ports
+           (fn [ports]
+             (if (contains? ports port)
+               ports
+               (assoc ports port (make-port-entry))))))
+  service)
+
 (def truncation-length 10000)
 
 (defn eval-code*
@@ -106,9 +176,9 @@
      :eval-id eval-id
      :session-type session-type}))
 
-(defn eval-code
-  "Evaluates code synchronously using a new connection.
-   Returns a sequence of response messages."
+(defn- eval-code-internal
+  "Internal eval - opens connection, no initialization.
+   Used by init code to avoid circular calls."
   [service code & {:keys [session-type]}]
   (let [conn (open-connection service)]
     (try
@@ -116,6 +186,17 @@
         responses)
       (finally
         (close-connection conn)))))
+
+;; Forward declaration - ensure-port-initialized! is defined later
+(declare ensure-port-initialized!)
+
+(defn eval-code
+  "Evaluates code synchronously using a new connection.
+   Triggers lazy port initialization if not already initialized.
+   Returns a sequence of response messages."
+  [service code & {:keys [session-type]}]
+  (ensure-port-initialized! service)
+  (eval-code-internal service code :session-type session-type))
 
 (defn interrupt*
   "Sends an interrupt over an existing connection using the provided session/id."
@@ -140,3 +221,146 @@
   (with-open [conn (connect service)]
     (let [client (nrepl/client conn 10000)]
       (nrepl/combine-responses (nrepl/message client {:op "describe"})))))
+
+;; -----------------------------------------------------------------------------
+;; Dialect-aware functions (moved from dialects.clj to avoid circular deps)
+;; -----------------------------------------------------------------------------
+
+(defn detect-nrepl-env-type
+  "Detects the nREPL environment type by querying the server's describe op."
+  [service]
+  (when-let [{:keys [versions]} (describe service)]
+    (cond
+      (get versions :clojure) :clj
+      (get versions :babashka) :bb
+      (get versions :basilisp) :basilisp
+      (get versions :sci-nrepl) :scittle
+      :else :unknown)))
+
+(defmulti ^:private fetch-project-directory-helper
+  "Helper multimethod for fetching project directory based on env-type."
+  (fn [nrepl-env-type _service] nrepl-env-type))
+
+(defmethod fetch-project-directory-helper :default [nrepl-env-type service]
+  ;; default to fetching from the nrepl
+  ;; Uses eval-code-internal to avoid triggering full init (we're called during init)
+  (when-let [exp (dialects/fetch-project-directory-exp nrepl-env-type)]
+    (try
+      (let [result-value (->> (eval-code-internal service exp :session-type :tools)
+                              nrepl/combine-responses
+                              :value)]
+        result-value)
+      (catch Exception e
+        (log/warn e "Failed to fetch project directory")
+        nil))))
+
+(defmethod fetch-project-directory-helper :scittle [_ service]
+  (when-let [desc (describe service)]
+    (some-> desc :aux :cwd io/file (.getCanonicalPath))))
+
+(defn fetch-project-directory
+  "Fetches the project directory for the given nREPL client.
+   If project-dir is provided in opts, returns it directly.
+   Otherwise, evaluates environment-specific expression to get it."
+  [service nrepl-env-type project-dir-arg]
+  (if project-dir-arg
+    (.getCanonicalPath (io/file project-dir-arg))
+    (let [raw-result (fetch-project-directory-helper nrepl-env-type service)]
+      ;; nrepl sometimes returns strings with extra quotes and in a vector
+      (if (and (vector? raw-result) (= 1 (count raw-result)) (string? (first raw-result)))
+        (str/replace (first raw-result) #"^\"|\"$" "")
+        raw-result))))
+
+(defn initialize-environment
+  "Initializes the environment by evaluating dialect-specific expressions.
+   Uses eval-code-internal to avoid circular init calls.
+   Returns the service unchanged."
+  [service nrepl-env-type]
+  (log/debug "Initializing environment for" nrepl-env-type)
+  (when-let [init-exps (not-empty (dialects/initialize-environment-exp nrepl-env-type))]
+    (doseq [exp init-exps]
+      (eval-code-internal service exp)))
+  service)
+
+(defn load-repl-helpers
+  "Loads REPL helper functions appropriate for the environment.
+   Uses eval-code-internal to avoid circular init calls."
+  [service nrepl-env-type]
+  (when-let [helper-exps (not-empty (dialects/load-repl-helpers-exp nrepl-env-type))]
+    (doseq [exp helper-exps]
+      (eval-code-internal service exp :session-type :tools)))
+  service)
+
+;; -----------------------------------------------------------------------------
+;; Lazy per-port initialization
+;; -----------------------------------------------------------------------------
+
+(def ^:private init-locks
+  "Atom holding per-port lock objects for thread-safe initialization."
+  (atom {}))
+
+(defn- get-lock-for-port
+  "Gets or creates a lock object for the given port."
+  [port]
+  (or (get @init-locks port)
+      (let [lock (Object.)]
+        (swap! init-locks (fn [locks]
+                            (if (contains? locks port)
+                              locks
+                              (assoc locks port lock))))
+        (get @init-locks port))))
+
+(defn detect-and-store-env-type!
+  "Detects the environment type for the given service's port and stores it.
+   Returns the detected env-type. Does nothing if already detected."
+  [service]
+  (or (get-port-env-type service)
+      (let [env-type (detect-nrepl-env-type service)]
+        (set-port-env-type! service env-type)
+        (log/info "Detected env-type for port" (:port service) ":" env-type)
+        env-type)))
+
+(defn initialize-port!
+  "Initializes a port: runs init expressions and loads helpers.
+   Does nothing if already initialized. Not thread-safe - use ensure-port-initialized!
+   Returns the service."
+  [service]
+  (ensure-port-entry! service)
+  (when-not (port-initialized? service)
+    (log/info "Initializing port" (:port service))
+    (let [env-type (detect-and-store-env-type! service)]
+      (initialize-environment service env-type)
+      (load-repl-helpers service env-type)
+      (set-port-initialized! service)
+      (log/info "Port" (:port service) "initialized successfully")))
+  service)
+
+(defn ensure-port-initialized!
+  "Ensures a port is initialized before use. Thread-safe via per-port locking.
+   Returns the service unchanged."
+  [service]
+  (when-not (port-initialized? service)
+    (let [port (:port service)
+          lock (get-lock-for-port port)]
+      (locking lock
+        (initialize-port! service))))
+  service)
+
+(defn with-port
+  "Returns a service map configured for the specified port.
+   If port is nil or same as current, returns service unchanged.
+   Ensures the port entry exists in state but does NOT initialize."
+  [service port]
+  (if (or (nil? port) (= port (:port service)))
+    service
+    (-> service
+        (assoc :port port)
+        ensure-port-entry!)))
+
+(defn with-port-initialized
+  "Returns a service map for the specified port, ensuring it is initialized.
+   Combines with-port and ensure-port-initialized! for convenience."
+  [service port]
+  (-> service
+      (with-port port)
+      ensure-port-initialized!))

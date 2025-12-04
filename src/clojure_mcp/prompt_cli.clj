@@ -8,7 +8,6 @@
             [clojure.data.json :as json]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
-            [clojure-mcp.dialects :as dialects]
             [clojure-mcp.tools.agent-tool-builder.core :as agent-core]
             [clojure-mcp.tools.agent-tool-builder.default-agents :as default-agents]
             [clojure-mcp.agent.general-agent :as general-agent]
@@ -232,11 +231,11 @@
     (let [nrepl-client-map (nrepl/create {:port port})
 
           ;; Detect environment type
-          env-type (dialects/detect-nrepl-env-type nrepl-client-map)
+          env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
 
           ;; Fetch project directory from REPL or use CLI option
           project-dir (or dir
-                          (dialects/fetch-project-directory nrepl-client-map env-type nil))
+                          (nrepl/fetch-project-directory nrepl-client-map env-type nil))
 
           ;; Load configuration  
           _ (println (str "Working directory: " project-dir))
@@ -249,8 +248,8 @@
                                               (assoc config-data :nrepl-env-type final-env-type))
 
           ;; Initialize environment
-          _ (dialects/initialize-environment nrepl-client-map-with-config final-env-type)
-          _ (dialects/load-repl-helpers nrepl-client-map-with-config final-env-type)
+          _ (nrepl/initialize-environment nrepl-client-map-with-config final-env-type)
+          _ (nrepl/load-repl-helpers nrepl-client-map-with-config final-env-type)
 
           nrepl-client-atom (atom nrepl-client-map-with-config)
 

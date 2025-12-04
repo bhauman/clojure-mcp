@@ -3,6 +3,7 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.config :as config]
+   [clojure-mcp.nrepl :as nrepl]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.bash.core :as core]
    [clojure.java.io :as io]
@@ -116,10 +117,10 @@ in the response to determine command success.")
 
 (defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session-type]} inputs]
   (let [nrepl-client @nrepl-client-atom]
-    (if nrepl-session-type
-      ;; Execute over nREPL with session type
+    (if (and nrepl-session-type (:port nrepl-client))
+      ;; Execute over nREPL with session type (only if default port is configured)
       (core/execute-bash-command-nrepl nrepl-client-atom (assoc inputs :session-type nrepl-session-type))
-      ;; Execute locally
+      ;; Execute locally (fallback when no default port configured)
       (core/execute-bash-command nrepl-client inputs))))
 
 (defmethod tool-system/format-results :bash [_ result]
