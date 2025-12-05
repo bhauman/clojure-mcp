@@ -86,7 +86,7 @@ Examples:
     (when (and port (not (pos-int? port)))
       (throw (ex-info (str "Error parameter must be positive integer: port " (pr-str inputs))
                       {:inputs inputs})))
-    ;; Check that a port is available (provided, configured, or from .nrepl-port file)
+    ;; Resolve effective port: provided, configured, or from .nrepl-port file
     (let [service @nrepl-client-atom
           project-dir (config/get-nrepl-user-dir service)
           effective-port (or port
@@ -95,39 +95,27 @@ Examples:
       (when-not effective-port
         (throw (ex-info "No nREPL port available. Please provide :port parameter, start server with a port configured, or ensure .nrepl-port file exists in project directory."
                         {:inputs inputs
-                         :project-dir project-dir}))))
-    ;; Return validated inputs
-    inputs))
+                         :project-dir project-dir})))
+      ;; Return inputs with resolved port
+      (assoc inputs :port effective-port))))
 
 (defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom timeout session-type]}
                                                     {:keys [timeout_ms port] :as inputs}]
-  ;; Get client for the specified port (or use base if no port specified)
-  ;; Ensures lazy initialization happens for non-default ports
-  (let [base-client @nrepl-client-atom
-        project-dir (config/get-nrepl-user-dir base-client)
-        ;; Try: provided port, configured port, or .nrepl-port file
-        effective-port (or port
-                           (:port base-client)
-                           (read-nrepl-port-file project-dir))]
+  ;; port is already resolved by validate-inputs
+  (let [base-client @nrepl-client-atom]
     (try
-      (let [client (if (or port (not (:port base-client)))
-                     ;; Use specified port or discovered port
-                     (nrepl/with-port-initialized base-client effective-port)
-                     (do
-                       ;; For default port, ensure it's initialized (should already be, but safe)
-                       (nrepl/ensure-port-initialized! base-client)
-                       base-client))]
+      (let [client (nrepl/with-port-initialized base-client port)]
         ;; Delegate to core implementation with repair
         (core/evaluate-with-repair client (cond-> inputs
                                             session-type (assoc :session-type session-type)
                                             (nil? timeout_ms) (assoc :timeout_ms timeout))))
       (catch java.net.ConnectException e
         {:outputs [[:err (format "Failed to connect to nREPL server on port %d: %s. Ensure an nREPL server is running on that port."
-                                 effective-port (.getMessage e))]]
+                                 port (.getMessage e))]]
          :error true})
       (catch java.net.SocketException e
         {:outputs [[:err (format "Connection error to nREPL server on port %d: %s. The server may have disconnected."
-                                 effective-port (.getMessage e))]]
+                                 port (.getMessage e))]]
          :error true}))))
 
 (defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as _eval-result}]
