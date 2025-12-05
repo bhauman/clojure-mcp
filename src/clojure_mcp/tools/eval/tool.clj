@@ -84,16 +84,26 @@ Examples:
   ;; Get client for the specified port (or use base if no port specified)
   ;; Ensures lazy initialization happens for non-default ports
   (let [base-client @nrepl-client-atom
-        client (if port
-                 (nrepl/with-port-initialized base-client port)
-                 (do
-                   ;; For default port, ensure it's initialized (should already be, but safe)
-                   (nrepl/ensure-port-initialized! base-client)
-                   base-client))]
-    ;; Delegate to core implementation with repair
-    (core/evaluate-with-repair client (cond-> inputs
-                                        session-type (assoc :session-type session-type)
-                                        (nil? timeout_ms) (assoc :timeout_ms timeout)))))
+        effective-port (or port (:port base-client))]
+    (try
+      (let [client (if port
+                     (nrepl/with-port-initialized base-client port)
+                     (do
+                       ;; For default port, ensure it's initialized (should already be, but safe)
+                       (nrepl/ensure-port-initialized! base-client)
+                       base-client))]
+        ;; Delegate to core implementation with repair
+        (core/evaluate-with-repair client (cond-> inputs
+                                            session-type (assoc :session-type session-type)
+                                            (nil? timeout_ms) (assoc :timeout_ms timeout))))
+      (catch java.net.ConnectException e
+        {:outputs [[:err (format "Failed to connect to nREPL server on port %d: %s. Ensure an nREPL server is running on that port."
+                                 effective-port (.getMessage e))]]
+         :error true})
+      (catch java.net.SocketException e
+        {:outputs [[:err (format "Connection error to nREPL server on port %d: %s. The server may have disconnected."
+                                 effective-port (.getMessage e))]]
+         :error true}))))
 
 (defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as _eval-result}]
   ;; The core implementation now returns a map with :outputs (raw outputs), :error (boolean), and :repaired (boolean)
