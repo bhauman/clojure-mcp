@@ -6,11 +6,11 @@ powered by large language models (LLMs).
 
 ## IMPORTANT UPDATE
 
-**Status Update (November 14 2025)**: Recent improvements in Claude Code with Sonnet 4.5 have reduced it's need for structural editing.
+**Status Update (November 14 2025)**: Recent improvements in Claude Code with Sonnet 4.5 have reduced its need for structural editing.
 
-If your are using [Claude Code](https://www.claude.com/product/claude-code) (and I highly recommend that you do), you should start with [clojure-mcp-light](https://github.com/bhauman/clojure-mcp-light)
+If you are using [Claude Code](https://www.claude.com/product/claude-code) (and I highly recommend that you do), you should start with [clojure-mcp-light](https://github.com/bhauman/clojure-mcp-light).
 
-If your not using Claude Code I still highly recommend you use ClojureMCP.
+If you are not using Claude Code I still highly recommend you use ClojureMCP.
 
 ## 🚀 Quick Overview
 
