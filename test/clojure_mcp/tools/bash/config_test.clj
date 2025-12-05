@@ -31,8 +31,9 @@
     (let [nrepl-calls (atom 0)
           local-calls (atom 0)
 
-          ;; Mock client with bash-over-nrepl = true
+          ;; Mock client with bash-over-nrepl = true and port configured
           mock-client-nrepl {:client :mock-client
+                             :port 7888  ;; nrepl-available? requires port
                              ::config/config {:allowed-directories [(System/getProperty "user.dir")]
                                               :nrepl-user-dir (System/getProperty "user.dir")
                                               :bash-over-nrepl true}}

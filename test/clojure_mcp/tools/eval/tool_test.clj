@@ -57,10 +57,11 @@
       (is (fn? (:tool-fn reg-map))))))
 
 (deftest validate-inputs-test
-  (testing "Validate accepts valid input"
+  (testing "Validate accepts valid input and resolves port"
     (let [tool-instance (eval-tool/create-eval-tool *nrepl-client-atom*)
           result (tool-system/validate-inputs tool-instance {:code "(+ 1 2)"})]
-      (is (= {:code "(+ 1 2)"} result))))
+      (is (= "(+ 1 2)" (:code result)))
+      (is (pos-int? (:port result)))))
 
   (testing "Validate rejects missing code parameter"
     (let [tool-instance (eval-tool/create-eval-tool *nrepl-client-atom*)]

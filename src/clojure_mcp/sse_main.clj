@@ -21,3 +21,22 @@
     :make-prompts-fn main/make-prompts
     :make-resources-fn main/make-resources}))
 
+(defn start
+  "Entry point for running SSE server from project directory.
+
+   Sets :project-dir to current working directory unless :not-cwd is true.
+   This allows running without an immediate REPL connection - REPL initialization
+   happens lazily when first needed.
+
+   Options:
+   - :not-cwd - If true, does NOT set project-dir to cwd (default: false)
+   - :port - Optional nREPL port (REPL is optional when project-dir is set)
+   - :mcp-sse-port - Port for SSE server (required)
+   - All other options supported by start-sse-mcp-server"
+  [opts]
+  (let [not-cwd? (get opts :not-cwd false)
+        opts' (if not-cwd?
+                opts
+                (assoc opts :project-dir (System/getProperty "user.dir")))]
+    (start-sse-mcp-server opts')))
+

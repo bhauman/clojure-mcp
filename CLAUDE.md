@@ -2,9 +2,8 @@
 
 ## Build Commands
 - Run REPL with MCP server: `clojure -X:mcp` (starts on port 7888)
-- Run all tests: `clojure -X:test`
-- Run single test: `clojure -X:test :dirs '["test"]' :include '"repl_tools_test"'`
-- Run linter: `clojure -M:lint` (checks src directory)
+- Run all tests: `clojure -M:test`
+- Run linter: `clj-kondo --lint src` or `clj-kondo --lint src test` for both
 - Build JAR: `clojure -T:build ci`
 - Install locally: `clojure -T:build install`
 
@@ -16,7 +15,6 @@
 - **Namespaces**: Align with directory structure (`clojure-mcp.repl-tools`)
 - **Testing**: Use `deftest` with descriptive names; `testing` for subsections; `is` for assertions
 - **REPL Development**: Prefer REPL-driven development for rapid iteration and feedback
-- Don't use the clojure -X:lint tool in the workflow
 
 ## MCP Tool Guidelines
 - Include clear tool `:description` for LLM guidance

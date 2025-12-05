@@ -38,17 +38,15 @@
  {:mcp
   {:exec-fn clojure-mcp.main/start-mcp-server
    ;; it needs an nrepl port to talk to
-   :exec-args {:port 7888}}
+   ;; :exec-args {:port 7888}
+   }
 
   :mcp-sse
   {:extra-deps {jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
                 org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
                 org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
-   :exec-fn clojure-mcp.sse-main/start-sse-mcp-server
-
-   :exec-args {:port 7888 ;; the nrepl port to connect to
-               ;; specify the :mcp-sse-port to listen on
-               :mcp-sse-port 8078}}
+   :exec-fn clojure-mcp.sse-main/start
+   :exec-args {:mcp-sse-port 8078}}
 
   :mcp-figwheel
   {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
@@ -71,9 +69,10 @@
 
   :dev-mcp
   {:extra-paths ["dev" "test"]
-   :exec-fn clojure-mcp.main/start-mcp-server
+   :exec-fn clojure-mcp.main/start
    ;; it needs an nrepl port to talk to
-   :exec-args {:port 7888
+   :exec-args {;; :port 7888
+               :enable-logging? true
                ;; test auto starting the repl
                ;; :start-nrepl-cmd ["clojure" "-M:nrepl"]
                }}

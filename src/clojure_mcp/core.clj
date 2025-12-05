@@ -5,7 +5,6 @@
             [taoensso.timbre :as log]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
-            [clojure-mcp.dialects :as dialects]
             [clojure-mcp.file-content :as file-content]
             [clojure-mcp.nrepl-launcher :as nrepl-launcher])
   (:import [io.modelcontextprotocol.server.transport
@@ -255,7 +254,7 @@
         (throw e)))))
 
 (defn fetch-config [nrepl-client-map config-file cli-env-type env-type project-dir]
-  (let [user-dir (dialects/fetch-project-directory nrepl-client-map env-type project-dir)]
+  (let [user-dir (nrepl/fetch-project-directory nrepl-client-map env-type project-dir)]
     (when-not user-dir
       (log/warn "Could not determine working directory")
       (throw (ex-info "No project directory!!" {})))
@@ -269,58 +268,66 @@
       (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))))
 
 (defn create-and-start-nrepl-connection
-  "Convenience higher-level API function to create and initialize an nREPL connection.
-   
-   This function handles the complete setup process including:
-   - Creating the nREPL client connection
-   - Loading required namespaces and helpers (if Clojure environment)
+  "Creates an nREPL client map and loads configuration.
+
+   This function handles:
+   - Creating the nREPL client connection (if port provided)
    - Setting up the working directory
    - Loading configuration
-   
-   Takes initial-config map with :port and optional :host, :project-dir, :nrepl-env-type, :config-file.
+
+   REPL initialization (env detection, init expressions, helpers) happens lazily
+   when the first eval-code call is made.
+
+   Takes initial-config map with optional :port, :host, :project-dir, :nrepl-env-type, :config-file.
+   - If :project-dir is provided, uses it directly (no REPL query needed)
+   - If :project-dir is NOT provided, queries REPL for project directory (requires :port)
+
    Returns the configured nrepl-client-map with ::config/config attached."
-  [{:keys [project-dir config-file] :as initial-config}]
-  (log/info "Creating nREPL connection with config:" initial-config)
+  [{:keys [project-dir config-file port] :as initial-config}]
+  (if port
+    (log/info "Creating nREPL client for port" port)
+    (log/info "Starting without nREPL connection (project-dir mode)"))
   (try
     (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type))
           cli-env-type (:nrepl-env-type initial-config)
-          _ (log/info "nREPL client map created")
-          ;; Detect environment type early
-          ;; TODO this needs to be sorted out
-          env-type (dialects/detect-nrepl-env-type nrepl-client-map)
-          nrepl-client-map-with-config (fetch-config nrepl-client-map
-                                                     config-file
-                                                     cli-env-type
-                                                     env-type
-                                                     project-dir)
-          nrepl-env-type' (config/get-config nrepl-client-map-with-config :nrepl-env-type)]
-      (log/debug "Initializing Clojure environment")
-      (dialects/initialize-environment nrepl-client-map-with-config nrepl-env-type')
-      (dialects/load-repl-helpers nrepl-client-map-with-config nrepl-env-type')
-      (log/debug "Environment initialized")
-      nrepl-client-map-with-config)
+          _ (log/info "nREPL client map created")]
+      (if project-dir
+        ;; Project dir provided - load config directly, no REPL query needed
+        (let [user-dir (.getCanonicalPath (io/file project-dir))
+              _ (log/info "Working directory set to:" user-dir)
+              config (load-config-handling-validation-errors config-file user-dir)
+              ;; Use cli-env-type or config's env-type, default to :clj
+              final-env-type (or cli-env-type
+                                 (:nrepl-env-type config)
+                                 :clj)]
+          (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))
+        ;; No project dir - need to query REPL (requires port)
+        (let [;; Detect environment type (uses describe op, no full init needed)
+              env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
+              _ (nrepl/set-port-env-type! nrepl-client-map env-type)]
+          (fetch-config nrepl-client-map config-file cli-env-type env-type project-dir))))
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
 
 (defn create-additional-connection
+  "Creates a service map for an additional port. Initialization is lazy.
+   The returned service shares the base client's state atom and config,
+   but targets a different port.
+
+   Note: The third argument (initialize-fn) is deprecated and ignored.
+   Initialization now happens lazily via nrepl/ensure-port-initialized!"
   ([nrepl-client-atom initial-config]
-   (create-additional-connection nrepl-client-atom initial-config identity))
-  ([nrepl-client-atom initial-config initialize-fn]
-   (log/info "Creating additional nREPL connection" initial-config)
-   (try
-     (let [nrepl-client-map (nrepl/create initial-config)]
-       ;; copy config
-       ;; maybe we should create this just like the normal nrelp connection?
-       ;; we should introspect the project and get a working directory
-       ;; and maybe add it to allowed directories for both
-       (when initialize-fn (initialize-fn nrepl-client-map))
-       (assert (::config/config @nrepl-client-atom))
-       ;; copy config over for now
-       (assoc nrepl-client-map ::config/config (::config/config @nrepl-client-atom)))
-     (catch Exception e
-       (log/error e "Failed to create additional nREPL connection")
-       (throw e)))))
+   (create-additional-connection nrepl-client-atom initial-config nil))
+  ([nrepl-client-atom {:keys [port host]} _deprecated-initialize-fn]
+   (log/info "Creating additional connection config for port" port)
+   (let [base-client @nrepl-client-atom]
+     (assert (::config/config base-client) "Base client must have config")
+     (-> base-client
+         (assoc :port port)
+         (cond-> host (assoc :host host))
+         ;; Ensure port entry exists but don't initialize yet (lazy init)
+         nrepl/ensure-port-entry!))))
 
 (defn close-servers
   "Convenience higher-level API function to gracefully shut down MCP and nREPL servers.
@@ -487,39 +494,38 @@
 
 (defn build-and-start-mcp-server-impl
   "Internal implementation of MCP server startup.
-   
+
    Builds and starts an MCP server with the provided configuration.
-   
+
    This is the main entry point for creating custom MCP servers. It handles:
-   - Validating input options
-   - Creating and starting the nREPL connection
+   - Creating the nREPL client and loading configuration
    - Setting up the working directory
    - Calling factory functions to create tools, prompts, and resources
    - Registering everything with the MCP server
-   
+
+   REPL initialization happens lazily on first eval-code call.
+
    Args:
    - nrepl-args: Map with connection settings
-     - :port (required) - nREPL server port
+     - :port (required if no :project-dir) - nREPL server port
      - :host (optional) - nREPL server host (defaults to localhost)
-     - :project-dir (optional) - Root directory for the project (must exist)
-   
+     - :project-dir (optional) - Root directory for the project. If provided, port is optional.
+
    - component-factories: Map with factory functions
      - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
-     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts  
+     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts
      - :make-resources-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of resources
-   
+
    All factory functions are optional. If not provided, that category won't be populated.
-   
+
    Side effects:
    - Stores the nREPL client in core/nrepl-client-atom
    - Starts the MCP server on stdio
-   
+
    Returns: nil"
   [nrepl-args component-factories]
-  ;; the nrepl-args are a map with :port and optional :host
-  ;; Note: validation should be done by caller
-  (let [_ (assert (:port nrepl-args) "Port must be provided for build-and-start-mcp-server-impl")
-        nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
+  ;; Either :port or :project-dir must be provided (validated by ensure-port-if-needed)
+  (let [nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
         ;; Store nREPL process (if auto-started) in client map for cleanup
         nrepl-client-with-process (if-let [process (:nrepl-process nrepl-args)]
@@ -536,40 +542,47 @@
     (swap! nrepl-client-atom assoc :mcp-server mcp)
     nil))
 
+(defn ensure-port-if-needed
+  "Ensures port is present when project-dir is NOT provided.
+   When project-dir IS provided, port is optional (REPL not needed for config loading)."
+  [args]
+  (if (:project-dir args)
+    args ;; project-dir provided, port is optional
+    (ensure-port args))) ;; no project-dir, port is required
+
 (defn build-and-start-mcp-server
   "Builds and starts an MCP server with optional automatic nREPL startup.
-   
+
    This function wraps build-and-start-mcp-server-impl with nREPL auto-start capability.
-   
+
    If auto-start conditions are met (see nrepl-launcher/should-start-nrepl?), it will:
    1. Start an nREPL server process using :start-nrepl-cmd
    2. Parse the port from process output (if no :port provided)
    3. Pass the discovered port to the main MCP server setup
-   
-   Otherwise, it requires a :port parameter.
-   
+
+   Port is only required when :project-dir is NOT provided (need REPL to discover project dir).
+
    Args:
    - nrepl-args: Map with connection settings and optional nREPL start
      configuration
-     - :port (required if not auto-starting) - nREPL server port
-       When provided with :start-nrepl-cmd, uses fixed port instead of parsing
-     - :host (optional) - nREPL server host (defaults to localhost)  
-     - :project-dir (optional) - Root directory for the project
+     - :port (required if no :project-dir) - nREPL server port
+     - :host (optional) - nREPL server host (defaults to localhost)
+     - :project-dir (optional) - Root directory for the project. If provided, port is optional.
      - :start-nrepl-cmd (optional) - Command to start nREPL server
-   
+
    - component-factories: Map with factory functions
      - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
-     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts  
+     - :make-prompts-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of prompts
      - :make-resources-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of resources
-   
+
    Auto-start conditions (must satisfy ONE):
    1. Both :start-nrepl-cmd AND :project-dir provided in nrepl-args
    2. Current directory contains .clojure-mcp/config.edn with :start-nrepl-cmd
-   
+
    Returns: nil"
   [nrepl-args component-factories]
   (-> nrepl-args
       validate-options
       nrepl-launcher/maybe-start-nrepl-process
-      ensure-port
+      ensure-port-if-needed
       (build-and-start-mcp-server-impl component-factories)))

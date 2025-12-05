@@ -183,7 +183,8 @@
   (let [{:keys [clojure java babashka _basilisp _python]} runtime-data
         ;; Read and parse project files locally
         deps (read-deps-edn working-dir)
-        bb-config (when babashka (read-bb-edn working-dir))
+        ;; Always try to read bb.edn - file existence indicates babashka project
+        bb-config (read-bb-edn working-dir)
         project-clj (read-project-clj working-dir)
         lein-config (when project-clj (parse-lein-config project-clj))
         project-type (determine-project-type deps project-clj bb-config)
@@ -341,16 +342,30 @@
           allowed-directories (config/get-allowed-directories nrepl-client)
           working-directory (config/get-nrepl-user-dir nrepl-client)
           nrepl-env-type (config/get-nrepl-env-type nrepl-client)]
-      (try
-        (when-let [formatted-info (some-> (mcp-nrepl/describe nrepl-client)
-                                          format-describe
-                                          (format-project-info allowed-directories working-directory nrepl-env-type))]
-          (let [result {:outputs [formatted-info]
-                        :error false}]
-            ;; Cache the result in the atom
-            (swap! nrepl-client-atom assoc ::clojure-project-info result)
-            (log/debug "Cached project info for future use")
-            result))
-        (catch Exception e
-          {:outputs [(str "Exception during project inspection: " (.getMessage e))]
-           :error true})))))
+      ;; Guard: need working-directory and allowed-directories for project inspection
+      (if (or (nil? working-directory) (empty? allowed-directories))
+        {:outputs ["Project inspection unavailable: missing working directory or allowed directories configuration"]
+         :error true}
+        (try
+          (let [;; Try configured port or .nrepl-port file
+                effective-port (or (:port nrepl-client)
+                                   (mcp-nrepl/read-nrepl-port-file working-directory))
+                ;; Only fetch describe info if we have a port
+                describe-info (when effective-port
+                                (some-> (mcp-nrepl/describe (assoc nrepl-client :port effective-port))
+                                        format-describe))
+                ;; Pass describe-info (may be nil) to format-project-info
+                formatted-info (format-project-info describe-info
+                                                    allowed-directories
+                                                    working-directory
+                                                    nrepl-env-type)]
+            (when formatted-info
+              (let [result {:outputs [formatted-info]
+                            :error false}]
+                ;; Cache the result in the atom
+                (swap! nrepl-client-atom assoc ::clojure-project-info result)
+                (log/debug "Cached project info for future use")
+                result)))
+          (catch Exception e
+            {:outputs [(str "Exception during project inspection: " (.getMessage e))]
+             :error true}))))))
