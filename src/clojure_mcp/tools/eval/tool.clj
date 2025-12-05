@@ -3,7 +3,23 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.eval.core :as core]
-   [clojure-mcp.nrepl :as nrepl]))
+   [clojure-mcp.config :as config]
+   [clojure-mcp.nrepl :as nrepl]
+   [clojure.java.io :as io]
+   [clojure.string :as string]))
+
+(defn- read-nrepl-port-file
+  "Reads the .nrepl-port file from the given directory.
+   Returns the port number if found and valid, nil otherwise."
+  [dir]
+  (when dir
+    (let [port-file (io/file dir ".nrepl-port")]
+      (when (.exists port-file)
+        (try
+          (-> (slurp port-file)
+              string/trim
+              Integer/parseInt)
+          (catch Exception _ nil))))))
 
 ;; Factory function to create the tool configuration
 (defn create-eval-tool
@@ -70,12 +86,16 @@ Examples:
     (when (and port (not (pos-int? port)))
       (throw (ex-info (str "Error parameter must be positive integer: port " (pr-str inputs))
                       {:inputs inputs})))
-    ;; Check that a port is available (either provided or configured)
+    ;; Check that a port is available (provided, configured, or from .nrepl-port file)
     (let [service @nrepl-client-atom
-          effective-port (or port (:port service))]
+          project-dir (config/get-nrepl-user-dir service)
+          effective-port (or port
+                             (:port service)
+                             (read-nrepl-port-file project-dir))]
       (when-not effective-port
-        (throw (ex-info "No nREPL port available. Please provide :port parameter or start server with a port configured."
-                        {:inputs inputs}))))
+        (throw (ex-info "No nREPL port available. Please provide :port parameter, start server with a port configured, or ensure .nrepl-port file exists in project directory."
+                        {:inputs inputs
+                         :project-dir project-dir}))))
     ;; Return validated inputs
     inputs))
 
@@ -84,10 +104,15 @@ Examples:
   ;; Get client for the specified port (or use base if no port specified)
   ;; Ensures lazy initialization happens for non-default ports
   (let [base-client @nrepl-client-atom
-        effective-port (or port (:port base-client))]
+        project-dir (config/get-nrepl-user-dir base-client)
+        ;; Try: provided port, configured port, or .nrepl-port file
+        effective-port (or port
+                           (:port base-client)
+                           (read-nrepl-port-file project-dir))]
     (try
-      (let [client (if port
-                     (nrepl/with-port-initialized base-client port)
+      (let [client (if (or port (not (:port base-client)))
+                     ;; Use specified port or discovered port
+                     (nrepl/with-port-initialized base-client effective-port)
                      (do
                        ;; For default port, ensure it's initialized (should already be, but safe)
                        (nrepl/ensure-port-initialized! base-client)
