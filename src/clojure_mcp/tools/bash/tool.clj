@@ -116,11 +116,17 @@ in the response to determine command success.")
         timeout_ms (assoc :timeout-ms timeout_ms)))))
 
 (defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session-type]} inputs]
-  (let [nrepl-client @nrepl-client-atom]
-    (if (and nrepl-session-type (:port nrepl-client))
-      ;; Execute over nREPL with session type (only if default port is configured)
-      (core/execute-bash-command-nrepl nrepl-client-atom (assoc inputs :session-type nrepl-session-type))
-      ;; Execute locally (fallback when no default port configured)
+  (let [nrepl-client @nrepl-client-atom
+        working-dir (config/get-nrepl-user-dir nrepl-client)
+        effective-port (or (:port nrepl-client)
+                           (nrepl/read-nrepl-port-file working-dir))]
+    (if (and nrepl-session-type effective-port)
+      ;; Execute over nREPL with session type - pass the resolved port
+      (core/execute-bash-command-nrepl nrepl-client-atom
+                                       (assoc inputs
+                                              :session-type nrepl-session-type
+                                              :port effective-port))
+      ;; Execute locally (fallback when no port available)
       (core/execute-bash-command nrepl-client inputs))))
 
 (defmethod tool-system/format-results :bash [_ result]

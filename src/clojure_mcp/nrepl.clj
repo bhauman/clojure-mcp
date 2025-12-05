@@ -364,3 +364,16 @@
   (-> service
       (with-port port)
       ensure-port-initialized!))
+
+(defn read-nrepl-port-file
+  "Reads the .nrepl-port file from the given directory.
+   Returns the port number if found and valid, nil otherwise."
+  [dir]
+  (when dir
+    (let [port-file (io/file dir ".nrepl-port")]
+      (when (.exists port-file)
+        (try
+          (-> (slurp port-file)
+              str/trim
+              Integer/parseInt)
+          (catch Exception _ nil))))))

@@ -4,22 +4,7 @@
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.eval.core :as core]
    [clojure-mcp.config :as config]
-   [clojure-mcp.nrepl :as nrepl]
-   [clojure.java.io :as io]
-   [clojure.string :as string]))
-
-(defn- read-nrepl-port-file
-  "Reads the .nrepl-port file from the given directory.
-   Returns the port number if found and valid, nil otherwise."
-  [dir]
-  (when dir
-    (let [port-file (io/file dir ".nrepl-port")]
-      (when (.exists port-file)
-        (try
-          (-> (slurp port-file)
-              string/trim
-              Integer/parseInt)
-          (catch Exception _ nil))))))
+   [clojure-mcp.nrepl :as nrepl]))
 
 ;; Factory function to create the tool configuration
 (defn create-eval-tool
@@ -91,7 +76,7 @@ Examples:
           project-dir (config/get-nrepl-user-dir service)
           effective-port (or port
                              (:port service)
-                             (read-nrepl-port-file project-dir))]
+                             (nrepl/read-nrepl-port-file project-dir))]
       (when-not effective-port
         (throw (ex-info "No nREPL port available. Please provide :port parameter, start server with a port configured, or ensure .nrepl-port file exists in project directory."
                         {:inputs inputs

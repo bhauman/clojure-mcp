@@ -347,9 +347,12 @@
         {:outputs ["Project inspection unavailable: missing working directory or allowed directories configuration"]
          :error true}
         (try
-          (let [;; Only fetch describe info if a default nREPL port is configured
-                describe-info (when (:port nrepl-client)
-                                (some-> (mcp-nrepl/describe nrepl-client)
+          (let [;; Try configured port or .nrepl-port file
+                effective-port (or (:port nrepl-client)
+                                   (mcp-nrepl/read-nrepl-port-file working-directory))
+                ;; Only fetch describe info if we have a port
+                describe-info (when effective-port
+                                (some-> (mcp-nrepl/describe (assoc nrepl-client :port effective-port))
                                         format-describe))
                 ;; Pass describe-info (may be nil) to format-project-info
                 formatted-info (format-project-info describe-info
