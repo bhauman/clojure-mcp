@@ -295,21 +295,6 @@
 ;; Lazy per-port initialization
 ;; -----------------------------------------------------------------------------
 
-(def ^:private init-locks
-  "Atom holding per-port lock objects for thread-safe initialization."
-  (atom {}))
-
-(defn- get-lock-for-port
-  "Gets or creates a lock object for the given port."
-  [port]
-  (or (get @init-locks port)
-      (let [lock (Object.)]
-        (swap! init-locks (fn [locks]
-                            (if (contains? locks port)
-                              locks
-                              (assoc locks port lock))))
-        (get @init-locks port))))
-
 (defn detect-and-store-env-type!
   "Detects the environment type for the given service's port and stores it.
    Returns the detected env-type. Does nothing if already detected."
@@ -336,15 +321,11 @@
   service)
 
 (defn ensure-port-initialized!
-  "Ensures a port is initialized before use. Thread-safe via per-port locking.
+  "Ensures a port is initialized before use.
    Returns the service unchanged."
   [service]
-  (when-not (port-initialized? service)
-    (let [port (:port service)
-          lock (get-lock-for-port port)]
-      (locking lock
-        (initialize-port! service))))
-  service)
+  (cond-> service
+    (not (port-initialized? service)) initialize-port!))
 
 (defn with-port
   "Returns a service map configured for the specified port.
