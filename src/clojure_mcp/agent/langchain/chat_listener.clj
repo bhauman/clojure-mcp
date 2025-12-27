@@ -25,7 +25,7 @@
                      (on-response (assoc ctx :ctx (:raw-context ctx)))))
     :on-error (when on-error
                 (fn [ctx]
-                  (on-error ctx)))}))
+                  (on-error (assoc ctx :ctx (:raw-context ctx)))))}))
 
 (defn logging-listener
   "Create a listener that logs all events."

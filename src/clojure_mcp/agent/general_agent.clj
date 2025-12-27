@@ -1,6 +1,7 @@
 (ns clojure-mcp.agent.general-agent
   "A generalized agent library with system prompts, context, tools, memory, and models."
   (:require [clojure.string :as string]
+            [clojure.set :as set]
             [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clojure-mcp.agent.langchain :as chain]
@@ -11,6 +12,10 @@
 (def DEFAULT-MEMORY-SIZE 100)
 (def DEFAULT-STATELESS-BUFFER 100)
 (def MIN-PERSISTENT-WINDOW 10)
+
+(def MEMORY-RESET-BUFFER
+  "Buffer size before triggering memory reset to prevent overflow."
+  15)
 
 (defn build-read-only-tools
   "Builds the read-only tools for agents.
@@ -138,7 +143,7 @@ Please use it to inform you as to which files should be investigated.\n=========
    
    Returns: The memory object (possibly reset)"
   [memory context memory-size]
-  (if (> (chain/memory-count memory) (- memory-size 15))
+  (if (> (chain/memory-count memory) (- memory-size MEMORY-RESET-BUFFER))
     (do
       (chain/memory-clear! memory)
       (initialize-memory-with-context! memory context))
@@ -258,5 +263,6 @@ Please use it to inform you as to which files should be investigated.\n=========
   [agent new-tools]
   (create-general-agent
    (-> agent
-       (select-keys [:system-prompt :context :model :memory-size])
+       (select-keys [:system-message :context :model :memory-size])
+       (set/rename-keys {:system-message :system-prompt})
        (assoc :tools (vec (concat (:tools agent) new-tools))))))

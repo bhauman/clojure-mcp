@@ -69,7 +69,8 @@
 ;; Tool conversion
 
 (defn- adapt-tool-fn
-  "Adapts clojure-mcp callback-style tool to langchain4clj return style."
+  "Adapts clojure-mcp callback-style tool to langchain4clj return style.
+   Includes a 5-minute timeout to prevent indefinite blocking."
   [callback-style-fn]
   (fn [args]
     (let [result-promise (promise)]
@@ -83,7 +84,10 @@
                     (if (sequential? result)
                       (string/join "\n\n" result)
                       (str result))))))
-      @result-promise)))
+      (let [result (deref result-promise 300000 ::timeout)]
+        (if (= result ::timeout)
+          "Tool Error: Execution timed out after 5 minutes"
+          result)))))
 
 (defn- registration-map->tool-map
   "Converts clojure-mcp tool registration map to langchain4clj tool map format."
@@ -127,13 +131,23 @@
 
 ;; Assistant creation
 
-(defn create-assistant-fn [{:keys [model memory tools system-message]}]
+(defn create-assistant-fn
+  "Creates an assistant function with the given configuration.
+   
+   Options:
+   - :model - The LLM model to use
+   - :memory - Chat memory instance
+   - :tools - Sequence of tool registration maps
+   - :system-message - System message for the assistant
+   - :max-iterations - Maximum tool iterations (default: 10)"
+  [{:keys [model memory tools system-message max-iterations]
+    :or {max-iterations 10}}]
   (assistant/create-assistant
    {:model model
     :memory memory
     :tools (when (seq tools) (convert-tools tools))
     :system-message system-message
-    :max-iterations 10}))
+    :max-iterations max-iterations}))
 
 ;; Message helpers
 
@@ -143,6 +157,4 @@
 (defn system-message [text]
   (messages/edn->message {:type :system :text text}))
 
-(defn user-message-with-contents [content-items]
-  (let [text (string/join "\n" (map #(.text %) content-items))]
-    (messages/edn->message {:type :user :text text})))
+
