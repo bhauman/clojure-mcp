@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-12-27
+
+This release migrates from direct LangChain4j Java imports to the langchain4clj Clojure wrapper library, significantly simplifying the codebase and improving maintainability.
+
+### Major Changes
+
+#### LangChain4j → langchain4clj Migration
+- **Replaced direct LangChain4j imports**: All Java interop code now uses langchain4clj wrapper library
+- **Simplified adapter layer**: `clojure-mcp.agent.langchain` namespace reduced by ~28%
+- **Removed schema.clj**: Eliminated 178 lines of JSON Schema → LangChain4j conversion code
+- **Cleaner listeners**: `chat_listener.clj` reduced from 174 to 51 lines (-71%)
+- **Streamlined message conversion**: `message_conv.clj` now delegates to langchain4clj.messages
+
+### Changed
+- **Dependencies**: Replaced 4 LangChain4j Maven artifacts with single langchain4clj dependency
+- **Tool conversion**: Now uses `langchain4clj.tools.helpers/create-tool-spec` for proper JSON schema handling
+- **Memory API**: Uses langchain4clj assistant functions instead of direct Java MessageWindowChatMemory
+
+### Breaking Changes
+- **`token-tracking-listener` atom structure changed**:
+  - Old: `{:total-input-tokens N :total-output-tokens N :total-tokens N :request-count N}`
+  - New: `{:input-tokens N :output-tokens N :total-tokens N :request-count N :last-request {...} :by-model {...}}`
+  - Consumers should update to use `:input-tokens`/`:output-tokens` keys
+
+### Removed
+- **`clojure-mcp.agent.langchain.schema`**: No longer needed - langchain4clj handles schema conversion
+- **Direct LangChain4j imports**: All Java imports removed from agent namespaces (except tests which use transitive dependency)
+
 ## [0.1.13] - 2025-12-21
 
 This release introduces lazy nREPL initialization, allowing ClojureMCP to start without an immediate REPL connection. It also includes logging improvements, SDK updates, and significant code cleanup.
