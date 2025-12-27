@@ -23,7 +23,7 @@
 
         ;; langchain4clj - Clojure wrapper for LangChain4j
         ;; Provides all LangChain4j classes transitively
-        io.github.nandoolle/langchain4clj {:mvn/version "1.6.0"}
+        io.github.nandoolle/langchain4clj {:mvn/version "1.6.1"}
 
         com.taoensso/timbre {:mvn/version "6.8.0"}
 
