@@ -127,3 +127,93 @@
         (testing (str "Pattern should not match: " mime)
           (is (not (some #(re-matches % mime) fc/text-like-mime-patterns))
               (str "Pattern incorrectly matched for " mime)))))))
+
+(deftest get-filename-test
+  (testing "Extracts filename correctly"
+    (is (= "file.org" (fc/get-filename "/path/to/file.org")))
+    (is (= ".gitignore" (fc/get-filename "/path/to/.gitignore")))
+    (is (= "makefile" (fc/get-filename "/path/to/Makefile"))))
+
+  (testing "Handles edge cases"
+    (is (nil? (fc/get-filename nil)))
+    (is (nil? (fc/get-filename "")))))
+
+(deftest get-file-extension-test
+  (testing "Extracts file extension correctly"
+    (is (= ".org" (fc/get-file-extension "/path/to/file.org")))
+    (is (= ".clj" (fc/get-file-extension "/path/to/file.clj")))
+    (is (= ".gz" (fc/get-file-extension "/path/to/file.tar.gz"))) ; Returns last extension
+    (is (= ".org" (fc/get-file-extension "file.org"))))
+
+  (testing "Handles case-insensitivity"
+    (is (= ".org" (fc/get-file-extension "/path/to/FILE.ORG")))
+    (is (= ".md" (fc/get-file-extension "README.MD"))))
+
+  (testing "Returns nil for files without extensions"
+    (is (nil? (fc/get-file-extension "/path/to/file")))
+    (is (nil? (fc/get-file-extension "Makefile"))))
+
+  (testing "Handles dotfiles correctly"
+    (is (nil? (fc/get-file-extension ".gitignore")))
+    (is (= ".local" (fc/get-file-extension ".gitignore.local"))))
+
+  (testing "Handles edge cases"
+    (is (nil? (fc/get-file-extension nil)))
+    (is (nil? (fc/get-file-extension "")))))
+
+(deftest text-extension-test
+  (testing "Known text extensions are recognized"
+    (is (fc/text-extension? "/path/to/file.org"))
+    (is (fc/text-extension? "/path/to/file.md"))
+    (is (fc/text-extension? "/path/to/file.txt"))
+    (is (fc/text-extension? "/path/to/file.rst"))
+    (is (fc/text-extension? "/path/to/file.csv"))
+    (is (fc/text-extension? "/path/to/file.log"))
+    (is (fc/text-extension? "/path/to/file.conf")))
+
+  (testing "Known text filenames (dotfiles, etc.) are recognized"
+    (is (fc/text-extension? "/path/to/.gitignore"))
+    (is (fc/text-extension? "/path/to/.dockerignore"))
+    (is (fc/text-extension? "/path/to/Makefile"))
+    (is (fc/text-extension? "/path/to/Dockerfile")))
+
+  (testing "Case-insensitive extension matching"
+    (is (fc/text-extension? "/path/to/file.ORG"))
+    (is (fc/text-extension? "/path/to/file.Md"))
+    (is (fc/text-extension? "/path/to/FILE.TXT")))
+
+  (testing "Case-insensitive filename matching"
+    (is (fc/text-extension? "/path/to/MAKEFILE"))
+    (is (fc/text-extension? "/path/to/.GITIGNORE")))
+
+  (testing "Unknown extensions return false"
+    (is (not (fc/text-extension? "/path/to/file.pdf")))
+    (is (not (fc/text-extension? "/path/to/file.exe")))
+    (is (not (fc/text-extension? "/path/to/file.png")))))
+
+(deftest org-file-text-detection-test
+  (testing ".org files are treated as text despite Tika MIME detection"
+    (let [org-file (create-test-file "test.org" "* Heading\n** Subheading\n- bullet point")]
+      ;; The file should be recognized as text due to extension override
+      (is (fc/text-file? org-file)
+          ".org files should be treated as text files")
+      ;; Also test case insensitivity
+      (is (fc/text-extension? org-file))))
+
+  (testing "Various org-mode content patterns work"
+    (let [org-content "#+TITLE: My Document
+#+AUTHOR: Test Author
+
+* Introduction
+This is an org-mode document.
+
+** Section 1
+- Item 1
+- Item 2
+
+#+BEGIN_SRC clojure
+(defn hello [] (println \"Hello\"))
+#+END_SRC
+"
+          org-file (create-test-file "document.org" org-content)]
+      (is (fc/text-file? org-file)))))

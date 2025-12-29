@@ -21,6 +21,43 @@
 (def ^MediaTypeRegistry registry
   (.getMediaTypeRegistry (MimeTypes/getDefaultMimeTypes)))
 
+(def text-file-extensions
+  "File extensions (including dot) that should always be treated as text,
+   regardless of MIME type detection. This handles cases where Tika misdetects
+   certain text formats (e.g., .org files detected as application/vnd.lotus-organizer)."
+  #{".org" ; Emacs Org-mode (misdetected as Lotus Organizer)
+    ".md" ; Markdown
+    ".markdown" ; Markdown (alternative extension)
+    ".rst" ; reStructuredText
+    ".adoc" ; AsciiDoc
+    ".textile" ; Textile
+    ".txt" ; Plain text
+    ".text" ; Plain text (alternative)
+    ".csv" ; CSV (sometimes misdetected)
+    ".tsv" ; TSV
+    ".log" ; Log files
+    ".conf" ; Configuration files
+    ".cfg" ; Configuration files
+    ".ini" ; INI files
+    ".properties" ; Java properties
+    ".env"}) ; Environment files
+
+(def text-file-names
+  "Full filenames (case-insensitive) that should be treated as text.
+   Used for dotfiles and other files without traditional extensions."
+  #{".gitignore"
+    ".gitattributes"
+    ".dockerignore"
+    ".editorconfig"
+    ".npmignore"
+    ".eslintignore"
+    ".prettierignore"
+    "makefile"
+    "dockerfile"
+    "rakefile"
+    "gemfile"
+    "procfile"})
+
 (def text-like-mime-patterns
   "Regex patterns for MIME types that should be treated as text.
    Covers common text-based data formats used in projects that don't
@@ -48,6 +85,29 @@
   (or (Files/probeContentType p)
       (try (.detect ^Tika @mime-detector (.toFile p))
            (catch Exception _ "application/octet-stream"))))
+
+(defn get-filename
+  "Returns the lowercase filename from a file path, or nil for nil/empty input."
+  [file-path]
+  (when (and file-path (seq (str file-path)))
+    (-> (str file-path) (str/split #"[/\\]") last str/lower-case)))
+
+(defn get-file-extension
+  "Returns the lowercase file extension including the dot, or nil if none.
+   Example: \"/path/to/file.ORG\" -> \".org\""
+  [file-path]
+  (when-let [path-str (str file-path)]
+    (let [filename (-> path-str (str/split #"[/\\]") last)
+          dot-idx (str/last-index-of filename ".")]
+      (when (and dot-idx (pos? dot-idx))
+        (str/lower-case (subs filename dot-idx))))))
+
+(defn text-extension?
+  "Returns true if the file path has a known text file extension,
+   or if the filename itself is a known text file (e.g., Makefile, .gitignore)."
+  [file-path]
+  (or (contains? text-file-extensions (get-file-extension file-path))
+      (contains? text-file-names (get-filename file-path))))
 
 (defn str->nio-path [fp]
   (Path/of fp (make-array String 0)))
@@ -88,8 +148,13 @@
 (defn should-be-file-response? [file-path]
   (not (text-media-type? (mime-type file-path))))
 
-(defn text-file? [file-path]
-  (text-media-type? (mime-type file-path)))
+(defn text-file?
+  "Returns true if the file should be treated as a text file.
+   First checks if the file has a known text extension (to handle
+   cases where MIME detection fails), then falls back to MIME type check."
+  [file-path]
+  (or (text-extension? file-path)
+      (text-media-type? (mime-type file-path))))
 
 (defn image-file? [file-path]
   (image-media-type? (mime-type file-path)))
