@@ -3,4 +3,22 @@
   :list_nrepl_ports
   :clojure_eval]
 
+ :disable-prompts
+ ["create-update-project-summary"
+  "plan-and-execute"
+  "chat-session-summarize"
+  "chat-session-resume"
+  "ACT/add-dir"
+  "ACT/scratch_pad_load"
+  "ACT/scratch_pad_save_as"
+  "save_new_prompt"
+  "clojure_repl_system_prompt"]
+
+ :disable-resources
+ ["PROJECT_SUMMARY.md"
+  "README.md"
+  "CLAUDE.md"
+  "LLM_CODE_STYLE.md"
+  "Clojure Project Info"]
+
  :write-file-guard false}
