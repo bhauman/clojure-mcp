@@ -1,6 +1,7 @@
 (ns clojure-mcp.config
   (:require
    [clojure.java.io :as io]
+   [clojure.string :as string]
    [clojure-mcp.config.schema :as schema]
    [clojure-mcp.utils.file :as file-utils]
    [clojure.edn :as edn]
@@ -311,11 +312,46 @@
         (log/warn "Invalid :dispatch-agent-context value, defaulting to true")
         true))))
 
-(defn get-enable-tools [nrepl-client-map]
-  (get-config nrepl-client-map :enable-tools))
+(def ^:dynamic *env-overrides*
+  "Dynamic var for overriding environment variables in tests.
+   When non-nil, will be checked before System/getenv."
+  nil)
 
-(defn get-disable-tools [nrepl-client-map]
-  (get-config nrepl-client-map :disable-tools))
+(defn- get-env
+  "Gets environment variable, checking *env-overrides* first for testing."
+  [var-name]
+  (or (when *env-overrides*
+        (get *env-overrides* var-name))
+      (System/getenv var-name)))
+
+(defn- parse-tools-env-var
+  "Parses a comma-separated string of tool names into a vector of keywords.
+   Returns nil if the env var is not set or empty.
+   Hyphens are normalized to underscores (e.g., file-edit -> file_edit)."
+  [env-var-name]
+  (when-let [value (get-env env-var-name)]
+    (when-not (empty? value)
+      (->> (string/split value #",")
+           (map string/trim)
+           (remove empty?)
+           (map #(string/replace % "-" "_"))
+           (mapv keyword)))))
+
+(defn get-enable-tools
+  "Returns the list of enabled tools.
+   ENABLE_TOOLS env var overrides config if set."
+  [nrepl-client-map]
+  (if-let [env-tools (parse-tools-env-var "ENABLE_TOOLS")]
+    env-tools
+    (get-config nrepl-client-map :enable-tools)))
+
+(defn get-disable-tools
+  "Returns the list of disabled tools.
+   DISABLE_TOOLS env var overrides config if set."
+  [nrepl-client-map]
+  (if-let [env-tools (parse-tools-env-var "DISABLE_TOOLS")]
+    env-tools
+    (get-config nrepl-client-map :disable-tools)))
 
 (defn tool-id-enabled?
   "Check if a tool should be enabled based on :enable-tools and :disable-tools config.
