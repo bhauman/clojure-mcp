@@ -1,0 +1,6 @@
+{:enable-tools
+ [:clojure_edit_agent
+  :list_nrepl_ports
+  :clojure_eval]
+
+ :write-file-guard false}

@@ -37,6 +37,11 @@
    ["-P" "--port PORT" "nREPL server port (optional, enables REPL features)"
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 65536) "Must be a valid port number"]]
+   ["--config-profile PROFILE" "Config profile to apply (e.g., cli-assist)"
+    :parse-fn (fn [s]
+                (if (str/starts-with? s ":")
+                  (keyword (subs s 1))
+                  (keyword s)))]
    ["-h" "--help" "Show help"]])
 
 (defn load-agent-config
@@ -221,7 +226,7 @@
 
 (defn run-prompt
   "Execute a prompt against the parent agent"
-  [{:keys [prompt model config dir port resume]}]
+  [{:keys [prompt model config dir port resume config-profile]}]
   (try
     ;; Disable logging to prevent output to stdout
     (logging/configure-logging! {:enable-logging? false})
@@ -243,9 +248,11 @@
             (let [env-type (nrepl/detect-nrepl-env-type nrepl-client-map)]
               [(nrepl/fetch-project-directory nrepl-client-map env-type nil) env-type]))
 
-          ;; Load configuration
+          ;; Load configuration (with optional profile overlay)
           _ (println (str "Working directory: " project-dir))
-          config-data (config/load-config nil project-dir)
+          _ (when config-profile
+              (println (str "Applying config profile: " config-profile)))
+          config-data (config/load-config nil project-dir config-profile)
           final-env-type (or (:nrepl-env-type config-data) env-type)
 
           ;; Attach config to nrepl-client-map

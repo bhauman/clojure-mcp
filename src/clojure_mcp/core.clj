@@ -233,34 +233,37 @@
       (log/error e "Failed to initialize MCP server")
       (throw e))))
 
-(defn load-config-handling-validation-errors [config-file user-dir]
-  (try
-    (config/load-config config-file user-dir)
-    (catch Exception e
-      (if (= ::config/schema-error (-> e ex-data :type))
-        (let [{:keys [errors file-path]} (ex-data e)]
-          (binding [*out* *err*]
-            (println "\n❌ Configuration validation failed!\n")
-            (when file-path
-              (println (str "File: " file-path "\n")))
-            (println "Errors found:")
-            (doseq [[k v] errors]
-              (let [msg (if (sequential? v) (first v) v)]
-                (println (str " 👉 " k " - " msg))))
-            (println "\nPlease fix these issues and try again.")
-            (println "See CONFIG.md for documentation.\n"))
-          (throw e))
-        ;; Other error - re-throw
-        (throw e)))))
+(defn load-config-handling-validation-errors
+  ([config-file user-dir]
+   (load-config-handling-validation-errors config-file user-dir nil))
+  ([config-file user-dir config-profile]
+   (try
+     (config/load-config config-file user-dir config-profile)
+     (catch Exception e
+       (if (= ::config/schema-error (-> e ex-data :type))
+         (let [{:keys [errors file-path]} (ex-data e)]
+           (binding [*out* *err*]
+             (println "\n❌ Configuration validation failed!\n")
+             (when file-path
+               (println (str "File: " file-path "\n")))
+             (println "Errors found:")
+             (doseq [[k v] errors]
+               (let [msg (if (sequential? v) (first v) v)]
+                 (println (str " 👉 " k " - " msg))))
+             (println "\nPlease fix these issues and try again.")
+             (println "See CONFIG.md for documentation.\n"))
+           (throw e))
+         ;; Other error - re-throw
+         (throw e))))))
 
-(defn fetch-config [nrepl-client-map config-file cli-env-type env-type project-dir]
+(defn fetch-config [nrepl-client-map config-file cli-env-type env-type project-dir config-profile]
   (let [user-dir (nrepl/fetch-project-directory nrepl-client-map env-type project-dir)]
     (when-not user-dir
       (log/warn "Could not determine working directory")
       (throw (ex-info "No project directory!!" {})))
     (log/info "Working directory set to:" user-dir)
 
-    (let [config (load-config-handling-validation-errors config-file user-dir)
+    (let [config (load-config-handling-validation-errors config-file user-dir config-profile)
           final-env-type (or cli-env-type
                              (if (contains? config :nrepl-env-type)
                                (:nrepl-env-type config)
@@ -278,24 +281,26 @@
    REPL initialization (env detection, init expressions, helpers) happens lazily
    when the first eval-code call is made.
 
-   Takes initial-config map with optional :port, :host, :project-dir, :nrepl-env-type, :config-file.
+   Takes initial-config map with optional :port, :host, :project-dir, :nrepl-env-type,
+   :config-file, :config-profile.
    - If :project-dir is provided, uses it directly (no REPL query needed)
    - If :project-dir is NOT provided, queries REPL for project directory (requires :port)
+   - If :config-profile is provided, merges profile overlay on top of base config
 
    Returns the configured nrepl-client-map with ::config/config attached."
-  [{:keys [project-dir config-file port] :as initial-config}]
+  [{:keys [project-dir config-file config-profile port] :as initial-config}]
   (if port
     (log/info "Creating nREPL client for port" port)
     (log/info "Starting without nREPL connection (project-dir mode)"))
   (try
-    (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type))
+    (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type :config-profile))
           cli-env-type (:nrepl-env-type initial-config)
           _ (log/info "nREPL client map created")]
       (if project-dir
         ;; Project dir provided - load config directly, no REPL query needed
         (let [user-dir (.getCanonicalPath (io/file project-dir))
               _ (log/info "Working directory set to:" user-dir)
-              config (load-config-handling-validation-errors config-file user-dir)
+              config (load-config-handling-validation-errors config-file user-dir config-profile)
               ;; Use cli-env-type or config's env-type, default to :clj
               final-env-type (or cli-env-type
                                  (:nrepl-env-type config)
@@ -305,7 +310,7 @@
         (let [;; Detect environment type (uses describe op, no full init needed)
               env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
               _ (nrepl/set-port-env-type! nrepl-client-map env-type)]
-          (fetch-config nrepl-client-map config-file cli-env-type env-type project-dir))))
+          (fetch-config nrepl-client-map config-file cli-env-type env-type project-dir config-profile))))
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
@@ -363,9 +368,10 @@
                                     (and (.exists f) (.isFile f)))
                                   (catch Exception _ false))))
 (s/def ::start-nrepl-cmd (s/coll-of string? :kind vector?))
+(s/def ::config-profile (s/or :keyword keyword? :symbol symbol? :string string?))
 (s/def ::nrepl-args (s/keys :req-un []
                             :opt-un [::port ::host ::config-file ::project-dir ::nrepl-env-type
-                                     ::start-nrepl-cmd]))
+                                     ::start-nrepl-cmd ::config-profile]))
 
 (def nrepl-client-atom (atom nil))
 

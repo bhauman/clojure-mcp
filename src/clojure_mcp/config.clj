@@ -41,7 +41,7 @@
   (let [home-config-file (get-home-config-path)]
     (load-config-file (.getPath home-config-file))))
 
-(defn- deep-merge
+(defn deep-merge
   "Deeply merges maps, with the second map taking precedence.
    For non-map values, the second value wins."
   [m1 m2]
@@ -50,6 +50,46 @@
     (merge-with deep-merge m1 m2)
 
     :else m2))
+
+(defn load-config-profile
+  "Loads a config profile from classpath resources.
+
+   Profile is loaded from: clojure_mcp/configs/<profile-name>.edn
+
+   Input: profile - keyword, symbol, or string identifying the profile
+   Output: parsed EDN map, or {} if not found or failed to parse
+
+   Logs a warning if the profile resource is not found or fails to parse."
+  [profile]
+  (when profile
+    (let [profile-name (name profile)
+          resource-path (str "clojure_mcp/configs/" profile-name ".edn")]
+      (if-let [resource (io/resource resource-path)]
+        (try
+          (edn/read-string (slurp resource))
+          (catch Exception e
+            (log/warn e "Failed to parse config profile:" profile-name)
+            {}))
+        (do
+          (log/warn "Config profile not found:" profile-name
+                    "(expected at" resource-path ")")
+          {})))))
+
+(defn apply-config-profile
+  "Applies a config profile overlay to a base config.
+
+   The profile is deep-merged on top of the base config, so profile values win.
+
+   Input:
+   - config: base configuration map
+   - profile: keyword, symbol, or string identifying the profile (or nil)
+
+   Output: config with profile merged in (or unchanged config if profile is nil)"
+  [config profile]
+  (if profile
+    (let [profile-config (load-config-profile profile)]
+      (deep-merge config profile-config))
+    config))
 
 (defn- merge-configs
   "Merges user home config (defaults) with project config (overrides).
@@ -111,49 +151,69 @@
       (assoc :nrepl-env-type (:nrepl-env-type config)))))
 
 (defn load-config
-  "Loads the configuration from user home and project directories."
-  [cli-config-file user-dir]
-  ;; Load user home config first (provides defaults)
-  (let [home-config (load-home-config)
-        home-config-path (get-home-config-path)
+  "Loads the configuration from user home and project directories.
 
-        ;; Load project config (provides overrides)
-        project-config-file (if cli-config-file
-                              (io/file cli-config-file)
-                              (io/file user-dir ".clojure-mcp" "config.edn"))
-        project-config (load-config-file (.getPath project-config-file))
+   Optionally applies a config profile overlay from classpath resources.
+   The profile is merged LAST, so profile values have highest precedence.
 
-        ;; Validate configs BEFORE merging
-        ;; This ensures we know which file has the error
-        ;; Use canonical paths for consistent error reporting
-        _ (validate-configs
-           (cond-> []
-             ;; Only validate home config if it exists and has content
-             (seq home-config)
-             (conj {:config home-config
-                    :file-path (.getCanonicalPath home-config-path)})
+   Merge precedence (highest to lowest):
+   1. config-profile overlay (if provided)
+   2. project config (from cli-config-file or .clojure-mcp/config.edn)
+   3. home config (~/.clojure-mcp/config.edn)
 
-             ;; Only validate project config if it exists and has content  
-             (seq project-config)
-             (conj {:config project-config
-                    :file-path (.getCanonicalPath project-config-file)})))
+   Parameters:
+   - cli-config-file: path to project config file (or nil for default)
+   - user-dir: project directory path
+   - config-profile: keyword/symbol/string profile name (optional)"
+  ([cli-config-file user-dir]
+   (load-config cli-config-file user-dir nil))
+  ([cli-config-file user-dir config-profile]
+   ;; Load user home config first (provides defaults)
+   (let [home-config (load-home-config)
+         home-config-path (get-home-config-path)
 
-        ;; Merge configs (project overrides home)
-        merged-config (merge-configs home-config project-config)
+         ;; Load project config (provides overrides)
+         project-config-file (if cli-config-file
+                               (io/file cli-config-file)
+                               (io/file user-dir ".clojure-mcp" "config.edn"))
+         project-config (load-config-file (.getPath project-config-file))
 
-        ;; Process the merged config
-        processed-config (process-config merged-config user-dir)]
+         ;; Validate configs BEFORE merging
+         ;; This ensures we know which file has the error
+         ;; Use canonical paths for consistent error reporting
+         _ (validate-configs
+            (cond-> []
+              ;; Only validate home config if it exists and has content
+              (seq home-config)
+              (conj {:config home-config
+                     :file-path (.getCanonicalPath home-config-path)})
 
-    ;; Logging for debugging
-    (log/debug "Home config file:" (.getCanonicalPath home-config-path) "exists:" (.exists home-config-path))
-    (when (seq home-config)
-      (log/debug "Home config validated successfully"))
-    (log/debug "Project config file:" (.getCanonicalPath project-config-file) "exists:" (.exists project-config-file))
-    (when (seq project-config)
-      (log/debug "Project config validated successfully"))
-    (log/debug "Final processed config:" processed-config)
+              ;; Only validate project config if it exists and has content
+              (seq project-config)
+              (conj {:config project-config
+                     :file-path (.getCanonicalPath project-config-file)})))
 
-    processed-config))
+         ;; Merge configs (project overrides home)
+         merged-config (merge-configs home-config project-config)
+
+         ;; Apply config profile overlay (profile overrides everything)
+         merged-with-profile (apply-config-profile merged-config config-profile)
+
+         ;; Process the merged config
+         processed-config (process-config merged-with-profile user-dir)]
+
+     ;; Logging for debugging
+     (log/debug "Home config file:" (.getCanonicalPath home-config-path) "exists:" (.exists home-config-path))
+     (when (seq home-config)
+       (log/debug "Home config validated successfully"))
+     (log/debug "Project config file:" (.getCanonicalPath project-config-file) "exists:" (.exists project-config-file))
+     (when (seq project-config)
+       (log/debug "Project config validated successfully"))
+     (when config-profile
+       (log/debug "Applied config profile:" config-profile))
+     (log/debug "Final processed config:" processed-config)
+
+     processed-config)))
 
 (defn get-config [nrepl-client-map k]
   (get-in nrepl-client-map [::config k]))
