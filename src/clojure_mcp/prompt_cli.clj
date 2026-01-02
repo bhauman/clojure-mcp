@@ -31,10 +31,10 @@
                   (keyword (subs s 1))
                   (keyword s)))]
    ["-c" "--config CONFIG" "Path to agent configuration file (optional)"]
-   ["-d" "--dir DIRECTORY" "Working directory (defaults to REPL's working directory)"
+   ["-d" "--dir DIRECTORY" "Working directory (defaults to current directory)"
+    :default (System/getProperty "user.dir")
     :validate [#(.isDirectory (io/file %)) "Must be a valid directory"]]
-   ["-P" "--port PORT" "nREPL server port"
-    :default 7888
+   ["-P" "--port PORT" "nREPL server port (optional, enables REPL features)"
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 65536) "Must be a valid port number"]]
    ["-h" "--help" "Show help"]])
@@ -226,18 +226,24 @@
     ;; Disable logging to prevent output to stdout
     (logging/configure-logging! {:enable-logging? false})
 
-    ;; Connect to nREPL and initialize with configuration
-    (println (str "Connecting to nREPL server on port " port "..."))
-    (let [nrepl-client-map (nrepl/create {:port port})
+    ;; Create nREPL connection - lazy initialization like main/core
+    ;; When dir is provided, nREPL connection is optional
+    (if dir
+      (println (str "Starting with project directory: " dir))
+      (println (str "Connecting to nREPL server on port " port "...")))
+    (let [;; Create nREPL client map - port is optional when dir is provided
+          nrepl-client-map (nrepl/create (when port {:port port}))
 
-          ;; Detect environment type
-          env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
+          ;; Determine project directory and env type
+          ;; If dir is provided, use it directly without REPL query
+          ;; Otherwise, detect env type and fetch from REPL
+          [project-dir env-type]
+          (if dir
+            [(.getCanonicalPath (java.io.File. dir)) :clj]
+            (let [env-type (nrepl/detect-nrepl-env-type nrepl-client-map)]
+              [(nrepl/fetch-project-directory nrepl-client-map env-type nil) env-type]))
 
-          ;; Fetch project directory from REPL or use CLI option
-          project-dir (or dir
-                          (nrepl/fetch-project-directory nrepl-client-map env-type nil))
-
-          ;; Load configuration  
+          ;; Load configuration
           _ (println (str "Working directory: " project-dir))
           config-data (config/load-config nil project-dir)
           final-env-type (or (:nrepl-env-type config-data) env-type)
@@ -247,9 +253,11 @@
                                               ::config/config
                                               (assoc config-data :nrepl-env-type final-env-type))
 
-          ;; Initialize environment
-          _ (nrepl/initialize-environment nrepl-client-map-with-config final-env-type)
-          _ (nrepl/load-repl-helpers nrepl-client-map-with-config final-env-type)
+          ;; Initialize environment lazily - only if we have a port connection
+          ;; This matches the behavior in core.clj where init happens on first eval-code
+          _ (when port
+              (nrepl/initialize-environment nrepl-client-map-with-config final-env-type)
+              (nrepl/load-repl-helpers nrepl-client-map-with-config final-env-type))
 
           nrepl-client-atom (atom nrepl-client-map-with-config)
 
@@ -409,13 +417,12 @@
         (println "\nOptions:")
         (println summary)
         (println "\nExamples:")
-        (println "  clojure -M:prompt-cli -p \"What namespaces are available?\"")
-        (println "  clojure -M:prompt-cli -p \"Evaluate (+ 1 2)\" -m :openai/gpt-4")
-        (println "  clojure -M:prompt-cli -p \"Create a fibonacci function\"")
+        (println "  clojure -M:prompt-cli -p \"What files are in this project?\"")
+        (println "  clojure -M:prompt-cli -p \"Analyze code\" -m :openai/gpt-4")
         (println "  clojure -M:prompt-cli -p \"Run my prompt\" -c custom-agent.edn")
-        (println "  clojure -M:prompt-cli -p \"Analyze project\" -P 8888  # Custom port")
-        (println "  clojure -M:prompt-cli --resume -p \"Continue previous task\"  # Resume latest session")
-        (println "  clojure -M:prompt-cli --resume -p \"Next step\" -m :openai/gpt-4  # Resume with different model")
+        (println "  clojure -M:prompt-cli -p \"Evaluate (+ 1 2)\" -P 7888  # With nREPL for eval")
+        (println "  clojure -M:prompt-cli -p \"Analyze code\" -d /path/to/project")
+        (println "  clojure -M:prompt-cli --resume -p \"Continue previous task\"")
         (System/exit 0))
 
       ;; Validation errors
