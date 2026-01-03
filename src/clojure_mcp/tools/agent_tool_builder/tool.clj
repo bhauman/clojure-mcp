@@ -88,7 +88,8 @@
         ;; Map tool-id keywords to agent-id keywords
         tool-id->agent-id {:dispatch_agent :dispatch-agent
                            :architect :architect
-                           :code_critique :code-critique}
+                           :code_critique :code-critique
+                           :clojure_edit_agent :clojure-edit-agent}
 
         ;; Merge tool configs into matching default agents
         default-agents-with-tool-config

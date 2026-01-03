@@ -2,33 +2,31 @@
 
 ## [Unreleased]
 
-## [0.2.0] - 2025-12-27
+## [0.2.0] - 2026-01-02
 
-This release migrates from direct LangChain4j Java imports to the langchain4clj Clojure wrapper library, significantly simplifying the codebase and improving maintainability.
+This release focuses on developer experience improvements with new tools for nREPL discovery, enhanced configuration flexibility through config profiles and environment variables, and a structural editing agent for Clojure code.
 
 ### Major Changes
 
-#### LangChain4j → langchain4clj Migration
-- **Replaced direct LangChain4j imports**: All Java interop code now uses langchain4clj wrapper library
-- **Simplified adapter layer**: `clojure-mcp.agent.langchain` namespace reduced by ~28%
-- **Removed schema.clj**: Eliminated 178 lines of JSON Schema → LangChain4j conversion code
-- **Cleaner listeners**: `chat_listener.clj` reduced from 174 to 51 lines (-71%)
-- **Streamlined message conversion**: `message_conv.clj` now delegates to langchain4clj.messages
+#### New Tools
+- **`list_nrepl_ports` tool**: Discover all running nREPL servers on your machine with environment type detection (clj, bb, shadow, etc.) and project directory information
+- **`clojure_edit_agent`**: New structural editing agent for Clojure code - use as a fallback when the Edit tool has trouble with delimiter matching
+
+#### Configuration Enhancements
+- **Config profiles**: New `:config-profile` CLI option for resource-based configuration overlays - easily switch between different tool configurations
+- **Environment variable support**: `ENABLE_TOOLS` and `DISABLE_TOOLS` environment variables for controlling which tools are loaded
+
+### Added
+- **Environment/namespace reporting**: Eval tool output now includes environment and namespace information
+- **Optional nREPL in prompt-cli**: nREPL connection is now optional for the prompt CLI
 
 ### Changed
-- **Dependencies**: Replaced 4 LangChain4j Maven artifacts with single langchain4clj dependency
-- **Tool conversion**: Now uses `langchain4clj.tools.helpers/create-tool-spec` for proper JSON schema handling
-- **Memory API**: Uses langchain4clj assistant functions instead of direct Java MessageWindowChatMemory
-
-### Breaking Changes
-- **`token-tracking-listener` atom structure changed**:
-  - Old: `{:total-input-tokens N :total-output-tokens N :total-tokens N :request-count N}`
-  - New: `{:input-tokens N :output-tokens N :total-tokens N :request-count N :last-request {...} :by-model {...}}`
-  - Consumers should update to use `:input-tokens`/`:output-tokens` keys
+- **Improved shadow-cljs detection**: Better detection in `list_nrepl_ports` with helpful messages about listing builds
+- **Simplified nREPL output format**: Cleaner, more readable output from `list_nrepl_ports`
 
 ### Removed
-- **`clojure-mcp.agent.langchain.schema`**: No longer needed - langchain4clj handles schema conversion
-- **Direct LangChain4j imports**: All Java imports removed from agent namespaces (except tests which use transitive dependency)
+- **`directory_tree` tool**: Removed in favor of other exploration methods
+- **Unused tools**: Removed `unified_clojure_edit` tool and sexp/match utilities
 
 ## [0.1.13] - 2025-12-21
 

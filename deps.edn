@@ -1,4 +1,9 @@
 {:paths ["src" "resources"]
+
+ ;; Tool installation support: clojure -Ttools install-latest :lib io.github.bhauman/clojure-mcp :as clj-mcp
+ :tools/usage {:ns-default clojure-mcp.main
+               :fn-default start}
+
  :deps {org.clojure/clojure {:mvn/version "1.12.1"}
         org.clojure/data.json {:mvn/version "2.5.1"}
         nrepl/nrepl {:mvn/version "1.3.1"}
@@ -35,10 +40,7 @@
  :aliases
 
  {:mcp
-  {:exec-fn clojure-mcp.main/start-mcp-server
-   ;; it needs an nrepl port to talk to
-   ;; :exec-args {:port 7888}
-   }
+  {:exec-fn clojure-mcp.main/start}
 
   :mcp-sse
   {:extra-deps {jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}

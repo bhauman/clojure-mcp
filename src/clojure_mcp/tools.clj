@@ -1,6 +1,7 @@
 (ns clojure-mcp.tools
   "Tool construction functions for Clojure MCP.
-   Uses dynamic symbol resolution to avoid circular dependencies.")
+   Uses dynamic symbol resolution to avoid circular dependencies."
+  (:require [clojure-mcp.config :as config]))
 
 ;; Tool creation function symbols organized by category
 (def read-only-tool-syms
@@ -8,7 +9,8 @@
   ['clojure-mcp.tools.unified-read-file.tool/unified-read-file-tool
    'clojure-mcp.tools.grep.tool/grep-tool
    'clojure-mcp.tools.glob-files.tool/glob-files-tool
-   'clojure-mcp.tools.project.tool/inspect-project-tool])
+   'clojure-mcp.tools.project.tool/inspect-project-tool
+   'clojure-mcp.tools.nrepl-ports.tool/list-nrepl-ports-tool])
 
 (def eval-tool-syms
   "Symbols for evaluation tool creation functions"
@@ -65,17 +67,48 @@
   (let [tool-fns (resolve-tool-fns read-only-tool-syms)]
     (mapv #(% nrepl-client-atom) tool-fns)))
 
+(defn apply-tools-config
+  "Applies :tools-config overrides to built tools.
+
+   Currently supports overriding :description for any tool.
+   Tool config is looked up by tool :id (keyword).
+
+   Example config:
+   {:tools-config {:clojure_eval {:description \"Custom eval description\"}
+                   :bash {:description \"Custom bash description\"}}}
+
+   Args:
+   - nrepl-client-atom: Atom containing nREPL client with config
+   - tools: Vector of built tool registration maps
+
+   Returns: Vector of tools with config overrides applied"
+  [nrepl-client-atom tools]
+  (let [tools-config (config/get-tools-config @nrepl-client-atom)]
+    (if (empty? tools-config)
+      tools
+      (mapv (fn [tool]
+              (let [tool-id (:id tool)
+                    tool-cfg (get tools-config tool-id)]
+                (if-let [desc (:description tool-cfg)]
+                  (assoc tool :description desc)
+                  tool)))
+            tools))))
+
 (defn build-all-tools
   "Builds and returns all available tools including read-only, eval, editing, and agent tools.
    Note: Agent tools require API keys to be configured.
-   Some tool builders may return multiple tools (e.g., agent-tool-builder)."
+   Some tool builders may return multiple tools (e.g., agent-tool-builder).
+
+   Tool descriptions can be overridden via :tools-config in config.edn:
+   {:tools-config {:clojure_eval {:description \"Custom description\"}}}"
   [nrepl-client-atom]
-  (let [tool-fns (resolve-tool-fns all-tool-syms)]
-    (vec (flatten (map (fn [f]
-                         (let [result (f nrepl-client-atom)]
-                           ;; Handle both single tools and vectors of tools
-                           (if (vector? result) result [result])))
-                       tool-fns)))))
+  (let [tool-fns (resolve-tool-fns all-tool-syms)
+        tools (vec (flatten (map (fn [f]
+                                   (let [result (f nrepl-client-atom)]
+                                     ;; Handle both single tools and vectors of tools
+                                     (if (vector? result) result [result])))
+                                 tool-fns)))]
+    (apply-tools-config nrepl-client-atom tools)))
 
 ;; Category-specific builders for fine-grained control
 (defn build-eval-tools

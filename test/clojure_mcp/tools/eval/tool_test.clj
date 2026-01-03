@@ -68,37 +68,48 @@
       (is (thrown? Exception (tool-system/validate-inputs tool-instance {}))))))
 
 (deftest execute-tool-test
-  (testing "Execute returns raw outputs"
+  (testing "Execute returns raw outputs with context"
     (let [tool-instance (eval-tool/create-eval-tool *nrepl-client-atom*)
           result (tool-system/execute-tool tool-instance {:code "(+ 1 2)"})]
       (is (map? result))
       (is (contains? result :outputs))
       (is (contains? result :error))
+      (is (contains? result :context))
       (is (false? (:error result)))
       (is (vector? (:outputs result)))
-      (is (some #(= [:value "3"] %) (:outputs result))))))
+      (is (some #(= [:value "3"] %) (:outputs result)))
+      ;; Should have :ns entry
+      (is (some #(= :ns (first %)) (:outputs result)))
+      ;; Context should have env-type
+      (is (= :clj (:env-type (:context result)))))))
 
 (deftest format-results-test
-  (testing "Format results properly formats outputs"
+  (testing "Format results properly formats outputs with context"
     (let [tool-instance (eval-tool/create-eval-tool *nrepl-client-atom*)
-          outputs [[:value "3"]]
-          result (tool-system/format-results tool-instance {:outputs outputs, :error false})]
+          outputs [[:value "3"] [:ns "user"]]
+          context {:env-type :clj}
+          result (tool-system/format-results tool-instance {:outputs outputs :error false :context context})]
       (is (map? result))
       (is (contains? result :result))
       (is (contains? result :error))
       (is (false? (:error result)))
-      (is (= ["=> 3"] (:result result))))))
+      (is (= ["=> 3\n*======== user | clj ========*"] (:result result))))))
 
 (deftest tool-execution-test
-  (testing "Basic evaluation"
+  (testing "Basic evaluation includes divider"
     (let [result (test-tool-execution "(+ 1 2)")]
       (is (false? (:error? result)))
-      (is (= ["=> 3"] (:result result)))))
+      (is (= 1 (count (:result result))))
+      (is (str/includes? (first (:result result)) "=> 3"))
+      (is (str/includes? (first (:result result)) "*======== user | clj ========*"))))
 
-  (testing "Evaluation with output"
+  (testing "Evaluation with output includes divider"
     (let [result (test-tool-execution "(println \"hello\")")]
       (is (false? (:error? result)))
-      (is (= ["hello\n=> nil"] (:result result)))))
+      (is (= 1 (count (:result result))))
+      (is (str/includes? (first (:result result)) "hello"))
+      (is (str/includes? (first (:result result)) "=> nil"))
+      (is (str/includes? (first (:result result)) "*======== user | clj ========*"))))
 
   (testing "Evaluation with error"
     (let [result (test-tool-execution "(throw (Exception. \"test error\"))")]
@@ -107,12 +118,14 @@
       (is (str/includes? (first (:result result)) "test error"))
       (is (str/includes? (first (:result result)) "Execution error"))))
 
-  (testing "Multiple expressions"
+  (testing "Multiple expressions each have their own divider"
     (let [result (test-tool-execution "(println \"first\") (+ 10 20)")]
       (is (false? (:error? result)))
-      (is (= 3 (count (:result result))))
-      (is (= ["first\n=> nil" "*===============================================*" "=> 30"]
-             (:result result)))))
+      ;; Now we get 2 groups (one per expression with :ns), not 3 with interposed divider
+      (is (= 2 (count (:result result))))
+      (is (str/includes? (first (:result result)) "first"))
+      (is (str/includes? (first (:result result)) "=> nil"))
+      (is (str/includes? (second (:result result)) "=> 30"))))
 
   (testing "Evaluation without linter warnings (no longer using comprehensive linting)"
     ;; With delimiter-only checking, semantic warnings like unused bindings are not detected
@@ -130,8 +143,10 @@
       (is (str/includes? (first (:result result)) "Syntax error")))))
 
 (deftest pipeline-test
-  (testing "Complete pipeline execution"
+  (testing "Complete pipeline execution includes divider"
     (let [result (test-pipeline-steps "(+ 1 2)")]
       (is (map? result))
-      (is (= ["=> 3"] (:result result)))
+      (is (= 1 (count (:result result))))
+      (is (str/includes? (first (:result result)) "=> 3"))
+      (is (str/includes? (first (:result result)) "*======== user | clj ========*"))
       (is (false? (:error result))))))

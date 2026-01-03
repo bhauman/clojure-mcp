@@ -334,7 +334,7 @@ Viewing tasks:
 ;; this is needed because of the special handling of edn in the default handler
 (defmethod tool-system/registration-map :scratch-pad [tool-config]
   {:name (tool-system/tool-name tool-config)
-   :id :scratch-pad
+   :id (tool-system/tool-id tool-config)
    :description (tool-system/tool-description tool-config)
    :schema (tool-system/tool-schema tool-config)
    :tool-fn (fn [_ params callback]
