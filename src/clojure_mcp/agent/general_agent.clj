@@ -1,20 +1,21 @@
 (ns clojure-mcp.agent.general-agent
-  "A generalized agent library that can be parameterized with system prompts,
-   context, tools, memory, and models."
+  "A generalized agent library with system prompts, context, tools, memory, and models."
   (:require [clojure.string :as string]
+            [clojure.set :as set]
             [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.tools.project.core :as project-core]
             [clojure-mcp.tools :as tools]
-            [clojure-mcp.utils.file :as file-utils])
-  (:import
-   [clojure_mcp.agent.langchain AiService]
-   [dev.langchain4j.data.message UserMessage TextContent]))
+            [clojure-mcp.utils.file :as file-utils]))
 
 (def DEFAULT-MEMORY-SIZE 100)
 (def DEFAULT-STATELESS-BUFFER 100)
 (def MIN-PERSISTENT-WINDOW 10)
+
+(def MEMORY-RESET-BUFFER
+  "Buffer size before triggering memory reset to prevent overflow."
+  15)
 
 (defn build-read-only-tools
   "Builds the read-only tools for agents.
@@ -120,47 +121,47 @@ Please use it to inform you as to which files should be investigated.\n=========
   "Initialize memory with the provided context strings.
    
    Args:
-   - memory: The langchain memory object
+   - memory: The langchain4clj memory object
    - context: A list of strings to add as context
    
    Returns: The memory object with context added"
   [memory context]
   (when (seq context)
-    (.add memory
-          (UserMessage.
-           (vec (for [content context]
-                  (TextContent/from content))))))
+    ;; Add context as a single user message with all context combined
+    (chain/memory-add! memory
+                       {:type :user
+                        :text (string/join "\n\n" context)}))
   memory)
 
 (defn reset-memory-if-needed!
   "Reset memory if it exceeds the specified size limit, re-initializing with context.
    
    Args:
-   - memory: The langchain memory object
+   - memory: The langchain4clj memory object
    - context: The context strings to re-initialize with
    - memory-size: The maximum memory size before reset
    
    Returns: The memory object (possibly reset)"
   [memory context memory-size]
-  (if (> (count (.messages memory)) (- memory-size 15))
-    (let [cleared-memory (doto memory (.clear))]
-      (initialize-memory-with-context! cleared-memory context))
+  (if (> (chain/memory-count memory) (- memory-size MEMORY-RESET-BUFFER))
+    (do
+      (chain/memory-clear! memory)
+      (initialize-memory-with-context! memory context))
     memory))
 
 (defn create-general-agent
-  "Creates a general AI agent service with the specified configuration.
+  "Creates a general AI agent with the specified configuration.
    
    Args:
    - config: A map containing:
      :system-prompt - The system prompt string for the agent
      :context - A list of strings providing context (optional)
      :tools - A vector of tools the agent can use
-     :memory - A langchain memory object (optional, creates one if not provided)
      :model - A langchain model object
      :memory-size - Memory configuration (nil/false/<10 = stateless, >=10 = persistent window)
    
    Returns: A map containing:
-     :service - The built AI service
+     :assistant-fn - The assistant function (takes user input, returns response)
      :memory - The memory object
      :model - The model object
      :tools - The tools vector
@@ -184,19 +185,22 @@ Please use it to inform you as to which files should be investigated.\n=========
           initialized-memory (if (and context (not stateless?))
                                (initialize-memory-with-context! memory context)
                                memory)
-          ai-service-data {:memory initialized-memory
-                           :model model
-                           :tools (or tools [])
-                           :system-message system-prompt}
-          service (-> (chain/create-service AiService ai-service-data)
-                      (.build))]
-      (assoc ai-service-data
-             :service service
-             :stateless? stateless?
-             :memory-size actual-memory-size
-             :context context))
+          ;; Create assistant function using langchain4clj
+          assistant-fn (chain/create-assistant-fn
+                        {:memory initialized-memory
+                         :model model
+                         :tools (or tools [])
+                         :system-message system-prompt})]
+      {:assistant-fn assistant-fn
+       :memory initialized-memory
+       :model model
+       :tools (or tools [])
+       :system-message system-prompt
+       :stateless? stateless?
+       :memory-size actual-memory-size
+       :context context})
     (catch Exception e
-      (log/error e "Failed to create general agent service")
+      (log/error e "Failed to create general agent")
       (throw e))))
 
 (defn chat-with-agent
@@ -214,7 +218,7 @@ Please use it to inform you as to which files should be investigated.\n=========
     (try
       ;; Clear memory for stateless agents at start of each chat
       (when (:stateless? agent)
-        (.clear (:memory agent))
+        (chain/memory-clear! (:memory agent))
         (when (:context agent)
           (initialize-memory-with-context! (:memory agent) (:context agent))))
 
@@ -225,7 +229,8 @@ Please use it to inform you as to which files should be investigated.\n=========
                                  (:context agent)
                                  (:memory-size agent)))
 
-      (let [result (.chat (:service agent) prompt)]
+      ;; Call the assistant function
+      (let [result ((:assistant-fn agent) prompt)]
         {:result result
          :error false})
       (catch Exception e
@@ -242,13 +247,13 @@ Please use it to inform you as to which files should be investigated.\n=========
    
    Returns: The updated agent map"
   [agent new-context]
-  (let [cleared-memory (doto (:memory agent) (.clear))
-        initialized-memory (initialize-memory-with-context! cleared-memory new-context)]
-    (assoc agent :context new-context :memory initialized-memory)))
+  (chain/memory-clear! (:memory agent))
+  (initialize-memory-with-context! (:memory agent) new-context)
+  (assoc agent :context new-context))
 
 (defn add-tools
   "Add additional tools to an existing agent.
-   Note: This requires recreating the service.
+   Note: This requires recreating the agent.
    
    Args:
    - agent: The agent map
@@ -258,5 +263,6 @@ Please use it to inform you as to which files should be investigated.\n=========
   [agent new-tools]
   (create-general-agent
    (-> agent
-       (select-keys [:system-prompt :context :memory :model :memory-size])
+       (select-keys [:system-message :context :model :memory-size])
+       (set/rename-keys {:system-message :system-prompt})
        (assoc :tools (vec (concat (:tools agent) new-tools))))))
