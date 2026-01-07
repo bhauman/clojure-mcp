@@ -53,14 +53,8 @@
                    (when (:details result)
                      (str "\nDetails: " (:details result))))]
      :error true}
-    (let [{:keys [content jar-path entry-path line-count total-line-count truncated? offset]} result
-          header (str "File: " jar-path ":" entry-path "\n"
-                      "Lines: " (inc (or offset 0)) "-" (+ (or offset 0) line-count)
-                      " of " total-line-count
-                      (when truncated? " (truncated)")
-                      "\n\n")]
-      {:result [(str header content)]
-       :error false})))
+    {:result [(:content result)]
+     :error false}))
 
 ;; Backward compatibility function
 (defn deps-read-tool
