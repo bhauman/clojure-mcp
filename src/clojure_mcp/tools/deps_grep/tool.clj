@@ -91,7 +91,7 @@
                                       (str "=== " jar ":" entry " ===\n"
                                            (string/join "\n"
                                                         (map (fn [{:keys [line-num content]}]
-                                                               (str line-num ": " content))
+                                                               (format "%6d→%s" line-num content))
                                                              matches))))
                                     results))
 

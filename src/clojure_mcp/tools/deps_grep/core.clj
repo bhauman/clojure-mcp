@@ -33,13 +33,33 @@
       (log/error e "Failed to resolve classpath")
       nil)))
 
+(defn find-sources-jar
+  "Given a jar path, find the corresponding -sources.jar if it exists."
+  [jar-path]
+  (when (str/ends-with? jar-path ".jar")
+    (let [sources-path (str/replace jar-path #"\.jar$" "-sources.jar")
+          sources-file (io/file sources-path)]
+      (when (.exists sources-file)
+        sources-path))))
+
+(defn get-jars-with-sources
+  "Given a list of jars, return jars plus any available sources jars."
+  [jars]
+  (let [sources-jars (->> jars
+                          (keep find-sources-jar)
+                          (remove (set jars)))] ; don't duplicate if already included
+    (into (vec jars) sources-jars)))
+
 (defn cached-classpath-jars
-  "Get classpath jars with caching. Returns cached result if available."
+  "Get classpath jars with caching. Returns cached result if available.
+   Includes sources jars when available."
   [project-dir]
   (or (get @classpath-cache project-dir)
       (when-let [jars (get-classpath-jars project-dir)]
-        (swap! classpath-cache assoc project-dir jars)
-        jars)))
+        (let [all-jars (get-jars-with-sources jars)]
+          (log/debug "Found" (- (count all-jars) (count jars)) "sources jars")
+          (swap! classpath-cache assoc project-dir all-jars)
+          all-jars))))
 
 (defn clear-classpath-cache!
   "Clear the classpath cache. Useful after deps changes."

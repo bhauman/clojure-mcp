@@ -71,7 +71,7 @@
               formatted-content (str/join "\n"
                                           (map-indexed
                                            (fn [idx line]
-                                             (format "%6d\t%s" (+ offset idx 1) line))
+                                             (format "%6d→%s" (+ offset idx 1) line))
                                            processed-lines))]
           {:content formatted-content
            :jar-path jar-path
