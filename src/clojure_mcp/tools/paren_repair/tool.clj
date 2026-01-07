@@ -22,12 +22,8 @@
 
 Use this tool when:
 - A file has unbalanced delimiters causing parse errors
-- You need to repair a file after an incomplete edit
-- The file won't compile due to missing closing parens/brackets
-
-The tool will:
-1. Detect delimiter errors using edamame parser
-2. Repair using parinfer's indent mode
+- You need to repair a file after an errant edit
+- The file won't compile due to unbalanced parens/brackets
 
 Returns a status message and diff showing what changed.")
 
