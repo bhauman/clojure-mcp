@@ -23,7 +23,7 @@
 
         ;; llm ecosystem java libs
         org.apache.tika/tika-core {:mvn/version "3.2.0"}
-        io.modelcontextprotocol.sdk/mcp {:mvn/version "0.15.0"}
+        io.modelcontextprotocol.sdk/mcp {:mvn/version "0.17.1"}
 
         dev.langchain4j/langchain4j {:mvn/version "1.8.0"}
         dev.langchain4j/langchain4j-open-ai {:mvn/version "1.8.0"}
