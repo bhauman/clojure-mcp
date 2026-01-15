@@ -1,7 +1,8 @@
 (ns clojure-mcp.config.tools-config-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure-mcp.config :as config]
-            [clojure-mcp.agent.langchain.model :as model]))
+            [clojure-mcp.agent.langchain.model :as model]
+            [langchain4clj.core :as lc]))
 
 (deftest test-get-tools-config
   (testing "Returns tools config when present"
@@ -39,7 +40,7 @@
 
 (deftest test-get-tool-model
   (testing "Creates model from tool config with default :model key"
-    (binding [model/*env-overrides* {"ANTHROPIC_API_KEY" "test-key"}]
+    (binding [lc/*env-overrides* {"ANTHROPIC_API_KEY" "test-key"}]
       (let [nrepl-client-map {::config/config
                               {:tools-config {:dispatch_agent {:model :anthropic/claude-3-haiku-20240307}}
                                :models {:anthropic/claude-3-haiku-20240307
@@ -50,7 +51,7 @@
         (is (some? model) "Should create model with test API key"))))
 
   (testing "Creates model with custom config key"
-    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key"}]
+    (binding [lc/*env-overrides* {"OPENAI_API_KEY" "test-key"}]
       (let [nrepl-client-map {::config/config
                               {:tools-config {:architect {:primary-model :openai/gpt-4o}}
                                :models {:openai/gpt-4o

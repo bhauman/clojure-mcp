@@ -3,8 +3,9 @@
             [clojure.string :as str]
             [clojure-mcp.agent.general-agent :as general-agent]
             [clojure-mcp.agent.langchain :as chain]
-            [clojure.java.io :as io])
-  (:import [dev.langchain4j.data.message UserMessage]))
+            [langchain4clj.core :as lc]
+            [langchain4clj.presets :as presets]
+            [clojure.java.io :as io]))
 
 (deftest test-build-context-strings
   (testing "Context building with true value uses default files"
@@ -39,13 +40,14 @@
     (let [memory (chain/chat-memory 100)
           context ["Context 1" "Context 2"]]
       (general-agent/initialize-memory-with-context! memory context)
-      (is (= 1 (count (.messages memory))))
-      (is (instance? UserMessage (first (.messages memory))))))
+      (is (= 1 (chain/memory-count memory)))
+      (let [messages (chain/memory-messages memory)]
+        (is (= 1 (count messages))))))
 
   (testing "Memory initialization with empty context"
     (let [memory (chain/chat-memory 100)]
       (general-agent/initialize-memory-with-context! memory [])
-      (is (zero? (count (.messages memory)))))))
+      (is (zero? (chain/memory-count memory))))))
 
 (deftest test-reset-memory-if-needed
   (testing "Memory reset when exceeding size limit"
@@ -53,25 +55,25 @@
           context ["Initial context"]]
       ;; Add messages to exceed limit
       (dotimes [_ 90]
-        (.add memory (UserMessage. "Test message")))
+        (chain/memory-add! memory {:type :user :text "Test message"}))
       (let [reset-memory (general-agent/reset-memory-if-needed! memory context 100)]
-        (is (< (count (.messages reset-memory)) 90))
-        (is (= 1 (count (.messages reset-memory)))))))
+        (is (< (chain/memory-count reset-memory) 90))
+        (is (= 1 (chain/memory-count reset-memory))))))
 
   (testing "Memory not reset when under size limit"
     (let [memory (chain/chat-memory 100)
           context ["Initial context"]]
-      (.add memory (UserMessage. "Test message"))
+      (chain/memory-add! memory {:type :user :text "Test message"})
       (let [result-memory (general-agent/reset-memory-if-needed! memory context 100)]
         (is (= memory result-memory))
-        (is (= 1 (count (.messages result-memory))))))))
+        (is (= 1 (chain/memory-count result-memory)))))))
 
 (deftest test-create-general-agent
   (testing "Agent creation with required parameters"
     (let [model (try
-                  (-> (chain/create-anthropic-model "claude-3-haiku-20240307")
-                      (.apiKey "test-key")
-                      (.build))
+                  ;; Use langchain4clj preset with test API key
+                  (lc/create-model (assoc (presets/get-preset :anthropic/claude-3-5-haiku)
+                                          :api-key "test-key"))
                   (catch Exception _
                     ;; If API key validation fails, skip test
                     nil))]
@@ -81,7 +83,7 @@
                       :model model})]
           (is (map? agent))
           (is (= "Test prompt" (:system-message agent)))
-          (is (some? (:service agent)))
+          (is (some? (:assistant-fn agent)))
           (is (some? (:memory agent)))))))
 
   (testing "Agent creation fails without model"
@@ -91,9 +93,8 @@
 
   (testing "Agent creation fails without system prompt"
     (let [model (try
-                  (-> (chain/create-anthropic-model "claude-3-haiku-20240307")
-                      (.apiKey "test-key")
-                      (.build))
+                  (lc/create-model (assoc (presets/get-preset :anthropic/claude-3-5-haiku)
+                                          :api-key "test-key"))
                   (catch Exception _
                     nil))]
       (when model
@@ -118,18 +119,17 @@
           agent {:memory memory :context ["Old context"]}
           new-context ["New context 1" "New context 2"]]
       ;; Add some messages to memory
-      (.add memory (UserMessage. "Test message"))
+      (chain/memory-add! memory {:type :user :text "Test message"})
       (let [updated-agent (general-agent/update-agent-context agent new-context)]
         (is (= new-context (:context updated-agent)))
         ;; Memory should be cleared and reinitialized with new context
-        (is (= 1 (count (.messages (:memory updated-agent)))))))))
+        (is (= 1 (chain/memory-count (:memory updated-agent))))))))
 
 (deftest test-add-tools
   (testing "Adding tools creates new agent with combined tools"
     (let [model (try
-                  (-> (chain/create-anthropic-model "claude-3-haiku-20240307")
-                      (.apiKey "test-key")
-                      (.build))
+                  (lc/create-model (assoc (presets/get-preset :anthropic/claude-3-5-haiku)
+                                          :api-key "test-key"))
                   (catch Exception _
                     nil))]
       (when model
