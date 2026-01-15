@@ -22,7 +22,8 @@
   ['clojure-mcp.tools.form-edit.combined-edit-tool/unified-form-edit-tool
    'clojure-mcp.tools.form-edit.tool/sexp-update-tool
    'clojure-mcp.tools.file-edit.tool/file-edit-tool
-   'clojure-mcp.tools.file-write.tool/file-write-tool])
+   'clojure-mcp.tools.file-write.tool/file-write-tool
+   'clojure-mcp.tools.paren-repair.tool/paren-repair-tool])
 
 (def agent-tool-syms
   "Symbols for agent tool creation functions (require API keys)"
