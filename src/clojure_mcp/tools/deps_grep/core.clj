@@ -5,10 +5,14 @@
    [clojure.string :as str]
    [clojure.java.shell :as shell]
    [clojure.java.io :as io]
+   [clojure-mcp.tools.deps-sources.core :as deps-sources]
    [taoensso.timbre :as log]))
 
-;; Cache for classpath jars, keyed by project directory
+;; Cache for base classpath jars, keyed by project directory
 (def ^:private classpath-cache (atom {}))
+
+;; Cache for jars with sources, keyed by [project-dir java-sources?]
+(def ^:private sources-cache (atom {}))
 
 (defn get-classpath-jars
   "Run `clojure -Spath` in the given directory and return a vector of jar paths.
@@ -42,29 +46,58 @@
       (when (.exists sources-file)
         sources-path))))
 
+(defn needs-java-sources?
+  "Check if the search options indicate we're looking for Java files."
+  [{:keys [type glob]}]
+  (or (= "java" type)
+      (and glob (re-find #"\.java" glob))))
+
 (defn get-jars-with-sources
-  "Given a list of jars, return jars plus any available sources jars."
-  [jars]
-  (let [sources-jars (->> jars
-                          (keep find-sources-jar)
-                          (remove (set jars)))] ; don't duplicate if already included
-    (into (vec jars) sources-jars)))
+  "Given a list of jars and search opts, return jars plus any available sources jars.
+   When searching for Java files, downloads missing sources from Maven Central."
+  [jars opts]
+  (let [;; First find sources jars already in Maven cache
+        existing-sources (->> jars
+                              (keep find-sources-jar)
+                              (remove (set jars)))]
+    (if (needs-java-sources? opts)
+      ;; For Java searches, also download missing sources
+      (let [jars-with-sources (set (map #(str/replace % #"-sources\.jar$" ".jar")
+                                        existing-sources))
+            jars-missing-sources (remove jars-with-sources jars)
+            _ (log/debug "Checking for Java sources for" (count jars-missing-sources) "jars")
+            downloaded-sources (deps-sources/ensure-sources-jars! jars-missing-sources)]
+        (log/debug "Downloaded" (count downloaded-sources) "sources jars")
+        (into (vec jars) (concat existing-sources downloaded-sources)))
+      ;; For non-Java searches, just use existing sources
+      (into (vec jars) existing-sources))))
 
 (defn cached-classpath-jars
   "Get classpath jars with caching. Returns cached result if available.
-   Includes sources jars when available."
-  [project-dir]
-  (or (get @classpath-cache project-dir)
-      (when-let [jars (get-classpath-jars project-dir)]
-        (let [all-jars (get-jars-with-sources jars)]
-          (log/debug "Found" (- (count all-jars) (count jars)) "sources jars")
-          (swap! classpath-cache assoc project-dir all-jars)
-          all-jars))))
+   Includes sources jars based on search opts - downloads Java sources when needed.
+   Results are memoized by [project-dir java-sources?] for fast subsequent lookups."
+  [project-dir opts]
+  (let [java-sources? (needs-java-sources? opts)
+        cache-key [project-dir java-sources?]]
+    ;; Check if we have a cached result for this project-dir + java-sources? combo
+    (or (get @sources-cache cache-key)
+        (let [;; Get base classpath jars (also cached)
+              base-jars (or (get @classpath-cache project-dir)
+                            (when-let [jars (get-classpath-jars project-dir)]
+                              (swap! classpath-cache assoc project-dir jars)
+                              jars))]
+          (when base-jars
+            ;; Add sources jars based on opts (downloads if needed for Java)
+            (let [all-jars (get-jars-with-sources base-jars opts)]
+              (log/debug "Total jars:" (count all-jars) "(base:" (count base-jars) ")")
+              (swap! sources-cache assoc cache-key all-jars)
+              all-jars))))))
 
 (defn clear-classpath-cache!
-  "Clear the classpath cache. Useful after deps changes."
+  "Clear the classpath and sources caches. Useful after deps changes."
   []
-  (reset! classpath-cache {}))
+  (reset! classpath-cache {})
+  (reset! sources-cache {}))
 
 (defn list-jar-entries
   "List all entries in a jar file using unzip -Z1.
@@ -184,7 +217,7 @@
 
    Returns a map with :results and optionally :truncated"
   [project-dir pattern opts]
-  (let [jars (cached-classpath-jars project-dir)
+  (let [jars (cached-classpath-jars project-dir opts)
         {:keys [output-mode head-limit]
          :or {output-mode :content}} opts]
     (if-not jars
