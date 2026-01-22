@@ -5,27 +5,13 @@
    [clojure.string :as str]
    [clojure.java.shell :as shell]
    [clojure.java.io :as io]
+   [clojure-mcp.utils.shell :as shell-utils]
    [taoensso.timbre :as log]))
 
- ;; Cache tool availability to avoid repeated shell calls
-(def ^:private tool-availability (atom {}))
-
 (defn- check-tool-available?
-  "Check if a command-line tool is available and cache the result.
-   Tests actual tool execution rather than just PATH existence for better reliability."
+  "Check if a command-line tool is available. Uses shared binary-available? utility."
   [tool-name]
-  (if-let [cached (@tool-availability tool-name)]
-    cached
-    (let [result (try
-                   (let [test-flag (case tool-name
-                                     "rg" "--version"
-                                     "grep" "--version"
-                                     "--help")
-                         result (shell/sh tool-name test-flag)]
-                     (zero? (:exit result)))
-                   (catch Exception _ false))]
-      (swap! tool-availability assoc tool-name result)
-      result)))
+  (shell-utils/binary-available? tool-name))
 
 (defn grep-with-rg
   "Uses ripgrep (rg) command to search file contents.
