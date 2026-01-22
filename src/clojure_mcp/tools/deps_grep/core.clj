@@ -24,8 +24,12 @@
   "Check that required binaries are available. Returns nil if all present,
    or an error map with :error and :missing-binaries keys."
   []
-  (let [required ["clojure" "unzip"]
-        missing (remove shell-utils/binary-available? required)]
+  (let [required {"clojure" ["-Sdescribe"]
+                  "unzip" ["-v"]}
+        missing (->> required
+                     (keep (fn [[bin args]]
+                             (when-not (apply shell-utils/binary-available? bin args)
+                               bin))))]
     (when (seq missing)
       {:error (str "Required binaries not found: " (str/join ", " missing)
                    ". Please install them to use deps_grep.")
