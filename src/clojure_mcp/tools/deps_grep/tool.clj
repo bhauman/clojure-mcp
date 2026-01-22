@@ -24,7 +24,9 @@
 - Supports glob patterns to filter file types (e.g., \"*.clj\", \"*.java\")
 - Three output modes: content (with line numbers), files_with_matches, count
 - Use this to find code patterns in your project's dependencies
-- Results include both jar path and entry path for use with deps_read tool")
+- Results include both jar path and entry path for use with deps_read tool
+- Requires: clojure CLI, unzip. Optional: ripgrep (rg) for context/multiline support
+- For Java sources: also requires curl (downloads sources from Maven Central)")
 
 (defmethod tool-system/tool-schema :deps-grep [_]
   {:type :object
@@ -90,8 +92,11 @@
                                (map (fn [{:keys [jar entry matches]}]
                                       (str "=== " jar ":" entry " ===\n"
                                            (string/join "\n"
-                                                        (map (fn [{:keys [line-num content]}]
-                                                               (format "%6d→%s" line-num content))
+                                                        (map (fn [{:keys [line-num content match?]}]
+                                                               ;; Use : for matches, - for context lines
+                                                               (format "%6d%s%s" line-num
+                                                                       (if (false? match?) "-" ":")
+                                                                       content))
                                                              matches))))
                                     results))
 

@@ -6,6 +6,7 @@
    [clojure.java.shell :as shell]
    [clojure.java.io :as io]
    [clojure-mcp.tools.deps-sources.core :as deps-sources]
+   [clojure-mcp.utils.shell :as shell-utils]
    [taoensso.timbre :as log]))
 
 ;; Cache for base classpath jars, keyed by project directory
@@ -13,6 +14,22 @@
 
 ;; Cache for jars with sources, keyed by [project-dir java-sources?]
 (def ^:private sources-cache (atom {}))
+
+(defn rg-available?
+  "Check if ripgrep (rg) is available on the system."
+  []
+  (shell-utils/binary-available? "rg"))
+
+(defn check-required-binaries!
+  "Check that required binaries are available. Returns nil if all present,
+   or an error map with :error and :missing-binaries keys."
+  []
+  (let [required ["clojure" "unzip"]
+        missing (remove shell-utils/binary-available? required)]
+    (when (seq missing)
+      {:error (str "Required binaries not found: " (str/join ", " missing)
+                   ". Please install them to use deps_grep.")
+       :missing-binaries (vec missing)})))
 
 (defn get-classpath-jars
   "Run `clojure -Spath` in the given directory and return a vector of jar paths.
@@ -24,7 +41,9 @@
                    (shell/sh "clojure" "-Spath"))]
       (if (zero? (:exit result))
         (let [classpath (:out result)
-              jars (->> (str/split classpath #":")
+              ;; Use platform-specific path separator (: on Unix, ; on Windows)
+              path-sep (re-pattern java.io.File/pathSeparator)
+              jars (->> (str/split classpath path-sep)
                         (filter #(str/ends-with? % ".jar"))
                         (filter #(.exists (io/file %)))
                         vec)]
@@ -142,60 +161,72 @@
       (filter #(glob-matches? effective-glob %) entries)
       entries)))
 
-(defn search-jar-entry
-  "Search a single entry within a jar using unzip -p and rg.
-   Returns a map with :jar, :entry, and :matches."
-  [jar-path entry-path pattern {:keys [case-insensitive
-                                        context-before context-after context
-                                        multiline]}]
+(defn search-jar-entry-rg
+  "Search using ripgrep. Supports context lines and multiline patterns."
+  [jar-path entry-path pattern {:keys [case-insensitive context-before context-after
+                                       context multiline]}]
   (try
-    (let [;; Build rg command args
-          rg-args (cond-> ["rg" "-n"]
+    (let [rg-opts (cond-> ["-n"]
                     case-insensitive (conj "-i")
                     multiline (conj "-U")
                     context-before (conj "-B" (str context-before))
                     context-after (conj "-A" (str context-after))
-                    context (conj "-C" (str context))
-                    true (conj pattern))
-          ;; Run unzip -p | rg
-          unzip-result (shell/sh "unzip" "-p" jar-path entry-path)
-          _ (when-not (zero? (:exit unzip-result))
-              (throw (ex-info "unzip failed" {:jar jar-path :entry entry-path})))
-          rg-result (shell/sh "bash" "-c"
-                              (str "echo " (pr-str (:out unzip-result))
-                                   " | rg " (str/join " " (map pr-str (rest rg-args)))))]
-      (when (zero? (:exit rg-result))
-        {:jar jar-path
-         :entry entry-path
-         :output (:out rg-result)}))
+                    context (conj "-C" (str context)))
+          cmd (str "unzip -p " (pr-str jar-path) " " (pr-str entry-path)
+                   " | rg " (str/join " " rg-opts) " " (pr-str pattern))
+          result (shell/sh "bash" "-c" cmd)]
+      (when (zero? (:exit result))
+        (let [matches (->> (str/split-lines (:out result))
+                           (keep (fn [line]
+                                   (when-let [[_ line-num sep content]
+                                              (re-matches #"(\d+)([:|-])(.*)$" line)]
+                                     {:line-num (parse-long line-num)
+                                      :content content
+                                      :match? (= sep ":")}))))]
+          (when (seq matches)
+            {:jar jar-path
+             :entry entry-path
+             :matches (vec matches)}))))
     (catch Exception e
       (log/debug "Error searching" entry-path "in" jar-path ":" (.getMessage e))
       nil)))
 
-(defn search-jar-entry-simple
-  "Search a single entry within a jar. Simpler implementation using temp file approach."
-  [jar-path entry-path pattern opts]
+(defn search-jar-entry-fallback
+  "Fallback search using Clojure regex. Does not support context lines or multiline."
+  [jar-path entry-path pattern {:keys [case-insensitive]}]
   (try
     (let [unzip-result (shell/sh "unzip" "-p" jar-path entry-path)]
       (when (zero? (:exit unzip-result))
         (let [content (:out unzip-result)
               lines (str/split-lines content)
-              pattern-re (re-pattern (if (:case-insensitive opts)
+              pattern-re (re-pattern (if case-insensitive
                                        (str "(?i)" pattern)
                                        pattern))
               matches (keep-indexed
                        (fn [idx line]
                          (when (re-find pattern-re line)
                            {:line-num (inc idx)
-                            :content line}))
+                            :content line
+                            :match? true}))
                        lines)]
           (when (seq matches)
             {:jar jar-path
              :entry entry-path
-             :matches matches}))))
+             :matches (vec matches)}))))
     (catch Exception e
       (log/debug "Error searching" entry-path "in" jar-path ":" (.getMessage e))
       nil)))
+
+(defn search-jar-entry
+  "Search a single entry within a jar. Uses ripgrep if available, otherwise
+   falls back to Clojure regex (without context/multiline support).
+
+   Returns a map with :jar, :entry, and :matches. Each match has :line-num,
+   :content, and :match? (true for matches, false for context lines)."
+  [jar-path entry-path pattern opts]
+  (if (rg-available?)
+    (search-jar-entry-rg jar-path entry-path pattern opts)
+    (search-jar-entry-fallback jar-path entry-path pattern opts)))
 
 (defn deps-grep
   "Search for a pattern in dependency jars.
@@ -215,13 +246,17 @@
      :head-limit - Limit number of results
      :multiline - Enable multiline matching
 
-   Returns a map with :results and optionally :truncated"
+   Returns a map with :results and optionally :truncated.
+
+   Requires: clojure CLI, unzip. Optional: ripgrep (rg) for context/multiline."
   [project-dir pattern opts]
-  (let [jars (cached-classpath-jars project-dir opts)
-        {:keys [output-mode head-limit]
-         :or {output-mode :content}} opts]
-    (if-not jars
-      {:error "Failed to resolve classpath. Is this a deps.edn project?"}
+  (if-let [binary-error (check-required-binaries!)]
+    binary-error
+    (let [jars (cached-classpath-jars project-dir opts)
+          {:keys [output-mode head-limit]
+           :or {output-mode :content}} opts]
+      (if-not jars
+        {:error "Failed to resolve classpath. Is this a deps.edn project?"}
       (let [all-results (atom [])
             result-count (atom 0)
             limit-reached (atom false)]
@@ -232,7 +267,7 @@
             (let [filtered-entries (filter-entries entries opts)]
               (doseq [entry filtered-entries
                       :while (not @limit-reached)]
-                (when-let [match (search-jar-entry-simple jar entry pattern opts)]
+                (when-let [match (search-jar-entry jar entry pattern opts)]
                   (case output-mode
                     :files-with-matches
                     (do
@@ -254,3 +289,4 @@
         (cond-> {:results @all-results}
           (= output-mode :count) (assoc :count @result-count)
           @limit-reached (assoc :truncated true))))))
+)

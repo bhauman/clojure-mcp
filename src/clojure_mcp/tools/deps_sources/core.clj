@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.java.shell :as shell]
    [clojure.java.io :as io]
+   [clojure-mcp.utils.shell :as shell-utils]
    [taoensso.timbre :as log]))
 
 ;; Global cache directory for downloaded source jars
@@ -14,6 +15,11 @@
 ;; File tracking jars that don't have sources available
 (def no-sources-file
   (io/file sources-cache-dir ".no-sources"))
+
+(defn curl-available?
+  "Check if curl is available on the system."
+  []
+  (shell-utils/binary-available? "curl"))
 
 (defn parse-maven-coords
   "Parse a jar path to extract Maven coordinates.
@@ -72,28 +78,48 @@
 (defn download-sources-jar!
   "Download a sources jar from Maven Central to the cache.
 
-   Returns the path to the downloaded jar, or nil if download failed (404 or other error)."
+   Returns the path to the downloaded jar, or nil if not available.
+   Only records in negative cache for HTTP 404 (not found), not for
+   transient network errors. Requires curl to be installed."
   [coords]
-  (let [url (sources-jar-url coords)
-        dest (cached-sources-path coords)
-        dest-dir (.getParentFile dest)]
-    (log/debug "Downloading sources jar:" url)
-    (.mkdirs dest-dir)
-    (let [result (shell/sh "curl" "--fail" "--silent" "--location"
-                           "--output" (.getAbsolutePath dest)
-                           url)]
-      (if (zero? (:exit result))
+  (if-not (curl-available?)
+    (do
+      (log/debug "curl not available, skipping source jar download")
+      nil)
+    (let [url (sources-jar-url coords)
+          dest (cached-sources-path coords)
+          dest-dir (.getParentFile dest)]
+      (log/debug "Downloading sources jar:" url)
+      (.mkdirs dest-dir)
+    (let [;; Download and capture HTTP status code
+          result (shell/sh "curl" "--silent" "--location"
+                           "-w" "\n%{http_code}"
+                           "-o" (.getAbsolutePath dest)
+                           url)
+          ;; Parse HTTP status from last line of output
+          http-status (last (str/split-lines (:out result)))]
+      (cond
+        ;; Success - file downloaded
+        (and (zero? (:exit result)) (= "200" http-status))
         (do
           (log/debug "Downloaded:" (.getAbsolutePath dest))
           (.getAbsolutePath dest))
+
+        ;; 404 Not Found - record in negative cache
+        (= "404" http-status)
         (do
-          (log/debug "Sources not available for:" (jar-identifier coords))
-          ;; Clean up any partial download
-          (when (.exists dest)
-            (.delete dest))
-          ;; Record in negative cache
+          (log/debug "Sources not available (404) for:" (jar-identifier coords))
+          (when (.exists dest) (.delete dest))
           (save-no-sources! (jar-identifier coords))
-          nil)))))
+          nil)
+
+        ;; Other errors (network, 500, etc.) - don't cache, just return nil
+        :else
+        (do
+          (log/debug "Failed to download sources for:" (jar-identifier coords)
+                     "- exit:" (:exit result) "http:" http-status)
+          (when (.exists dest) (.delete dest))
+          nil))))))
 
 (defn find-sources-jar-for
   "Find or download sources jar for a given jar path.
