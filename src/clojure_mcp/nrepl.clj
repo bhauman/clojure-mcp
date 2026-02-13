@@ -226,11 +226,46 @@
 ;; Dialect-aware functions (moved from dialects.clj to avoid circular deps)
 ;; -----------------------------------------------------------------------------
 
+(defn detect-shadow-cljs?
+  "Detects if the nREPL server is shadow-cljs by evaluating '1' and checking
+   if the response ns is 'shadow.user'. Uses eval-code-internal to avoid
+   triggering full initialization."
+  [service]
+  (try
+    (let [responses (eval-code-internal service "1" :session-type :tools)
+          combined (nrepl/combine-responses responses)]
+      (= "shadow.user" (:ns combined)))
+    (catch Exception _
+      false)))
+
+(defn shadow-cljs-mode?
+  "Detects if a shadow-cljs session is currently in CLJS mode by evaluating
+   cljs.user/*clojurescript-version*. If it returns a value (not nil/error),
+   the session is in CLJS mode.
+   Uses the specified session-type (defaults to :default)."
+  ([service]
+   (shadow-cljs-mode? service :default))
+  ([service session-type]
+   (try
+     (let [responses (eval-code-internal service
+                                         "cljs.user/*clojurescript-version*"
+                                         :session-type session-type)
+           combined (nrepl/combine-responses responses)]
+       ;; If we get a value and it's not nil, we're in CLJS mode
+       (and (:value combined)
+            (not= "nil" (:value combined))
+            (nil? (:ex combined))))
+     (catch Exception _
+       false))))
+
 (defn detect-nrepl-env-type
-  "Detects the nREPL environment type by querying the server's describe op."
+  "Detects the nREPL environment type by querying the server's describe op.
+   Also detects shadow-cljs which runs on top of Clojure."
   [service]
   (when-let [{:keys [versions]} (describe service)]
     (cond
+      ;; Check for shadow-cljs first (runs on top of Clojure)
+      (and (get versions :clojure) (detect-shadow-cljs? service)) :shadow
       (get versions :clojure) :clj
       (get versions :babashka) :bb
       (get versions :basilisp) :basilisp

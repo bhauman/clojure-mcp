@@ -1,0 +1,103 @@
+;; cli-assist-agent profile: Minimal toolset for CLI assistance with Claude Code
+;;
+;; Enabled tools:
+;;   - clojure_eval            (REPL evaluation)
+;;   - clojure_edit_agent      (agent-based editing - fallback for Edit tool)
+;;   - clojure_inspect_project (project structure analysis)
+;;   - list_nrepl_ports        (discover running nREPL servers)
+;;
+;; Enabled resources:
+;;   - clojure-project-info    (deps.edn/project.clj analysis)
+
+{:disable-tools
+ [:read_file
+  :grep
+  :glob_files
+  :bash
+  :clojure_edit_replace_sexp
+  :file_edit
+  :file_write
+  :scratch_pad
+  :dispatch_agent
+  :architect
+  :code_critique
+  :clojure_edit]
+
+ :disable-prompts
+ ["create-update-project-summary"
+  "plan-and-execute"
+  "chat-session-summarize"
+  "chat-session-resume"
+  "ACT/add-dir"
+  "ACT/scratch_pad_load"
+  "ACT/scratch_pad_save_as"
+  "save_new_prompt"
+  "clojure_repl_system_prompt"]
+
+ :disable-resources
+ ["PROJECT_SUMMARY.md"
+  "README.md"
+  "CLAUDE.md"
+  "LLM_CODE_STYLE.md"]
+
+ :write-file-guard false
+
+:tools-config
+ {:clojure_edit_agent
+  {:description
+   "FALLBACK TOOL: Only use this tool when the Edit tool returns the error 'String to replace not found in file' or similar errors while editing a Clojure file (.clj, .cljs, .cljc, .edn).
+
+The Edit tool works 99% of the time and is preferred for its UI integration. Always try Edit first.
+
+After using this tool to work around an Edit error, resume using the Edit tool for subsequent edits.
+
+Specialized Clojure code editor that applies code changes to a single file using structural editing tools.
+
+To use this agent, provide:
+1. The absolute path to the file
+2. Instructions describing what needs to be changed
+3. Code snippets showing the desired changes
+
+Format:
+```
+target_file: /absolute/path/to/file.clj
+instructions: Brief description of what needs to be changed
+
+;; ... existing code before the change ...
+(defn function-to-modify [args]
+  ;; New implementation here
+  ...)
+;; ... existing code after the change ...
+```
+
+IMPORTANT FORMAT RULES:
+- Use `;; ... existing code ...` or similar markers to represent unchanged code sections
+- Include sufficient context around changes to unambiguously locate the code to modify
+- Minimize repeating unchanged code - only show what's needed for context
+- Never omit code sections without using the `;; ...` marker
+- No line numbers needed - the context helps locate the changes
+- You can include multiple changes within the single file
+
+Example:
+```
+target_file: /path/to/math.clj
+instructions: Add validation to calculate function and make add handle nil values
+
+;; ... namespace and imports ...
+
+(defn calculate [x y operation]
+  ;; Add input validation
+  (when (or (nil? x) (nil? y))
+    (throw (IllegalArgumentException. \"Inputs cannot be nil\")))
+  (operation x y))
+
+;; ... other functions ...
+
+(defn add [a b]
+  ;; Handle nil by treating as 0
+  (+ (or a 0) (or b 0)))
+
+;; ... rest of file ...
+```
+
+The agent will read the file, identify the locations to change based on context, apply the changes using clojure_edit tools, and return a summary with diffs showing all modifications."}}}

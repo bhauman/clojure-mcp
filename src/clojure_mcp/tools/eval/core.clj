@@ -10,29 +10,68 @@
 
 ;; Eval results formatting
 ;; The goal is to make it clear for the LLM to understand
-(defn partition-outputs [outputs]
+
+(defn format-divider
+  "Creates a divider string with namespace and env-type info.
+   Format: *======== user | clj ========*"
+  [ns-str env-type]
+  (str "*======== " (or ns-str "?") " | " (if env-type (name env-type) "?") " ========*"))
+
+(defn shadow-cljs-mode-message
+  "Returns a message about the shadow-cljs REPL mode status."
+  [in-cljs-mode?]
+  (if in-cljs-mode?
+    ";; shadow-cljs repl is in CLJS mode"
+    (str ";; shadow-cljs repl is NOT in CLJS mode\n"
+         ";; use (shadow/active-builds) to list builds available\n"
+         ";; use (shadow/repl <build-id>) to jack into a CLJS repl")))
+
+(defn partition-outputs
+  "Partitions outputs into groups, each ending with a :ns entry.
+   This groups all output leading up to and including the namespace divider."
+  [outputs]
   (when (not-empty outputs)
-    (let [[non-val-parts [val & xs]] (split-with #(not= :value (first %)) outputs)]
-      (cons (cond-> (vec non-val-parts)
-              val (conj val))
+    (let [[pre-ns-parts [ns-entry & xs]] (split-with #(not= :ns (first %)) outputs)]
+      (cons (cond-> (vec pre-ns-parts)
+              ns-entry (conj ns-entry))
             (partition-outputs xs)))))
 
-(defn format-value [[k v]]
+(defn format-value
+  "Formats a single output entry.
+   - :value entries show the result with => prefix
+   - :ns entries show the divider with namespace and env-type
+   - :out/:err entries show raw text"
+  [[k v] env-type]
   (string/trim-newline
-   (if (= k :value)
-     (str "=> " v (if (<= nrepl/truncation-length (count v))
-                    " ... RESULT TRUNCATED"
-                    ""))
+   (case k
+     :value (str "=> " v
+                 (when (<= nrepl/truncation-length (count v))
+                   " ... RESULT TRUNCATED"))
+     :ns (format-divider v env-type)
      (str v))))
 
-(defn format-eval-outputs [outputs]
+(defn format-eval-outputs
+  "Formats a group of outputs (leading up to and including a value)."
+  [outputs env-type]
   (->> outputs
-       (map format-value)
+       (map #(format-value % env-type))
        (string/join "\n")))
 
-(defn partition-and-format-outputs [outputs]
-  (interpose "*===============================================*"
-             (mapv format-eval-outputs (partition-outputs outputs))))
+(defn partition-and-format-outputs
+  "Formats all outputs, grouping by expression (each ending with :ns divider).
+   Context map can include:
+   - :env-type - the environment type keyword (:clj, :shadow, etc.)
+   - :shadow-cljs-mode? - boolean for shadow-cljs CLJS mode status
+
+   For shadow-cljs, prepends a mode status message."
+  ([outputs] (partition-and-format-outputs outputs nil))
+  ([outputs {:keys [env-type shadow-cljs-mode?] :as _context}]
+   (let [prefix (when (= env-type :shadow)
+                  [(shadow-cljs-mode-message shadow-cljs-mode?)])
+         formatted (mapv #(format-eval-outputs % env-type) (partition-outputs outputs))]
+     (if prefix
+       (into prefix formatted)
+       formatted))))
 
 (defn repair-code
   [code]
@@ -46,7 +85,9 @@
     (doseq [msg responses]
       (when (:out msg) (swap! outputs conj [:out (:out msg)]))
       (when (:err msg) (swap! outputs conj [:err (:err msg)]))
-      (when (:value msg) (swap! outputs conj [:value (:value msg)]))
+      (when (:value msg)
+        (swap! outputs conj [:value (:value msg)])
+        (swap! outputs conj [:ns (:ns msg)]))
       (when (:ex msg)
         (reset! error-occurred true)
         (swap! outputs conj [:err (:ex msg)]))

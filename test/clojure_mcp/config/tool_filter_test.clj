@@ -2,6 +2,111 @@
   (:require [clojure.test :refer [deftest is testing]]
             [clojure-mcp.config :as config]))
 
+;; Tests for ENABLE_TOOLS and DISABLE_TOOLS environment variable support
+
+(deftest test-enable-tools-env-var
+  (testing "ENABLE_TOOLS env var overrides config"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" "bash,eval_code,read_file"}]
+      (let [nrepl-map {::config/config {:enable-tools [:other_tool :another_tool]}}]
+        ;; Env var should override config
+        (is (true? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code)))
+        (is (true? (config/tool-id-enabled? nrepl-map :read_file)))
+        (is (false? (config/tool-id-enabled? nrepl-map :other_tool)))
+        (is (false? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "ENABLE_TOOLS env var with spaces around commas"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" "bash , eval_code , read_file"}]
+      (let [nrepl-map {::config/config {}}]
+        (is (true? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code)))
+        (is (true? (config/tool-id-enabled? nrepl-map :read_file)))
+        (is (false? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "ENABLE_TOOLS env var normalizes hyphens to underscores"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" "file-edit,eval-code,read-file"}]
+      (let [nrepl-map {::config/config {}}]
+        ;; Hyphens in env var should match underscore tool IDs
+        (is (true? (config/tool-id-enabled? nrepl-map :file_edit)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code)))
+        (is (true? (config/tool-id-enabled? nrepl-map :read_file)))
+        (is (false? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "Empty ENABLE_TOOLS env var is ignored (config used)"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" ""}]
+      (let [nrepl-map {::config/config {:enable-tools [:bash :grep]}}]
+        ;; Empty string should be ignored, config should be used
+        (is (true? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))
+        (is (false? (config/tool-id-enabled? nrepl-map :eval-code))))))
+
+  (testing "No env var uses config"
+    (binding [config/*env-overrides* {}]
+      (let [nrepl-map {::config/config {:enable-tools [:bash :grep]}}]
+        (is (true? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))
+        (is (false? (config/tool-id-enabled? nrepl-map :eval-code)))))))
+
+(deftest test-disable-tools-env-var
+  (testing "DISABLE_TOOLS env var overrides config"
+    (binding [config/*env-overrides* {"DISABLE_TOOLS" "bash,dispatch_agent"}]
+      (let [nrepl-map {::config/config {:disable-tools [:other_tool]}}]
+        ;; Env var should override config
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (false? (config/tool-id-enabled? nrepl-map :dispatch_agent)))
+        (is (true? (config/tool-id-enabled? nrepl-map :other_tool))) ; config ignored
+        (is (true? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "DISABLE_TOOLS env var with spaces"
+    (binding [config/*env-overrides* {"DISABLE_TOOLS" " bash , dispatch_agent "}]
+      (let [nrepl-map {::config/config {}}]
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (false? (config/tool-id-enabled? nrepl-map :dispatch_agent)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "DISABLE_TOOLS env var normalizes hyphens to underscores"
+    (binding [config/*env-overrides* {"DISABLE_TOOLS" "dispatch-agent,file-edit"}]
+      (let [nrepl-map {::config/config {}}]
+        ;; Hyphens in env var should match underscore tool IDs
+        (is (false? (config/tool-id-enabled? nrepl-map :dispatch_agent)))
+        (is (false? (config/tool-id-enabled? nrepl-map :file_edit)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep))))))
+
+  (testing "Empty DISABLE_TOOLS env var is ignored (config used)"
+    (binding [config/*env-overrides* {"DISABLE_TOOLS" ""}]
+      (let [nrepl-map {::config/config {:disable-tools [:bash]}}]
+        ;; Empty string should be ignored, config should be used
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))))))
+
+(deftest test-enable-and-disable-tools-env-vars
+  (testing "Both env vars can be used together"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" "bash,grep,eval_code"
+                                       "DISABLE_TOOLS" "bash"}]
+      (let [nrepl-map {::config/config {}}]
+        ;; bash is in enable but also in disable - disable wins
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code)))
+        (is (false? (config/tool-id-enabled? nrepl-map :read_file)))))) ; not in enable list
+
+  (testing "ENABLE_TOOLS env var with DISABLE_TOOLS from config"
+    (binding [config/*env-overrides* {"ENABLE_TOOLS" "bash,grep,eval_code"}]
+      (let [nrepl-map {::config/config {:disable-tools [:bash]}}]
+        ;; ENABLE from env, DISABLE from config
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code))))))
+
+  (testing "DISABLE_TOOLS env var with ENABLE_TOOLS from config"
+    (binding [config/*env-overrides* {"DISABLE_TOOLS" "bash"}]
+      (let [nrepl-map {::config/config {:enable-tools [:bash :grep :eval_code]}}]
+        ;; ENABLE from config, DISABLE from env
+        (is (false? (config/tool-id-enabled? nrepl-map :bash)))
+        (is (true? (config/tool-id-enabled? nrepl-map :grep)))
+        (is (true? (config/tool-id-enabled? nrepl-map :eval_code)))
+        (is (false? (config/tool-id-enabled? nrepl-map :read_file)))))))
+
 (deftest test-tool-id-enabled?
   (testing "No configuration - all tools enabled"
     (let [nrepl-map {::config/config {}}]

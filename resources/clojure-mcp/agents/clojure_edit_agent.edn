@@ -1,0 +1,64 @@
+{:id :clojure-edit-agent
+ :name "clojure_edit_agent"
+ :description "Specialized Clojure code editor that applies code changes to a single file using structural editing tools.
+
+To use this agent, provide:
+1. The absolute path to the file
+2. Instructions describing what needs to be changed
+3. Code snippets showing the desired changes
+
+Format:
+```
+target_file: /absolute/path/to/file.clj
+instructions: Brief description of what needs to be changed
+
+;; ... existing code before the change ...
+(defn function-to-modify [args]
+  ;; New implementation here
+  ...)
+;; ... existing code after the change ...
+```
+
+IMPORTANT FORMAT RULES:
+- Use `;; ... existing code ...` or similar markers to represent unchanged code sections
+- Include sufficient context around changes to unambiguously locate the code to modify
+- Minimize repeating unchanged code - only show what's needed for context
+- Never omit code sections without using the `;; ...` marker
+- No line numbers needed - the context helps locate the changes
+- You can include multiple changes within the single file
+
+Example:
+```
+target_file: /path/to/math.clj
+instructions: Add validation to calculate function and make add handle nil values
+
+;; ... namespace and imports ...
+
+(defn calculate [x y operation]
+  ;; Add input validation
+  (when (or (nil? x) (nil? y))
+    (throw (IllegalArgumentException. \"Inputs cannot be nil\")))
+  (operation x y))
+
+;; ... other functions ...
+
+(defn add [a b]
+  ;; Handle nil by treating as 0
+  (+ (or a 0) (or b 0)))
+
+;; ... rest of file ...
+```
+
+The agent will read the file, identify the locations to change based on context, apply the changes using clojure_edit tools, and return a summary with diffs showing all modifications."
+ :system-message "You are an efficient Clojure code editor that works on a single file at a time. When provided with a file path and edit instructions:
+
+1. Read the target file to understand its current state
+2. Identify the exact locations that need to be changed based on the context provided
+3. Use the appropriate clojure_edit tools (clojure_edit for defn/def replacements, clojure_edit_replace_sexp for expression changes) to make the changes
+4. Apply all requested changes efficiently
+5. The file change tracking system will automatically show diffs of your modifications
+
+Remember: Prefer structural editing tools over text-based editing for reliability and to maintain proper Clojure syntax."
+ :context false
+ :enable-tools [:read_file :clojure_edit :clojure_edit_replace_sexp :glob_files :grep :file_edit]
+ :track-file-changes true}

@@ -87,26 +87,36 @@ Examples:
 (defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom timeout session-type]}
                                                     {:keys [timeout_ms port] :as inputs}]
   ;; port is already resolved by validate-inputs
-  (let [base-client @nrepl-client-atom]
+  (let [base-client @nrepl-client-atom
+        session-type (or session-type :default)]
     (try
-      (let [client (nrepl/with-port-initialized base-client port)]
-        ;; Delegate to core implementation with repair
-        (core/evaluate-with-repair client (cond-> inputs
-                                            session-type (assoc :session-type session-type)
-                                            (nil? timeout_ms) (assoc :timeout_ms timeout))))
+      (let [client (nrepl/with-port-initialized base-client port)
+            env-type (nrepl/get-port-env-type client)
+            ;; Check CLJS mode for shadow-cljs
+            cljs-mode? (when (= env-type :shadow)
+                         (nrepl/shadow-cljs-mode? client session-type))
+            ;; Execute the eval
+            eval-result (core/evaluate-with-repair client (cond-> inputs
+                                                            session-type (assoc :session-type session-type)
+                                                            (nil? timeout_ms) (assoc :timeout_ms timeout)))]
+        ;; Add context to result for formatting
+        (assoc eval-result :context {:env-type env-type
+                                     :shadow-cljs-mode? cljs-mode?}))
       (catch java.net.ConnectException e
         {:outputs [[:err (format "Failed to connect to nREPL server on port %d: %s. Ensure an nREPL server is running on that port."
                                  port (.getMessage e))]]
-         :error true})
+         :error true
+         :context nil})
       (catch java.net.SocketException e
         {:outputs [[:err (format "Connection error to nREPL server on port %d: %s. The server may have disconnected."
                                  port (.getMessage e))]]
-         :error true}))))
+         :error true
+         :context nil}))))
 
-(defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as _eval-result}]
-  ;; The core implementation now returns a map with :outputs (raw outputs), :error (boolean), and :repaired (boolean)
-  ;; We need to format the outputs and return a map with :result, :error, and :repaired
-  {:result (core/partition-and-format-outputs outputs)
+(defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired context] :as _eval-result}]
+  ;; The core implementation returns :outputs, :error, :repaired, and :context
+  ;; Pass context to formatting for namespace/env-type display in dividers
+  {:result (core/partition-and-format-outputs outputs context)
    :error error
    :repaired repaired})
 

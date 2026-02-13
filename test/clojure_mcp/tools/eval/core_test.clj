@@ -28,24 +28,27 @@
 (use-fixtures :once test-nrepl-fixture)
 
 (deftest partition-outputs-test
-  (testing "Partitioning output with single value"
+  (testing "Partitioning output with single value and namespace"
     (let [outputs [[:out "Console output"]
-                   [:value "42"]]
+                   [:value "42"]
+                   [:ns "user"]]
           result (eval-core/partition-outputs outputs)]
       (is (= 1 (count result)))
-      (is (= [[:out "Console output"] [:value "42"]] (first result)))))
+      (is (= [[:out "Console output"] [:value "42"] [:ns "user"]] (first result)))))
 
   (testing "Partitioning output with multiple values"
     (let [outputs [[:out "First output"]
                    [:value "1"]
+                   [:ns "user"]
                    [:out "Second output"]
-                   [:value "2"]]
+                   [:value "2"]
+                   [:ns "user"]]
           result (eval-core/partition-outputs outputs)]
       (is (= 2 (count result)))
-      (is (= [[:out "First output"] [:value "1"]] (first result)))
-      (is (= [[:out "Second output"] [:value "2"]] (second result)))))
+      (is (= [[:out "First output"] [:value "1"] [:ns "user"]] (first result)))
+      (is (= [[:out "Second output"] [:value "2"] [:ns "user"]] (second result)))))
 
-  (testing "Partitioning with no values"
+  (testing "Partitioning with no namespace entries"
     (let [outputs [[:out "Just output"]
                    [:err "An error"]]
           result (eval-core/partition-outputs outputs)]
@@ -59,47 +62,59 @@
 
 (deftest format-value-test
   (testing "Formatting value output"
-    (is (= "=> 42" (eval-core/format-value [:value "42"]))))
+    (is (= "=> 42" (eval-core/format-value [:value "42"] :clj))))
 
   (testing "Formatting standard output"
-    (is (= "Hello" (eval-core/format-value [:out "Hello"]))))
+    (is (= "Hello" (eval-core/format-value [:out "Hello"] :clj))))
 
   (testing "Formatting error output"
-    (is (= "Error" (eval-core/format-value [:err "Error"]))))
+    (is (= "Error" (eval-core/format-value [:err "Error"] :clj))))
 
   (testing "Formatting lint output"
-    (is (= "Lint warning" (eval-core/format-value [:lint "Lint warning"]))))
+    (is (= "Lint warning" (eval-core/format-value [:lint "Lint warning"] :clj))))
+
+  (testing "Formatting namespace entry as divider"
+    (is (= "*======== user | clj ========*" (eval-core/format-value [:ns "user"] :clj))))
 
   (testing "Truncation indicator for long values"
     (with-redefs [nrepl/truncation-length 5]
-      (is (str/includes? (eval-core/format-value [:value "123456"]) "RESULT TRUNCATED")))))
+      (is (str/includes? (eval-core/format-value [:value "123456"] :clj) "RESULT TRUNCATED")))))
 
 (deftest format-eval-outputs-test
-  (testing "Formatting single output"
-    (is (= "=> 42" (eval-core/format-eval-outputs [[:value "42"]]))))
+  (testing "Formatting single output with namespace"
+    (is (= "=> 42\n*======== user | clj ========*"
+           (eval-core/format-eval-outputs [[:value "42"] [:ns "user"]] :clj))))
 
-  (testing "Formatting multiple outputs"
-    (is (= "Hello\n=> 42"
-           (eval-core/format-eval-outputs [[:out "Hello"] [:value "42"]]))))
+  (testing "Formatting multiple outputs with namespace"
+    (is (= "Hello\n=> 42\n*======== user | clj ========*"
+           (eval-core/format-eval-outputs [[:out "Hello"] [:value "42"] [:ns "user"]] :clj))))
 
-  (testing "Formatting error output"
-    (is (= "Error\n=> nil"
-           (eval-core/format-eval-outputs [[:err "Error"] [:value "nil"]])))))
+  (testing "Formatting error output with namespace"
+    (is (= "Error\n=> nil\n*======== user | clj ========*"
+           (eval-core/format-eval-outputs [[:err "Error"] [:value "nil"] [:ns "user"]] :clj)))))
 
 (deftest partition-and-format-outputs-test
-  (testing "Formatting single evaluation"
-    (let [outputs [[:out "Hello"] [:value "42"]]
-          result (eval-core/partition-and-format-outputs outputs)]
-      (is (= "Hello\n=> 42" (first result)))))
+  (testing "Formatting single evaluation with context"
+    (let [outputs [[:out "Hello"] [:value "42"] [:ns "user"]]
+          context {:env-type :clj}
+          result (eval-core/partition-and-format-outputs outputs context)]
+      (is (= "Hello\n=> 42\n*======== user | clj ========*" (first result)))))
 
-  (testing "Formatting multiple evaluations"
-    (let [outputs [[:out "First"] [:value "1"]
-                   [:out "Second"] [:value "2"]]
-          result (eval-core/partition-and-format-outputs outputs)]
-      (is (= 3 (count result)))
-      (is (= "First\n=> 1" (first result)))
-      (is (= "*===============================================*" (second result)))
-      (is (= "Second\n=> 2" (nth result 2))))))
+  (testing "Formatting multiple evaluations with context"
+    (let [outputs [[:out "First"] [:value "1"] [:ns "user"]
+                   [:out "Second"] [:value "2"] [:ns "user"]]
+          context {:env-type :clj}
+          result (eval-core/partition-and-format-outputs outputs context)]
+      (is (= 2 (count result)))
+      (is (= "First\n=> 1\n*======== user | clj ========*" (first result)))
+      (is (= "Second\n=> 2\n*======== user | clj ========*" (second result)))))
+
+  (testing "Shadow-cljs mode adds mode message prefix"
+    (let [outputs [[:value "42"] [:ns "cljs.user"]]
+          context {:env-type :shadow :shadow-cljs-mode? true}
+          result (eval-core/partition-and-format-outputs outputs context)]
+      (is (= 2 (count result)))
+      (is (str/includes? (first result) "shadow-cljs repl is in CLJS mode")))))
 
 (deftest evaluate-code-test
   (testing "Evaluating basic expression"
@@ -108,13 +123,16 @@
       (is (contains? result :outputs))
       (is (contains? result :error))
       (is (false? (:error result)))
-      (is (some #(= [:value "3"] %) (:outputs result)))))
+      (is (some #(= [:value "3"] %) (:outputs result)))
+      ;; Should also have a :ns entry
+      (is (some #(= :ns (first %)) (:outputs result)))))
 
   (testing "Evaluating with console output"
     (let [result (eval-core/evaluate-code *nrepl-client* {:code "(println \"hello\")"})]
       (is (false? (:error result)))
       (is (some #(= [:out "hello\n"] %) (:outputs result)))
-      (is (some #(= [:value "nil"] %) (:outputs result)))))
+      (is (some #(= [:value "nil"] %) (:outputs result)))
+      (is (some #(= :ns (first %)) (:outputs result)))))
 
   (testing "Evaluating with error"
     (let [result (eval-core/evaluate-code *nrepl-client* {:code "(/ 1 0)"})]
@@ -127,10 +145,12 @@
     (let [result (eval-core/evaluate-code *nrepl-client* {:code "(println \"first\") (+ 10 20)"})]
       (is (false? (:error result)))
       (is (some #(= [:out "first\n"] %) (:outputs result)))
-      (is (some #(= [:value "30"] %) (:outputs result)))))
+      (is (some #(= [:value "30"] %) (:outputs result)))
+      ;; Should have 2 :ns entries for 2 expressions
+      (is (= 2 (count (filter #(= :ns (first %)) (:outputs result)))))))
 
   (testing "Linting with warnings"
-    ;; Note: This test is hard to make reliable because different Clojure versions 
+    ;; Note: This test is hard to make reliable because different Clojure versions
     ;; and linter configurations may handle unused bindings differently
     (let [result (eval-core/evaluate-code *nrepl-client* {:code "(let [unused 1] (+ 2 3))"})]
       (is (false? (:error result)))
