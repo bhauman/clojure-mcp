@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-13
+
+This release fixes MCP client compatibility for clients sending the newer `elicitation.form` capability field, and adds a new tool for repairing delimiter errors in Clojure files.
+
+### Added
+- **`paren_repair` MCP tool**: Fix unbalanced parentheses, brackets, and braces in Clojure files using parinfer (#144)
+
+### Fixed
+- **MCP client compatibility**: Updated MCP Java SDK to 0.17.2 to handle `elicitation.form` field from newer clients (e.g., OpenAI Codex)
+
 ## [0.2.3] - 2026-01-14
 
 ### Changed
