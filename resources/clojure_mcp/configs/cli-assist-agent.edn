@@ -3,7 +3,6 @@
 ;; Enabled tools:
 ;;   - clojure_eval            (REPL evaluation)
 ;;   - clojure_edit_agent      (agent-based editing - fallback for Edit tool)
-;;   - clojure_inspect_project (project structure analysis)
 ;;   - list_nrepl_ports        (discover running nREPL servers)
 ;;
 ;; Enabled resources:
@@ -21,7 +20,8 @@
   :dispatch_agent
   :architect
   :code_critique
-  :clojure_edit]
+  :clojure_edit
+  :clojure_inspect_project]
 
  :disable-prompts
  ["create-update-project-summary"
