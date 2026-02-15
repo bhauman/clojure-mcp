@@ -4,7 +4,10 @@
    [clojure.string :as str]
    [clojure.java.io :as io]
    [clojure-mcp.tools.deps-common.jar-utils :as jar-utils]
-   [taoensso.timbre :as log]))
+   [clojure-mcp.utils.valid-paths :as valid-paths]
+   [taoensso.timbre :as log])
+  (:import
+   (java.io File)))
 
 (defn list-jar-entries
   "List all entries in a jar file.
@@ -95,6 +98,21 @@
           {:jar-path jar-path
            :entry-path entry-path})))))
 
+(defn allowed-jar-dirs
+  "Returns the list of directories that jar paths are allowed to reside in.
+   - ~/.m2/repository (Maven local cache)
+   - ~/.clojure-mcp/deps_cache (downloaded sources cache)"
+  []
+  (let [home (System/getProperty "user.home")]
+    [(.getPath (io/file home ".m2" "repository"))
+     (.getPath (io/file home ".clojure-mcp" "deps_cache"))]))
+
+(defn validate-jar-path!
+  "Validates that a jar path is under an allowed dependency cache directory.
+   Returns the normalized path if valid, throws ex-info if not."
+  [jar-path]
+  (valid-paths/validate-path jar-path "/" (allowed-jar-dirs)))
+
 (defn deps-read
   "Read a file from a dependency jar.
 
@@ -112,6 +130,7 @@
      (deps-read jar-path entry-path opts)
      {:error (str "Invalid path format. Expected 'jar-path:entry-path', got: " path)}))
   ([jar-path entry-path opts]
+   (validate-jar-path! jar-path)
    (read-jar-entry jar-path entry-path
                    :offset (or (:offset opts) 0)
                    :limit (:limit opts)
