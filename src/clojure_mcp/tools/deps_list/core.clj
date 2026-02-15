@@ -21,7 +21,11 @@
     (if-not jars
       {:error "Failed to resolve classpath. Is this a deps.edn project?"}
       (let [pattern-re (when-let [p (:pattern opts)]
-                         (re-pattern (str "(?i)" p)))
+                         (try
+                           (re-pattern (str "(?i)" p))
+                           (catch java.util.regex.PatternSyntaxException e
+                             (throw (ex-info (str "Invalid pattern: " (.getMessage e))
+                                            {:pattern p})))))
             deps (->> jars
                       (keep deps-sources/parse-maven-coords)
                       (map (fn [{:keys [group artifact version]}]

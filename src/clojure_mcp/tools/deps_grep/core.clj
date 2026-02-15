@@ -143,10 +143,10 @@
   [pattern path]
   (if-not pattern
     true
-    (let [;; Convert glob to regex
-          ;; Handle {a,b} patterns
+    (let [;; Convert glob to regex, escaping all regex metacharacters first
+          ;; then restoring glob wildcards
           pattern-regex (-> pattern
-                            (str/replace "." "\\.")
+                            (str/replace #"[.+^$|()\\]" "\\\\$0")
                             (str/replace "*" ".*")
                             (str/replace #"\{([^}]+)\}"
                                          (fn [[_ alts]]

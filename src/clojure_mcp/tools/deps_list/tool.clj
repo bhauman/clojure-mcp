@@ -3,7 +3,8 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.deps-list.core :as core]
-   [clojure-mcp.config :as config]))
+   [clojure-mcp.config :as config]
+   [clojure.string :as string]))
 
 ;; Factory function to create the tool configuration
 (defn create-deps-list-tool
@@ -47,7 +48,7 @@
     (let [{:keys [dependencies]} result]
       {:result [(if (seq dependencies)
                   (str (count dependencies) " dependencies found:\n"
-                       (clojure.string/join
+                       (string/join
                         "\n"
                         (map (fn [{:keys [group artifact version]}]
                                (str group "/" artifact " " version))

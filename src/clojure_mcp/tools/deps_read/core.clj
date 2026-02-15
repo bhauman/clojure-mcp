@@ -37,6 +37,11 @@
   [jar-path entry-path & {:keys [offset limit max-line-length]
                           :or {offset 0 max-line-length 2000}}]
   (try
+    ;; Validate inputs
+    (when (neg? offset)
+      (throw (ex-info "Offset must be >= 0" {:offset offset})))
+    (when (and limit (<= limit 0))
+      (throw (ex-info "Limit must be > 0" {:limit limit})))
     ;; Verify jar exists
     (when-not (.exists (io/file jar-path))
       (throw (ex-info "Jar file not found" {:jar-path jar-path})))
