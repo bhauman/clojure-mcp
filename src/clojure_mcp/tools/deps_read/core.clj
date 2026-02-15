@@ -2,25 +2,18 @@
   "Core implementation for reading files from dependency jars."
   (:require
    [clojure.string :as str]
-   [clojure.java.shell :as shell]
    [clojure.java.io :as io]
+   [clojure-mcp.tools.deps-common.jar-utils :as jar-utils]
    [taoensso.timbre :as log]))
 
 (defn list-jar-entries
-  "List all entries in a jar file using unzip -Z1.
+  "List all entries in a jar file.
    Returns a vector of entry paths or nil on error."
   [jar-path]
-  (try
-    (let [result (shell/sh "unzip" "-Z1" jar-path)]
-      (if (zero? (:exit result))
-        (vec (str/split-lines (:out result)))
-        nil))
-    (catch Exception e
-      (log/debug "Failed to list jar entries:" jar-path (.getMessage e))
-      nil)))
+  (jar-utils/list-jar-entries jar-path))
 
 (defn read-jar-entry
-  "Read a file from inside a jar using unzip -p.
+  "Read a file from inside a jar.
 
    Arguments:
    - jar-path: Path to the jar file
@@ -48,40 +41,37 @@
     (when-not (.exists (io/file jar-path))
       (throw (ex-info "Jar file not found" {:jar-path jar-path})))
 
-    ;; Read entry from jar
-    (let [result (shell/sh "unzip" "-p" jar-path entry-path)]
-      (if (zero? (:exit result))
-        (let [content (:out result)
-              all-lines (str/split-lines content)
-              total-line-count (count all-lines)
-              ;; Apply offset and limit
-              offset-lines (drop offset all-lines)
-              limited-lines (if limit
-                              (take limit offset-lines)
-                              offset-lines)
-              ;; Truncate long lines
-              processed-lines (map (fn [line]
-                                     (if (> (count line) max-line-length)
-                                       (str (subs line 0 max-line-length) "...")
-                                       line))
-                                   limited-lines)
-              line-count (count processed-lines)
-              truncated? (and limit (> (count offset-lines) limit))
-              ;; Format with line numbers (1-indexed, accounting for offset)
-              formatted-content (str/join "\n"
-                                          (map-indexed
-                                           (fn [idx line]
-                                             (format "%6d→%s" (+ offset idx 1) line))
-                                           processed-lines))]
-          {:content formatted-content
-           :jar-path jar-path
-           :entry-path entry-path
-           :line-count line-count
-           :total-line-count total-line-count
-           :truncated? truncated?
-           :offset offset})
-        {:error (str "Entry not found: " entry-path " in " jar-path)
-         :details (:err result)}))
+    ;; Read entry from jar using Java zip support
+    (if-let [content (jar-utils/read-jar-entry jar-path entry-path)]
+      (let [all-lines (str/split-lines content)
+            total-line-count (count all-lines)
+            ;; Apply offset and limit
+            offset-lines (drop offset all-lines)
+            limited-lines (if limit
+                            (take limit offset-lines)
+                            offset-lines)
+            ;; Truncate long lines
+            processed-lines (map (fn [line]
+                                   (if (> (count line) max-line-length)
+                                     (str (subs line 0 max-line-length) "...")
+                                     line))
+                                 limited-lines)
+            line-count (count processed-lines)
+            truncated? (and limit (> (count offset-lines) limit))
+            ;; Format with line numbers (1-indexed, accounting for offset)
+            formatted-content (str/join "\n"
+                                        (map-indexed
+                                         (fn [idx line]
+                                           (format "%6d→%s" (+ offset idx 1) line))
+                                         processed-lines))]
+        {:content formatted-content
+         :jar-path jar-path
+         :entry-path entry-path
+         :line-count line-count
+         :total-line-count total-line-count
+         :truncated? truncated?
+         :offset offset})
+      {:error (str "Entry not found: " entry-path " in " jar-path)})
     (catch Exception e
       {:error (.getMessage e)})))
 

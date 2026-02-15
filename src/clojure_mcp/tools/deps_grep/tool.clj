@@ -25,7 +25,7 @@
 - Three output modes: content (with line numbers), files_with_matches, count
 - Use this to find code patterns in your project's dependencies
 - Results include both jar path and entry path for use with deps_read tool
-- Requires: clojure CLI, unzip. Optional: ripgrep (rg) for context/multiline support
+- Requires: clojure CLI. Optional: ripgrep (rg) for context/multiline support
 - For Java sources: also requires curl (downloads sources from Maven Central)")
 
 (defmethod tool-system/tool-schema :deps-grep [_]
