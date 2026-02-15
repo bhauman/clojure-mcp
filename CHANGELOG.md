@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-02-15
+
+New tools for searching and reading dependency source code, plus a cli-assist configuration tweak.
+
+### Added
+- **`deps_grep` tool**: Search for patterns inside dependency jar files on the classpath, with support for regex, glob filtering, and multiple output modes (#147)
+- **`deps_read` tool**: Read files from inside dependency jars using paths from `deps_grep` results (#147)
+- **`deps_list` tool**: List all dependencies on the project classpath with Maven coordinates, useful for discovering library names for `deps_grep` (#147)
+
+### Changed
+- **cli-assist configs**: Disabled `clojure_inspect_project` tool in cli-assist profiles to keep the toolset minimal
+
 ## [0.2.4] - 2026-02-13
 
 This release fixes MCP client compatibility for clients sending the newer `elicitation.form` capability field, and adds a new tool for repairing delimiter errors in Clojure files.
