@@ -12,8 +12,8 @@
 ;; Cache for base classpath jars, keyed by project directory
 (def ^:private classpath-cache (atom {}))
 
-;; Cache for jars with sources, keyed by [project-dir java-sources?]
-(def ^:private sources-cache (atom {}))
+;; Cache for library-filtered jars with sources, keyed by [project-dir library java-sources?]
+(def ^:private library-jars-cache (atom {}))
 
 (defn rg-available?
   "Check if ripgrep (rg) is available on the system."
@@ -95,32 +95,41 @@
       ;; For non-Java searches, just use existing sources
       (into (vec jars) existing-sources))))
 
-(defn cached-classpath-jars
-  "Get classpath jars with caching. Returns cached result if available.
-   Includes sources jars based on search opts - downloads Java sources when needed.
-   Results are memoized by [project-dir java-sources?] for fast subsequent lookups."
-  [project-dir opts]
-  (let [java-sources? (needs-java-sources? opts)
-        cache-key [project-dir java-sources?]]
-    ;; Check if we have a cached result for this project-dir + java-sources? combo
-    (or (get @sources-cache cache-key)
-        (let [;; Get base classpath jars (also cached)
-              base-jars (or (get @classpath-cache project-dir)
-                            (when-let [jars (get-classpath-jars project-dir)]
-                              (swap! classpath-cache assoc project-dir jars)
-                              jars))]
-          (when base-jars
-            ;; Add sources jars based on opts (downloads if needed for Java)
-            (let [all-jars (get-jars-with-sources base-jars opts)]
-              (log/debug "Total jars:" (count all-jars) "(base:" (count base-jars) ")")
-              (swap! sources-cache assoc cache-key all-jars)
-              all-jars))))))
+(defn parse-library-filter
+  "Parse a library filter string into group and optional artifact.
+   Returns {:group \"group.id\"} or {:group \"group.id\" :artifact \"name\"}."
+  [library]
+  (let [parts (str/split library #"/" 2)]
+    (if (= 2 (count parts))
+      {:group (first parts) :artifact (second parts)}
+      {:group (first parts)})))
+
+(defn filter-jars-by-library
+  "Filter jars to only those matching the given library filter.
+   Library can be a group ID (matches all artifacts) or group/artifact (exact match).
+   Uses deps-sources/parse-maven-coords to extract coordinates from jar paths."
+  [jars library]
+  (let [{:keys [group artifact]} (parse-library-filter library)]
+    (filterv (fn [jar-path]
+               (when-let [coords (deps-sources/parse-maven-coords jar-path)]
+                 (and (= group (:group coords))
+                      (or (nil? artifact)
+                          (= artifact (:artifact coords))))))
+             jars)))
+
+(defn cached-base-jars
+  "Get base classpath jars with caching. Returns cached result if available."
+  [project-dir]
+  (or (get @classpath-cache project-dir)
+      (when-let [jars (get-classpath-jars project-dir)]
+        (swap! classpath-cache assoc project-dir jars)
+        jars)))
 
 (defn clear-classpath-cache!
-  "Clear the classpath and sources caches. Useful after deps changes."
+  "Clear all caches. Useful after deps changes."
   []
   (reset! classpath-cache {})
-  (reset! sources-cache {}))
+  (reset! library-jars-cache {}))
 
 (defn list-jar-entries
   "List all entries in a jar file using unzip -Z1.
@@ -239,6 +248,7 @@
    - project-dir: Directory containing deps.edn
    - pattern: Regex pattern to search for
    - opts: Map of options
+     :library - Required. Maven group or group/artifact to search
      :glob - Filter files by glob pattern (e.g., \"*.clj\")
      :type - Filter files by type (e.g., \"clj\", \"java\")
      :output-mode - :content, :files-with-matches, or :count
@@ -256,41 +266,52 @@
   [project-dir pattern opts]
   (if-let [binary-error (check-required-binaries!)]
     binary-error
-    (let [jars (cached-classpath-jars project-dir opts)
-          {:keys [output-mode head-limit]
-           :or {output-mode :content}} opts]
-      (if-not jars
+    (let [base-jars (cached-base-jars project-dir)]
+      (if-not base-jars
         {:error "Failed to resolve classpath. Is this a deps.edn project?"}
-      (let [all-results (atom [])
-            result-count (atom 0)
-            limit-reached (atom false)]
-        ;; Search each jar
-        (doseq [jar jars
-                :while (not @limit-reached)]
-          (when-let [entries (list-jar-entries jar)]
-            (let [filtered-entries (filter-entries entries opts)]
-              (doseq [entry filtered-entries
+        (let [library (:library opts)
+              cache-key [project-dir library (needs-java-sources? opts)]
+              filtered-jars (filter-jars-by-library base-jars library)]
+          (if (empty? filtered-jars)
+            {:error (str "No libraries found matching: " (:library opts)
+                         ". Use deps_list to see available libraries.")}
+            (let [;; Get jars with sources (cached per library)
+                  jars (or (get @library-jars-cache cache-key)
+                           (let [result (get-jars-with-sources filtered-jars opts)]
+                             (swap! library-jars-cache assoc cache-key result)
+                             result))
+                  {:keys [output-mode head-limit]
+                   :or {output-mode :content}} opts
+                  all-results (atom [])
+                  result-count (atom 0)
+                  limit-reached (atom false)]
+              ;; Search each jar
+              (doseq [jar jars
                       :while (not @limit-reached)]
-                (when-let [match (search-jar-entry jar entry pattern opts)]
-                  (case output-mode
-                    :files-with-matches
-                    (do
-                      (swap! all-results conj {:jar (:jar match)
-                                               :entry (:entry match)})
-                      (swap! result-count inc))
+                (when-let [entries (list-jar-entries jar)]
+                  (let [filtered-entries (filter-entries entries opts)]
+                    (doseq [entry filtered-entries
+                            :while (not @limit-reached)]
+                      (when-let [match (search-jar-entry jar entry pattern opts)]
+                        (case output-mode
+                          :files-with-matches
+                          (do
+                            (swap! all-results conj {:jar (:jar match)
+                                                     :entry (:entry match)})
+                            (swap! result-count inc))
 
-                    :count
-                    (swap! result-count + (count (:matches match)))
+                          :count
+                          (swap! result-count + (count (:matches match)))
 
-                    ;; :content (default)
-                    (do
-                      (swap! all-results conj match)
-                      (swap! result-count + (count (:matches match)))))
+                          ;; :content (default)
+                          (do
+                            (swap! all-results conj match)
+                            (swap! result-count + (count (:matches match)))))
 
-                  (when (and head-limit (>= @result-count head-limit))
-                    (reset! limit-reached true)))))))
+                        (when (and head-limit (>= @result-count head-limit))
+                          (reset! limit-reached true)))))))
 
-        (cond-> {:results @all-results}
-          (= output-mode :count) (assoc :count @result-count)
-          @limit-reached (assoc :truncated true))))))
-)
+              (cond-> {:results @all-results}
+                (= output-mode :count) (assoc :count @result-count)
+                @limit-reached (assoc :truncated true)))))))))
+

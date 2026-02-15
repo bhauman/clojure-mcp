@@ -32,6 +32,8 @@
   {:type :object
    :properties {:pattern {:type :string
                           :description "The regular expression pattern to search for"}
+                :library {:type :string
+                          :description "Maven group ID or group/artifact to search (e.g., \"io.modelcontextprotocol.sdk\" for all artifacts in group, or \"io.modelcontextprotocol.sdk/mcp\" for exact artifact). Use deps_list to see available libraries."}
                 :glob {:type :string
                        :description "Glob pattern to filter files (e.g., \"*.clj\", \"*.{clj,java}\")"}
                 :type {:type :string
@@ -43,20 +45,22 @@
                                    :description "Case insensitive search"}
                 :head_limit {:type :integer
                              :description "Limit output to first N results"}}
-   :required [:pattern]})
+   :required [:pattern :library]})
 
 (defmethod tool-system/validate-inputs :deps-grep [{:keys [nrepl-client-atom]} inputs]
-  (let [{:keys [pattern glob type output_mode case_insensitive head_limit]} inputs
+  (let [{:keys [pattern library glob type output_mode case_insensitive head_limit]} inputs
         nrepl-client @nrepl-client-atom
         project-dir (config/get-nrepl-user-dir nrepl-client)]
     (when-not project-dir
       (throw (ex-info "No project directory configured" {:inputs inputs})))
     (when-not pattern
       (throw (ex-info "Missing required parameter: pattern" {:inputs inputs})))
+    (when-not library
+      (throw (ex-info "Missing required parameter: library" {:inputs inputs})))
 
     {:project-dir project-dir
      :pattern pattern
-     :opts (cond-> {}
+     :opts (cond-> {:library library}
              glob (assoc :glob glob)
              type (assoc :type type)
              output_mode (assoc :output-mode (keyword (string/replace output_mode "_" "-")))
