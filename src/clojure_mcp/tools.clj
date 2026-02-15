@@ -10,7 +10,10 @@
    'clojure-mcp.tools.grep.tool/grep-tool
    'clojure-mcp.tools.glob-files.tool/glob-files-tool
    'clojure-mcp.tools.project.tool/inspect-project-tool
-   'clojure-mcp.tools.nrepl-ports.tool/list-nrepl-ports-tool])
+   'clojure-mcp.tools.nrepl-ports.tool/list-nrepl-ports-tool
+   'clojure-mcp.tools.deps-grep.tool/deps-grep-tool
+   'clojure-mcp.tools.deps-read.tool/deps-read-tool
+   'clojure-mcp.tools.deps-list.tool/deps-list-tool])
 
 (def eval-tool-syms
   "Symbols for evaluation tool creation functions"
