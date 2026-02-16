@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-15
+
+Security hardening for the `deps_read` tool.
+
+### Fixed
+- **`deps_read` path validation**: Jar paths are now validated to ensure they reside under `~/.m2/repository` or `~/.clojure-mcp/deps_cache`, preventing path traversal attacks from reading arbitrary jar files outside dependency caches
+
 ## [0.2.5] - 2026-02-15
 
 New tools for searching and reading dependency source code, plus a cli-assist configuration tweak.
