@@ -15,8 +15,7 @@
     #_McpServerFeatures$AsyncToolSpecification
     #_McpServerFeatures$AsyncResourceSpecification]
    [io.modelcontextprotocol.spec
-    McpSchema$ServerCapabilities]
-   [com.fasterxml.jackson.databind ObjectMapper]))
+    McpSchema$ServerCapabilities]))
 
 ;; helpers for setting up an sse mcp server
 
