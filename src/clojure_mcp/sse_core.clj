@@ -15,15 +15,16 @@
     #_McpServerFeatures$AsyncToolSpecification
     #_McpServerFeatures$AsyncResourceSpecification]
    [io.modelcontextprotocol.spec
-    McpSchema$ServerCapabilities]
-   [com.fasterxml.jackson.databind ObjectMapper]))
+    McpSchema$ServerCapabilities]))
 
 ;; helpers for setting up an sse mcp server
 
 (defn mcp-sse-server []
   (log/info "Starting SSE MCP server")
   (try
-    (let [transport-provider (HttpServletSseServerTransportProvider. (ObjectMapper.) "/mcp/message")
+    (let [transport-provider (-> (HttpServletSseServerTransportProvider/builder)
+                                 (.messageEndpoint "/mcp/message")
+                                 (.build))
           server (-> (McpServer/async transport-provider)
                      (.serverInfo "clojure-server" "0.1.0")
                      (.capabilities (-> (McpSchema$ServerCapabilities/builder)
