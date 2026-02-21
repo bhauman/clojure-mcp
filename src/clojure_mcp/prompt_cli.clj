@@ -11,13 +11,14 @@
             [clojure-mcp.tools.agent-tool-builder.core :as agent-core]
             [clojure-mcp.tools.agent-tool-builder.default-agents :as default-agents]
             [clojure-mcp.agent.general-agent :as general-agent]
+            [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.agent.langchain.chat-listener :as listener]
             [clojure-mcp.agent.langchain.message-conv :as msg-conv]
             [clojure-mcp.tool-format :as tool-format]
             [clojure-mcp.utils.file :as file-utils]
-            [clojure-mcp.logging :as logging])
-  (:import [dev.langchain4j.data.message ChatMessageSerializer ChatMessageDeserializer]
-           [java.time LocalDateTime]
+            [clojure-mcp.logging :as logging]
+            [langchain4clj.messages :as lc-messages])
+  (:import [java.time LocalDateTime]
            [java.time.format DateTimeFormatter])
   (:gen-class))
 
@@ -90,7 +91,7 @@
   [messages model-str working-dir filename]
   (let [sessions-dir (ensure-sessions-dir! working-dir)
         session-file (io/file sessions-dir filename)
-        messages-json (ChatMessageSerializer/messagesToJson messages)
+        messages-json (lc-messages/messages->json messages)
         formatter (DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss")
         created (.format (LocalDateTime/now) formatter)
         session-data {:model model-str
@@ -119,7 +120,7 @@
   (let [json-str (file-utils/slurp-utf8 session-file)
         session-data (json/read-str json-str :key-fn keyword)
         messages-json (:messages session-data)
-        messages (ChatMessageDeserializer/messagesFromJson messages-json)]
+        messages (lc-messages/json->messages messages-json)]
     {:model (:model session-data)
      :messages messages
      :filename (.getName session-file)}))
@@ -379,7 +380,7 @@
 
                 ;; Add Java messages to memory
                 (doseq [msg loaded-messages]
-                  (.add (:memory agent) msg))))
+                  (chain/memory-add! (:memory agent) msg))))
 
           ;; Send the prompt and get response
           _ (println "\nProcessing prompt...")
