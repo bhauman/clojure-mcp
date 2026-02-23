@@ -39,7 +39,10 @@ To make a file edit, provide the file_path, old_string (the text to replace), an
                 :old_string {:type :string
                              :description "The text to replace (must match the file contents exactly, including all whitespace and indentation)."}
                 :new_string {:type :string
-                             :description "The edited text to replace the old_string"}}
+                             :description "The edited text to replace the old_string"}
+                :dry_run {:type :string
+                          :enum ["diff" "new-source"]
+                          :description "Optional. Preview changes without writing: \"diff\" returns unified diff, \"new-source\" returns full modified source."}}
    :required [:file_path :old_string :new_string]})
 
 (defmethod tool-system/validate-inputs :file-edit [{:keys [nrepl-client-atom]} inputs]
@@ -65,6 +68,13 @@ To make a file edit, provide the file_path, old_string (the text to replace), an
     (when (= old_string new_string)
       (throw (ex-info "No changes to make: old_string and new_string are exactly the same."
                       {:inputs inputs})))
+
+    ;; Validate dry_run if provided
+    (let [dry_run (:dry_run inputs)]
+      (when (and (some? dry_run) (not (#{"diff" "new-source"} dry_run)))
+        (throw (ex-info (str "Invalid dry_run: " dry_run
+                             ". Supported values: diff, new-source")
+                        {:inputs inputs}))))
 
     ;; Validate path using the utility function
     (let [validated-path (valid-paths/validate-path-with-client file_path nrepl-client)]

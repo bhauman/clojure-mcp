@@ -57,7 +57,10 @@
             :replace_all {:type :boolean
                           :description
                           (format "Whether to %s all occurrences (default: false)"
-                                  (if multi-op "apply operation to" "replace"))}}
+                                  (if multi-op "apply operation to" "replace"))}
+            :dry_run {:type :string
+                      :enum ["diff" "new-source"]
+                      :description "Optional. Preview changes without writing: \"diff\" returns unified diff, \"new-source\" returns full modified source."}}
      multi-op
      (assoc :operation {:type :string
                         :enum ["replace" "insert_before" "insert_after"]
@@ -108,6 +111,10 @@
         (catch Exception e
           (throw (ex-info (str "Invalid Clojure code in new_form: " (.getMessage e))
                           {:inputs inputs})))))
+    (when (and dry_run (not (#{"diff" "new-source"} dry_run)))
+      (throw (ex-info (str "Invalid dry_run: " dry_run
+                           ". Supported values: diff, new-source")
+                      {:inputs inputs})))
     {:file_path file-path
      :match_form match_form
      :new_form new_form

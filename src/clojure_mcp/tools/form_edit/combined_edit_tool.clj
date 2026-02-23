@@ -112,7 +112,10 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
                              :enum ["replace" "insert_before" "insert_after"]
                              :description "The editing operation to perform"}
                 "content" {:type "string"
-                           :description "New content to use for the operation"}}})
+                           :description "New content to use for the operation"}
+                "dry_run" {:type "string"
+                           :enum ["diff" "new-source"]
+                           :description "Optional. Preview changes without writing: \"diff\" returns unified diff, \"new-source\" returns full modified source."}}})
 
 ;; Validate inputs implementation
 (defmethod tool-system/validate-inputs :clojure-edit-form [{:keys [nrepl-client-atom]} inputs]
@@ -134,6 +137,10 @@ Note: For `defmethod` forms, be sure to include the dispatch value (`area :recta
                       {:inputs inputs})))
     (when-not content
       (throw (ex-info "Missing required parameter: content"
+                      {:inputs inputs})))
+    (when (and dry_run (not (#{"diff" "new-source"} dry_run)))
+      (throw (ex-info (str "Invalid dry_run: " dry_run
+                           ". Supported values: diff, new-source")
                       {:inputs inputs})))
     {:file_path file-path
      :form_name form_name
