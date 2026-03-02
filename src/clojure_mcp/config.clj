@@ -144,7 +144,9 @@
                   distinct
                   vec))
       (some? (:cljfmt config))
-      (assoc :cljfmt (boolean (:cljfmt config)))
+      (assoc :cljfmt (if (= :partial (:cljfmt config))
+                       :partial
+                       (boolean (:cljfmt config))))
       (some? (:bash-over-nrepl config))
       (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config)))
       (some? (:nrepl-env-type config))
@@ -224,7 +226,12 @@
 (defn get-nrepl-user-dir [nrepl-client-map]
   (get-config nrepl-client-map :nrepl-user-dir))
 
-(defn get-cljfmt [nrepl-client-map]
+(defn get-cljfmt
+  "Returns the cljfmt setting: true (default), false, or :partial.
+   - true: full-file formatting via cljfmt after edits
+   - false: no formatting
+   - :partial: format only the replaced form in isolation, preserving surrounding formatting"
+  [nrepl-client-map]
   (let [value (get-config nrepl-client-map :cljfmt)]
     (if (nil? value)
       true ; Default to true when not specified
