@@ -42,13 +42,16 @@
 
 (s/def ::dry-run (s/nilable #{"diff" "new-source"}))
 
+(s/def ::form-col pos-int?)
+
 (s/def ::context
   (s/keys :req [::file-path]
           :opt [::source ::old-content ::new-source-code ::top-level-def-name
                 ::top-level-def-type ::edit-type ::error ::message
                 ::zloc ::offsets ::lint-result ::docstring
                 ::comment-substring ::new-content ::expand-symbols
-                ::diff ::type ::output-source ::nrepl-client-atom ::dry-run]))
+                ::diff ::type ::output-source ::nrepl-client-atom ::dry-run
+                ::form-col]))
 
 ;; Pipeline helper functions
 
@@ -229,6 +232,43 @@
                      (str error-msg suggestion-msg)
                      error-msg)}))))
 
+(defn capture-form-position
+  "Captures the column position of the found form for partial formatting.
+   Must be called after find-form, before edit-form.
+   Saves ::form-col (1-based column) to the context when position is available.
+   Leaves ::form-col absent when z/position returns nil so downstream code
+   can fall back to full-file formatting rather than mis-indenting.
+
+   Requires ::zloc in the context (pointing to the found form)."
+  [ctx]
+  (let [zloc (::zloc ctx)]
+    (if-let [pos (z/position zloc)]
+      (assoc ctx ::form-col (second pos)) ;; [row col] -> col
+      ctx))) ;; leave ::form-col absent — downstream falls back to full-file formatting
+
+(defn format-new-source-partial
+  "Formats the new source code in isolation when cljfmt is set to :partial
+   and position tracking succeeded (::form-col is present in context).
+   Formats ::new-source-code using cljfmt, then re-indents to match the
+   target column position. This is done BEFORE insertion so the formatted
+   content replaces the old form without touching the rest of the file.
+
+   When ::form-col is absent (position tracking unavailable), passes through
+   unchanged so format-source falls back to full-file formatting.
+
+   Requires ::new-source-code, ::form-col, and ::nrepl-client-atom in context."
+  [ctx]
+  (let [nrepl-client-map (some-> ctx ::nrepl-client-atom deref)
+        cljfmt-setting (config/get-cljfmt nrepl-client-map)]
+    (if (and (= :partial cljfmt-setting) (::form-col ctx))
+      (let [new-source (::new-source-code ctx)
+            target-col (::form-col ctx)
+            formatting-options (core/project-formatting-options nrepl-client-map)
+            formatted (core/format-form-in-isolation new-source target-col formatting-options)]
+        (assoc ctx ::new-source-code formatted))
+      ;; Not :partial mode, or position unavailable — pass through
+      ctx)))
+
 (defn edit-form
   "Edits the form according to the specified edit type.
    Requires ::zloc, ::top-level-def-type, ::top-level-def-name, 
@@ -269,13 +309,25 @@
   "Formats the source code using the formatter.
    If formatting fails but the source is syntactically valid,
    returns the original source unchanged.
-   
+
+   When cljfmt is :partial AND the form was already formatted in isolation
+   (indicated by ::form-col in context), skips whole-file formatting.
+   Otherwise falls back to full-file formatting (e.g., for sexp-edit-pipeline
+   which doesn't do pre-insertion partial formatting).
+
    Requires ::output-source in the context.
    Updates ::output-source with the formatted code (or unchanged if formatting fails)."
   [ctx]
   (let [nrepl-client-map (some-> ctx ::nrepl-client-atom deref)
-        cljfmt-enabled (config/get-cljfmt nrepl-client-map)]
-    (if cljfmt-enabled
+        cljfmt-setting (config/get-cljfmt nrepl-client-map)]
+    (cond
+      ;; :partial mode with pre-formatted form - skip whole-file formatting
+      ;; ::form-col presence means format-new-source-partial already ran
+      (and (= :partial cljfmt-setting) (::form-col ctx))
+      ctx
+
+      ;; true (or :partial without pre-formatting) - full-file formatting
+      cljfmt-setting
       (try
         (let [source (::output-source ctx)
               formatting-options (core/project-formatting-options nrepl-client-map)
@@ -289,7 +341,9 @@
             ;; Only propagate error if we don't have valid source
             {::error true
              ::message (str "Failed to format source: " (.getMessage e))})))
-      ;; If cljfmt is disabled, return ctx unchanged
+
+      ;; false - formatting disabled, return ctx unchanged
+      :else
       ctx)))
 
 (defn determine-file-type
@@ -425,6 +479,8 @@
      enhance-defmethod-name
      parse-source
      find-form
+     capture-form-position
+     format-new-source-partial
      edit-form
      zloc->output-source
      format-source

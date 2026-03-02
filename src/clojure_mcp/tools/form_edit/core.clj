@@ -10,7 +10,8 @@
    [rewrite-clj.node :as n]
    [rewrite-clj.parser :as p]
    [rewrite-clj.zip :as z]
-   [clojure-mcp.utils.file :as file-utils]))
+   [clojure-mcp.utils.file :as file-utils]
+   [taoensso.timbre :as log]))
 
 ;; Form identification and location functions
 
@@ -275,6 +276,52 @@
    - The formatted source code string"
   [source-str formatting-options]
   (fmt/reformat-string source-str formatting-options))
+
+;; Partial formatting helpers
+
+(defn re-indent-to-column
+  "Re-indents a formatted form string so that:
+   - The first line is unchanged (it will be placed at the correct column by rewrite-clj)
+   - Subsequent lines are indented to align with the target column position.
+
+   Arguments:
+   - form-str: The formatted form string (formatted in isolation starting at column 1)
+   - target-col: The 1-based column where the form starts in the file
+
+   Returns:
+   - The re-indented form string"
+  [form-str target-col]
+  (if (<= target-col 1)
+    form-str
+    (let [lines (str/split form-str #"\n" -1)
+          indent-str (apply str (repeat (dec target-col) " "))
+          re-indented (cons (first lines)
+                            (map (fn [line]
+                                   (if (str/blank? line)
+                                     line
+                                     (str indent-str line)))
+                                 (rest lines)))]
+      (str/join "\n" re-indented))))
+
+(defn format-form-in-isolation
+  "Formats a form string in isolation using cljfmt, then re-indents it
+   to match the target column position. This avoids reformatting the
+   entire file when only one form is being replaced.
+
+   Arguments:
+   - form-str: The form source code to format
+   - target-col: The 1-based column where the form starts in the file
+   - formatting-options: cljfmt formatting options
+
+   Returns:
+   - The formatted and re-indented form string, or the original on failure"
+  [form-str target-col formatting-options]
+  (try
+    (let [formatted (fmt/reformat-string form-str formatting-options)]
+      (re-indent-to-column formatted target-col))
+    (catch Exception e
+      (log/debug "Partial formatting failed, using original form:" (.getMessage e))
+      form-str)))
 
 ;; File operations
 

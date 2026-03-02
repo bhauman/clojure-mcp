@@ -135,8 +135,9 @@ your-project/
   - `:partial-read` - Both full and collapsed reads update timestamps (default)
   - `:full-read` - Only full reads update timestamps (safest)
   - `false` - Disables timestamp checking entirely
-- `cljfmt`: Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`)
-  - `true` - Applies cljfmt formatting to edited files (default behavior)
+- `cljfmt`: Controls cljfmt formatting in editing pipelines (default: `true`)
+  - `true` - Applies cljfmt formatting to entire file after edits (default behavior)
+  - `:partial` - Formats only the replaced/inserted form, preserving surrounding formatting
   - `false` - Disables formatting, preserving exact whitespace and formatting
 - `bash-over-nrepl`: Boolean flag to control bash command execution mode (default: `true`)
   - `true` - Execute bash commands over nREPL connection (default behavior)
