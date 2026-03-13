@@ -43,6 +43,7 @@
 (s/def ::dry-run (s/nilable #{"diff" "new-source"}))
 
 (s/def ::form-col pos-int?)
+(s/def ::pre-formatted? boolean?)
 
 (s/def ::context
   (s/keys :req [::file-path]
@@ -51,7 +52,7 @@
                 ::zloc ::offsets ::lint-result ::docstring
                 ::comment-substring ::new-content ::expand-symbols
                 ::diff ::type ::output-source ::nrepl-client-atom ::dry-run
-                ::form-col]))
+                ::form-col ::pre-formatted?]))
 
 ;; Pipeline helper functions
 
@@ -265,7 +266,9 @@
             target-col (::form-col ctx)
             formatting-options (core/project-formatting-options nrepl-client-map)
             formatted (core/format-form-in-isolation new-source target-col formatting-options)]
-        (assoc ctx ::new-source-code formatted))
+        (-> ctx
+            (assoc ::new-source-code formatted)
+            (assoc ::pre-formatted? true)))
       ;; Not :partial mode, or position unavailable — pass through
       ctx)))
 
@@ -310,8 +313,8 @@
    If formatting fails but the source is syntactically valid,
    returns the original source unchanged.
 
-   When cljfmt is :partial AND the form was already formatted in isolation
-   (indicated by ::form-col in context), skips whole-file formatting.
+   When ::pre-formatted? is true, skips whole-file formatting (the form
+   was already formatted in isolation by format-new-source-partial).
    Otherwise falls back to full-file formatting (e.g., for sexp-edit-pipeline
    which doesn't do pre-insertion partial formatting).
 
@@ -321,9 +324,8 @@
   (let [nrepl-client-map (some-> ctx ::nrepl-client-atom deref)
         cljfmt-setting (config/get-cljfmt nrepl-client-map)]
     (cond
-      ;; :partial mode with pre-formatted form - skip whole-file formatting
-      ;; ::form-col presence means format-new-source-partial already ran
-      (and (= :partial cljfmt-setting) (::form-col ctx))
+      ;; Form was already formatted in isolation - skip whole-file formatting
+      (::pre-formatted? ctx)
       ctx
 
       ;; true (or :partial without pre-formatting) - full-file formatting

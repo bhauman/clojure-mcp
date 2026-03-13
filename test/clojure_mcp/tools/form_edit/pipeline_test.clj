@@ -399,18 +399,18 @@
         (is (nil? (::sut/form-col result)))))))
 
 (deftest format-source-partial-skips-whole-file-test
-  (testing "format-source skips whole-file formatting when cljfmt is :partial"
+  (testing "format-source skips whole-file formatting when pre-formatted"
     ;; Set cljfmt to :partial
     (config/set-config! *nrepl-client-atom* :cljfmt :partial)
     (try
       ;; Source with intentional bad formatting in the ns form (should be preserved)
-      ;; ::form-col signals that format-new-source-partial already ran
+      ;; ::pre-formatted? signals that format-new-source-partial already ran
       (let [source "(ns   test.core)\n\n(defn example-fn [x y]\n  (+ x y))"
             ctx {::sut/nrepl-client-atom *nrepl-client-atom*
                  ::sut/output-source source
-                 ::sut/form-col 1}
+                 ::sut/pre-formatted? true}
             result (sut/format-source ctx)]
-        ;; With :partial + ::form-col, format-source should return the source unchanged
+        ;; With ::pre-formatted?, format-source should return the source unchanged
         (is (= source (::sut/output-source result)))
         ;; The extra spaces in ns should be preserved
         (is (str/includes? (::sut/output-source result) "(ns   test.core)")))

@@ -23,7 +23,7 @@ Controls cljfmt formatting behavior in editing pipelines (default: `true`). Dete
 
 **When to use each setting:**
 - `true` - Best for maintaining consistent code style across your project. Note: this reformats the entire file after each edit, which may introduce formatting changes to code you did not intend to modify.
-- `:partial` - Recommended for most workflows. Formats only the form being edited (fixing indentation, spacing, etc.) without touching the rest of the file. Prevents collateral formatting changes to unrelated code.
+- `:partial` - Useful when you want the edited form to be formatted but don't want to touch the rest of the file. Prevents collateral formatting changes to unrelated code.
 - `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting completely
 
 ### `:write-file-guard`
