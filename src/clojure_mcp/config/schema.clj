@@ -261,7 +261,7 @@
    ;; Core configuration
    [:allowed-directories {:optional true} [:sequential Path]]
    [:write-file-guard {:optional true} [:enum :full-read :partial-read false]]
-   [:cljfmt {:optional true} :boolean]
+   [:cljfmt {:optional true} [:or :boolean [:= :partial]]]
    [:bash-over-nrepl {:optional true} :boolean]
    [:nrepl-env-type {:optional true} [:enum :clj :bb :basilisp :scittle]]
    [:start-nrepl-cmd {:optional true} [:sequential NonBlankString]]

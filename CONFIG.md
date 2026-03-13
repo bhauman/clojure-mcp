@@ -14,15 +14,17 @@ These basic settings affect how clojure-mcp interacts with your local system.
 Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute.
 
 ### `:cljfmt`
-Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`). When disabled, file edits preserve the original formatting without applying cljfmt.
+Controls cljfmt formatting behavior in editing pipelines (default: `true`). Determines whether and how formatting is applied when editing Clojure forms.
 
 **Available values:**
-- `true` (default) - Applies cljfmt formatting to all edited files
-- `false` - Disables formatting, preserving exact whitespace and formatting
+- `true` (default) - Applies cljfmt formatting to the entire file after each edit
+- `:partial` - Formats only the replaced/inserted form in isolation, preserving surrounding formatting
+- `false` - Disables formatting entirely, preserving exact whitespace and formatting
 
 **When to use each setting:**
-- `true` - Best for maintaining consistent code style across your project
-- `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting
+- `true` - Best for maintaining consistent code style across your project. Note: this reformats the entire file after each edit, which may introduce formatting changes to code you did not intend to modify.
+- `:partial` - Recommended for most workflows. Formats only the form being edited (fixing indentation, spacing, etc.) without touching the rest of the file. Prevents collateral formatting changes to unrelated code.
+- `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting completely
 
 ### `:write-file-guard`
 Controls the file timestamp tracking behavior (default: `:partial-read`). This setting determines when file editing is allowed based on read operations.

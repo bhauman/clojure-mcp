@@ -84,7 +84,14 @@
 
   (testing "Config with all nrepl-env-type values"
     (doseq [env-type [:clj :bb :basilisp :scittle]]
-      (is (schema/valid? {:nrepl-env-type env-type})))))
+      (is (schema/valid? {:nrepl-env-type env-type}))))
+
+  (testing "Config with cljfmt :partial"
+    (is (schema/valid? {:cljfmt :partial})))
+
+  (testing "Config with all cljfmt values"
+    (doseq [v [true false :partial]]
+      (is (schema/valid? {:cljfmt v})))))
 
 ;; ==============================================================================
 ;; Invalid Configuration Tests
