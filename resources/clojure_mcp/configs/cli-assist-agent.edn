@@ -113,7 +113,7 @@ After using this tool to work around an Edit error, resume using the Edit tool f
 
 Replaces Clojure expressions in a file.
 
-This tool provides targeted replacement of Clojure expressions within forms. For complete top-level form operations, use `clojure_edit` instead.
+This tool provides targeted replacement of Clojure expressions within forms. For complete top-level form operations, use `clojure_edit_agent` instead.
 
 KEY BENEFITS:
 - Syntax-aware matching that understands Clojure code structure
