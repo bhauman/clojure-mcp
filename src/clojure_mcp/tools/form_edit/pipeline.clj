@@ -496,18 +496,29 @@
              update-file-timestamp))))))
 
 (defn edit-sexp
-  [{:keys [::zloc ::match-form ::new-form ::operation ::replace-all ::_whitespace-sensitive] :as ctx}]
+  [{:keys [::zloc ::match-form ::new-form ::operation ::replace-all ::_whitespace-sensitive ::nrepl-client-atom] :as ctx}]
   (try
-    (if-let [result (core/find-and-edit-multi-sexp
-                     zloc
-                     match-form
-                     new-form
-                     (cond-> {:operation operation}
-                       replace-all (assoc :all? true)))]
-      (-> ctx
-          (assoc ::zloc (:zloc result)))
-      {::error true
-       ::message (str "Could not find form: " match-form)})
+    (let [nrepl-client-map (some-> nrepl-client-atom deref)
+          cljfmt-setting (config/get-cljfmt nrepl-client-map)
+          ;; When partial mode, pre-format new-form at col 1 and build reindent-fn
+          [adjusted-form reindent-fn]
+          (if (and (= :partial cljfmt-setting) (not (str/blank? new-form)))
+            (let [formatting-options (core/project-formatting-options nrepl-client-map)
+                  formatted (core/format-form-in-isolation new-form 1 formatting-options)]
+              [formatted (fn [form-str col] (core/re-indent-to-column form-str col))])
+            [new-form nil])]
+      (if-let [result (core/find-and-edit-multi-sexp
+                       zloc
+                       match-form
+                       adjusted-form
+                       (cond-> {:operation operation}
+                         replace-all (assoc :all? true)
+                         reindent-fn (assoc :reindent-fn reindent-fn)))]
+        (-> ctx
+            (assoc ::zloc (:zloc result))
+            (cond-> reindent-fn (assoc ::pre-formatted? true)))
+        {::error true
+         ::message (str "Could not find form: " match-form)}))
     (catch Exception e
       {::error true
        ::message (str "Error editing form: " (.getMessage e))})))

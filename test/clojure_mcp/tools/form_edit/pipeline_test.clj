@@ -510,13 +510,14 @@
       ;; Cleanup
       (test-utils/clean-test-dir test-dir))))
 
-(deftest sexp-edit-pipeline-partial-fallback-test
-  (testing "sexp-edit-pipeline falls back to full-file formatting when cljfmt is :partial"
+(deftest sexp-edit-pipeline-partial-test
+  (testing "sexp-edit-pipeline uses partial formatting, preserving surrounding code"
     ;; Set cljfmt to :partial
     (config/set-config! *nrepl-client-atom* :cljfmt :partial)
     (try
       (let [test-dir (test-utils/create-test-dir)
-            content (str "(ns test.core)\n\n"
+            ;; File with quirky formatting in ns that full-file cljfmt would fix
+            content (str "(ns   test.core)\n\n"
                          "(defn example-fn [x y]\n  (+   x   y))\n")
             file-path (test-utils/create-and-register-test-file
                        *nrepl-client-atom* test-dir "sexp_partial.clj" content)
@@ -536,10 +537,438 @@
         ;; The replacement should be present
         (is (str/includes? file-content "(* x y)")
             "Replacement form should be present")
-        ;; Full-file formatting should still run (fallback behavior)
-        ;; so the file should be properly formatted
+        ;; The surrounding code should still be properly structured
         (is (str/includes? file-content "(defn example-fn [x y]")
-            "File should be formatted by full-file cljfmt fallback")
+            "Surrounding defn should be intact")
+        ;; The quirky ns formatting should be PRESERVED (not reformatted)
+        (is (str/includes? file-content "(ns   test.core)")
+            "Surrounding ns form formatting should be preserved with :partial")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-pipeline-partial-formatting-test
+  (testing "partial formatting formats the replaced sexp, preserving surrounding code"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            quirky-content (str "(ns   test.core)\n\n"
+                                "(defn example-fn\n  [x y]\n  (+ x y))\n\n"
+                                "(def   a     1)\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "sexp_replace.clj" quirky-content)
+            ;; Replace (+ x y) with badly-formatted version — should get cleaned up
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x y)"
+                             "(*   x   y)"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; The replaced sexp should be formatted (extra spaces fixed)
+        (is (str/includes? file-content "(* x y)")
+            "Replaced sexp should be formatted")
+        ;; The ns form's quirky formatting should be PRESERVED
+        (is (str/includes? file-content "(ns   test.core)")
+            "Surrounding ns form formatting should be preserved with :partial")
+        ;; The def's quirky formatting should also be PRESERVED
+        (is (str/includes? file-content "(def   a     1)")
+            "Surrounding def formatting should be preserved with :partial")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-pipeline-full-formatting-test
+  (testing "full formatting (cljfmt true) reformats the entire file via sexp pipeline"
+    (config/set-config! *nrepl-client-atom* :cljfmt true)
+    (let [test-dir (test-utils/create-test-dir)
+          quirky-content (str "(ns   test.core)\n\n"
+                              "(defn example-fn\n  [x y]\n  (+ x y))\n\n"
+                              "(def   a     1)\n")
+          file-path (test-utils/create-and-register-test-file
+                     *nrepl-client-atom* test-dir "sexp_full.clj" quirky-content)
+          pipeline-result (sut/sexp-edit-pipeline
+                           file-path
+                           "(+ x y)"
+                           "(* x y)"
+                           :replace
+                           false
+                           false
+                           nil
+                           {:nrepl-client-atom *nrepl-client-atom*})
+          result (sut/format-result pipeline-result)
+          file-content (slurp file-path)]
+      (is (false? (:error result))
+          (str "Pipeline error: " (:message result)))
+      ;; With full formatting, the ns form's extra spaces should be removed
+      (is (not (str/includes? file-content "(ns   test.core)"))
+          "Full formatting should fix ns form spacing")
+      (is (str/includes? file-content "(ns test.core)")
+          "Full formatting should normalize ns form")
+      ;; Cleanup
+      (test-utils/clean-test-dir test-dir))))
+
+(deftest sexp-edit-pipeline-partial-before-test
+  (testing "partial formatting with :insert-before preserves surrounding formatting"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            quirky-content (str "(ns   test.core)\n\n"
+                                "(defn example-fn\n  [x y]\n  (+ x y))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "sexp_before.clj" quirky-content)
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(defn example-fn [x y] (+ x y))"
+                             "(defn   helper-fn   [z]\n  (inc z))"
+                             :insert-before
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; The inserted form should be formatted (extra spaces fixed)
+        (is (str/includes? file-content "(defn helper-fn [z]")
+            "Inserted form should be formatted")
+        ;; The ns form's quirky formatting should be PRESERVED
+        (is (str/includes? file-content "(ns   test.core)")
+            "Surrounding ns form formatting should be preserved with :partial")
+        ;; Original function should still be present
+        (is (str/includes? file-content "(defn example-fn")
+            "Original form should still exist")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-pipeline-partial-after-test
+  (testing "partial formatting with :insert-after preserves surrounding formatting"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            quirky-content (str "(ns   test.core)\n\n"
+                                "(defn example-fn\n  [x y]\n  (+ x y))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "sexp_after.clj" quirky-content)
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(defn example-fn [x y] (+ x y))"
+                             "(defn   helper-fn   [z]\n  (inc z))"
+                             :insert-after
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; The inserted form should be formatted (extra spaces fixed)
+        (is (str/includes? file-content "(defn helper-fn [z]")
+            "Inserted form should be formatted")
+        ;; The ns form's quirky formatting should be PRESERVED
+        (is (str/includes? file-content "(ns   test.core)")
+            "Surrounding ns form formatting should be preserved with :partial")
+        ;; Original function should still be present
+        (is (str/includes? file-content "(defn example-fn")
+            "Original form should still exist")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-pipeline-partial-replace-all-test
+  (testing "partial formatting with replace-all formats each replacement at its position"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            ;; File with the same sexp at two different nesting levels
+            content (str "(ns   test.core)\n\n"
+                         "(def   a     (inc 1))\n\n"
+                         "(defn example-fn [x]\n  (inc 1))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "sexp_replace_all.clj" content)
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(inc 1)"
+                             "(+   1   1)"
+                             :replace
+                             true
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; Both occurrences should be replaced and formatted
+        (is (not (str/includes? file-content "(inc 1)"))
+            "All occurrences of (inc 1) should be replaced")
+        (is (str/includes? file-content "(+ 1 1)")
+            "Replacements should be formatted (extra spaces removed)")
+        ;; Quirky ns formatting should be PRESERVED
+        (is (str/includes? file-content "(ns   test.core)")
+            "Surrounding ns form formatting should be preserved")
+        ;; Quirky def formatting should be PRESERVED
+        (is (str/includes? file-content "(def   a")
+            "Surrounding def formatting should be preserved")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+;; E2E test reproducing issue #154 via sexp pipeline
+(deftest issue-154-sexp-e2e-test
+  (testing "issue #154 via sexp: replacing bar should NOT change alignment in unrelated defs"
+    (let [issue-content (str "(ns example.core)\n\n"
+                             "(def ob-yes-heavy\n"
+                             "  {:orderbook {:yes [[60 200] [55 150]]\n"
+                             "               :no  [[40 80]  [35 60]]}})\n\n"
+                             "(def ob-empty-no  {:orderbook {:yes [[60 100]] :no []}})\n"
+                             "(def ob-empty     {:orderbook {:yes [] :no []}})\n\n"
+                             "(defn foo [x] (+ x 1))\n\n"
+                             "(defn bar [x] (+ x 2))\n")]
+
+      ;; Test with :partial — only bar should change
+      (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+      (try
+        (let [test-dir (test-utils/create-test-dir)
+              file-path (test-utils/create-and-register-test-file
+                         *nrepl-client-atom* test-dir "issue154_sexp.clj" issue-content)
+              pipeline-result (sut/sexp-edit-pipeline
+                               file-path
+                               "(defn bar [x] (+ x 2))"
+                               "(defn bar [x] (+ x 3))"
+                               :replace
+                               false
+                               false
+                               nil
+                               {:nrepl-client-atom *nrepl-client-atom*})
+              result (sut/format-result pipeline-result)
+              file-content (slurp file-path)]
+          (is (false? (:error result))
+              (str "Pipeline error: " (:message result)))
+          ;; The replaced form should have the new implementation
+          (is (str/includes? file-content "(defn bar [x] (+ x 3))")
+              "bar should have new implementation")
+          ;; Alignment spacing in unrelated defs must be PRESERVED
+          (is (str/includes? file-content ":no  [[40 80]  [35 60]]")
+              "Alignment in ob-yes-heavy :no should be preserved")
+          (is (str/includes? file-content "(def ob-empty-no  {:orderbook")
+              "Double space after ob-empty-no should be preserved")
+          (is (str/includes? file-content "(def ob-empty     {:orderbook")
+              "Alignment spaces in ob-empty should be preserved")
+          ;; foo should be completely untouched
+          (is (str/includes? file-content "(defn foo [x] (+ x 1))")
+              "foo should be untouched")
+          ;; ns should be untouched
+          (is (str/includes? file-content "(ns example.core)")
+              "ns should be untouched")
+          ;; Cleanup
+          (test-utils/clean-test-dir test-dir))
+        (finally
+          (config/set-config! *nrepl-client-atom* :cljfmt true))))))
+
+;; Sub-expression partial formatting tests
+
+(deftest sexp-edit-partial-nested-replace-test
+  (testing "partial formatting replaces nested sexp and preserves surrounding formatting"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            content (str "(ns   test.core)\n\n"
+                         "(def   a     1)\n\n"
+                         "(defn example-fn [x y]\n  (+ x y))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "nested_replace.clj" content)
+            ;; Replace the nested (+ x y) with badly-formatted sexp
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x y)"
+                             "(*   x   y)"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; Replacement should be formatted
+        (is (str/includes? file-content "(* x y)")
+            "Nested replacement should be formatted")
+        ;; Surrounding quirky formatting preserved
+        (is (str/includes? file-content "(ns   test.core)")
+            "ns formatting should be preserved")
+        (is (str/includes? file-content "(def   a     1)")
+            "def formatting should be preserved")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-partial-multi-form-replace-test
+  (testing "partial formatting replaces sexp with multiple forms"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            content (str "(ns   test.core)\n\n"
+                         "(def   a     1)\n\n"
+                         "(defn example-fn [x y]\n  (+ x y))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "multi_form.clj" content)
+            ;; Replace nested (+ x y) with two forms
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x y)"
+                             "(+ 1 2)\n(+ 3 4)"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; Both replacement forms should be present
+        (is (str/includes? file-content "(+ 1 2)")
+            "First replacement form should be present")
+        (is (str/includes? file-content "(+ 3 4)")
+            "Second replacement form should be present")
+        ;; Surrounding quirky formatting preserved
+        (is (str/includes? file-content "(ns   test.core)")
+            "ns formatting should be preserved")
+        (is (str/includes? file-content "(def   a     1)")
+            "def formatting should be preserved")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-partial-multi-form-badly-formatted-test
+  (testing "partial formatting formats each form in a multi-form replacement"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            content (str "(ns   test.core)\n\n"
+                         "(defn example-fn [x y]\n  (+ x y))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "multi_form_fmt.clj" content)
+            ;; Replace with badly formatted multi-form
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x y)"
+                             "(+   1   2)\n(*   3   4)"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; Both forms should be formatted (extra spaces removed)
+        (is (str/includes? file-content "(+ 1 2)")
+            "First form should be formatted")
+        (is (str/includes? file-content "(* 3 4)")
+            "Second form should be formatted")
+        ;; Surrounding quirky ns preserved
+        (is (str/includes? file-content "(ns   test.core)")
+            "ns formatting should be preserved")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-partial-deeply-nested-test
+  (testing "partial formatting works on deeply nested sexps"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            content (str "(ns   test.core)\n\n"
+                         "(defn example-fn [x]\n"
+                         "  (let [a 1]\n"
+                         "    (if (pos? a)\n"
+                         "      (+ x a)\n"
+                         "      (- x a))))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "deeply_nested.clj" content)
+            ;; Replace deeply nested (+ x a) with multi-line let
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x a)"
+                             "(let [b   (*   x   2)]\n  (+   b   a))"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; Replacement should be formatted
+        (is (str/includes? file-content "(let [b (* x 2)]")
+            "Replacement let form should be formatted")
+        (is (str/includes? file-content "(+ b a)")
+            "Replacement body should be formatted")
+        ;; Surrounding quirky ns preserved
+        (is (str/includes? file-content "(ns   test.core)")
+            "ns formatting should be preserved")
+        ;; Rest of the defn should be intact
+        (is (str/includes? file-content "(- x a)")
+            "Other branch should be untouched")
+        ;; Cleanup
+        (test-utils/clean-test-dir test-dir))
+      (finally
+        (config/set-config! *nrepl-client-atom* :cljfmt true)))))
+
+(deftest sexp-edit-partial-multi-line-at-column-test
+  (testing "partial formatting re-indents multi-line replacement to match target column"
+    (config/set-config! *nrepl-client-atom* :cljfmt :partial)
+    (try
+      (let [test-dir (test-utils/create-test-dir)
+            content (str "(ns   test.core)\n\n"
+                         "(defn example-fn [x]\n"
+                         "  (+ x 1))\n")
+            file-path (test-utils/create-and-register-test-file
+                       *nrepl-client-atom* test-dir "multi_line_col.clj" content)
+            ;; Replace (+ x 1) with a multi-line let form
+            pipeline-result (sut/sexp-edit-pipeline
+                             file-path
+                             "(+ x 1)"
+                             "(let [a 1\n      b 2]\n  (+ a b x))"
+                             :replace
+                             false
+                             false
+                             nil
+                             {:nrepl-client-atom *nrepl-client-atom*})
+            result (sut/format-result pipeline-result)
+            file-content (slurp file-path)]
+        (is (false? (:error result))
+            (str "Pipeline error: " (:message result)))
+        ;; The let form should be present and properly indented inside defn
+        (is (str/includes? file-content "(let [a 1")
+            "let form should be present")
+        (is (str/includes? file-content "(+ a b x)")
+            "let body should be present")
+        ;; Surrounding quirky ns preserved
+        (is (str/includes? file-content "(ns   test.core)")
+            "ns formatting should be preserved")
         ;; Cleanup
         (test-utils/clean-test-dir test-dir))
       (finally

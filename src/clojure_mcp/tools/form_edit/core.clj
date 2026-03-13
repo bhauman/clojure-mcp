@@ -580,36 +580,48 @@
        (filter #(match-multi-sexp match-sexprs %))
        first))
 
-(defn find-and-edit-one-multi-sexp [zloc operation match-form new-form]
-  {:pre [(#{:insert-before :insert-after :replace} operation) zloc (string? match-form) (string? new-form)]}
-  ;; no-op
-  (when-not (and (str/blank? new-form) (#{:insert-before :insert-after} operation))
-    (let [new-node (when-not (str/blank? new-form) (p/parse-string-all new-form))
-          match-sexprs (str-forms->sexps match-form)]
-      (when-let [found-loc (find-multi-sexp zloc match-sexprs)]
-        (condp = operation
-          :insert-before (insert-before-multi found-loc match-sexprs new-node)
-          :insert-after (insert-after-multi found-loc match-sexprs new-node)
-          (replace-multi found-loc match-sexprs new-form))))))
+(defn find-and-edit-one-multi-sexp
+  ([zloc operation match-form new-form]
+   (find-and-edit-one-multi-sexp zloc operation match-form new-form nil))
+  ([zloc operation match-form new-form reindent-fn]
+   {:pre [(#{:insert-before :insert-after :replace} operation) zloc (string? match-form) (string? new-form)]}
+   ;; no-op
+   (when-not (and (str/blank? new-form) (#{:insert-before :insert-after} operation))
+     (let [match-sexprs (str-forms->sexps match-form)]
+       (when-let [found-loc (find-multi-sexp zloc match-sexprs)]
+         (let [adjusted-form (if reindent-fn
+                               (if-let [col (some-> (z/position found-loc) second)]
+                                 (reindent-fn new-form col)
+                                 new-form)
+                               new-form)
+               new-node (when-not (str/blank? adjusted-form)
+                          (p/parse-string-all adjusted-form))]
+           (condp = operation
+             :insert-before (insert-before-multi found-loc match-sexprs new-node)
+             :insert-after (insert-after-multi found-loc match-sexprs new-node)
+             (replace-multi found-loc match-sexprs adjusted-form))))))))
 
-(defn find-and-edit-all-multi-sexp [zloc operation match-form new-form]
-  {:pre [(#{:insert-before :insert-after :replace} operation) zloc (string? match-form) (string? new-form)]}
-  (when-not (and (str/blank? new-form) (#{:insert-before :insert-after} operation))
-    (loop [loc zloc
-           locations []]
-      (if-let [{:keys [after-loc edit-span-loc]}
-               (find-and-edit-one-multi-sexp loc operation match-form new-form)]
-        (recur after-loc (conj locations edit-span-loc))
-        (when-not (empty? locations)
-          ;; this is a location after the last match
-          ;; z/root-string on this will produce the final edited form
-          {:zloc loc
-           :locations locations})))))
+(defn find-and-edit-all-multi-sexp
+  ([zloc operation match-form new-form]
+   (find-and-edit-all-multi-sexp zloc operation match-form new-form nil))
+  ([zloc operation match-form new-form reindent-fn]
+   {:pre [(#{:insert-before :insert-after :replace} operation) zloc (string? match-form) (string? new-form)]}
+   (when-not (and (str/blank? new-form) (#{:insert-before :insert-after} operation))
+     (loop [loc zloc
+            locations []]
+       (if-let [{:keys [after-loc edit-span-loc]}
+                (find-and-edit-one-multi-sexp loc operation match-form new-form reindent-fn)]
+         (recur after-loc (conj locations edit-span-loc))
+         (when-not (empty? locations)
+           ;; this is a location after the last match
+           ;; z/root-string on this will produce the final edited form
+           {:zloc loc
+            :locations locations}))))))
 
-(defn find-and-edit-multi-sexp* [zloc match-form new-form {:keys [operation all?]}]
+(defn find-and-edit-multi-sexp* [zloc match-form new-form {:keys [operation all? reindent-fn]}]
   (if all?
-    (find-and-edit-all-multi-sexp zloc operation match-form new-form)
-    (when-let [{:keys [after-loc edit-span-loc]} (find-and-edit-one-multi-sexp zloc operation match-form new-form)]
+    (find-and-edit-all-multi-sexp zloc operation match-form new-form reindent-fn)
+    (when-let [{:keys [after-loc edit-span-loc]} (find-and-edit-one-multi-sexp zloc operation match-form new-form reindent-fn)]
       ;; this is a location after the last match
       ;; z/root-string on this will produce the final edited form
       {:zloc after-loc
