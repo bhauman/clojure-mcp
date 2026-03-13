@@ -1,6 +1,6 @@
 # Clojure MCP: REPL-Driven Development with AI Assistance
 
-ClojureMCP is an MCP server Clojure!
+ClojureMCP is an MCP server for Clojure!
 
 ## Table of Contents
 
