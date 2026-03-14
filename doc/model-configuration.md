@@ -230,14 +230,16 @@ If a model key is not found in your custom configuration, the system automatical
 
 ## Built-in Models
 
-The system includes 21 pre-configured models that can be used without configuration:
+The system includes 44 pre-configured models that can be used without configuration:
 
 ### OpenAI
 - `:openai/gpt-4o`
-- `:openai/gpt-4-1`
-- `:openai/gpt-4-1-mini`
-- `:openai/gpt-4-1-nano`
-- `:openai/o1`, `:openai/o1-mini`
+- `:openai/gpt-4-1`, `:openai/gpt-4-1-mini`, `:openai/gpt-4-1-nano`
+- `:openai/gpt-5`, `:openai/gpt-5-mini`, `:openai/gpt-5-nano`, `:openai/gpt-5-pro`, `:openai/gpt-5-codex`
+- `:openai/gpt-5-1`, `:openai/gpt-5-1-codex`, `:openai/gpt-5-1-codex-max`, `:openai/gpt-5-1-codex-mini`
+- `:openai/gpt-5-2`, `:openai/gpt-5-2-pro`, `:openai/gpt-5-2-codex`
+- `:openai/gpt-5-4`, `:openai/gpt-5-4-pro`
+- `:openai/o1`, `:openai/o1-mini`, `:openai/o1-pro`
 - `:openai/o3`, `:openai/o3-mini`, `:openai/o3-pro`
 - `:openai/o4-mini`, `:openai/o4-mini-reasoning`
 
@@ -249,11 +251,13 @@ The system includes 21 pre-configured models that can be used without configurat
 - `:google/gemini-2-5-pro-reasoning`
 
 ### Anthropic
-- `:anthropic/claude-opus-4`
-- `:anthropic/claude-opus-4-reasoning`
-- `:anthropic/claude-3-5-haiku`
-- `:anthropic/claude-sonnet-4`
-- `:anthropic/claude-sonnet-4-reasoning`
+- `:anthropic/claude-opus-4-6`, `:anthropic/claude-opus-4-6-reasoning`
+- `:anthropic/claude-sonnet-4-6`, `:anthropic/claude-sonnet-4-6-reasoning`
+- `:anthropic/claude-opus-4-1`, `:anthropic/claude-opus-4-1-reasoning`
+- `:anthropic/claude-opus-4`, `:anthropic/claude-opus-4-reasoning`
+- `:anthropic/claude-sonnet-4-5`, `:anthropic/claude-sonnet-4-5-reasoning`
+- `:anthropic/claude-sonnet-4`, `:anthropic/claude-sonnet-4-reasoning`
+- `:anthropic/claude-haiku-4-5`
 
 ## API Keys
 

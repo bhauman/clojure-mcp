@@ -55,17 +55,72 @@
 
    :openai/gpt-5
    (merge model-base
-          {:model-name "gpt-5-2025-08-07"
+          {:model-name "gpt-5"
            :thinking {:effort :medium}})
 
    :openai/gpt-5-mini
    (merge model-base
-          {:model-name "gpt-5-mini-2025-08-07"
+          {:model-name "gpt-5-mini"
            :thinking {:effort :medium}})
 
    :openai/gpt-5-nano
    (merge model-base
-          {:model-name "gpt-5-nano-2025-08-07"
+          {:model-name "gpt-5-nano"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-pro
+   (merge model-base
+          {:model-name "gpt-5-pro"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-codex
+   (merge model-base
+          {:model-name "gpt-5-codex"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-1
+   (merge model-base
+          {:model-name "gpt-5.1"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-1-codex
+   (merge model-base
+          {:model-name "gpt-5.1-codex"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-1-codex-max
+   (merge model-base
+          {:model-name "gpt-5.1-codex-max"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-1-codex-mini
+   (merge model-base
+          {:model-name "gpt-5.1-codex-mini"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-2
+   (merge model-base
+          {:model-name "gpt-5.2"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-2-pro
+   (merge model-base
+          {:model-name "gpt-5.2-pro"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-2-codex
+   (merge model-base
+          {:model-name "gpt-5.2-codex"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-4
+   (merge model-base
+          {:model-name "gpt-5.4"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-4-pro
+   (merge model-base
+          {:model-name "gpt-5.4-pro"
            :thinking {:effort :medium}})
 
    :openai/o1
@@ -76,6 +131,11 @@
    :openai/o1-mini
    (merge reasoning-model-base
           {:model-name "o1-mini"
+           :thinking {:effort :medium}})
+
+   :openai/o1-pro
+   (merge reasoning-model-base
+          {:model-name "o1-pro"
            :thinking {:effort :medium}})
 
    :openai/o3
@@ -90,7 +150,7 @@
 
    :openai/o3-pro
    (merge reasoning-model-base
-          {:model-name "o3-pro-2025-06-10"
+          {:model-name "o3-pro"
            :thinking {:effort :medium}})
 
    :openai/o4-mini
@@ -146,10 +206,30 @@
            :thinking (merge thinking-base
                             {:budget-tokens 4096})})
 
-   :anthropic/claude-3-5-haiku
+   :anthropic/claude-opus-4-6
    (merge model-base
-          {:model-name AnthropicChatModelName/CLAUDE_3_5_HAIKU_20241022
-           :max-tokens 2048}) ; Haiku has lower default max tokens
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_6})
+
+   :anthropic/claude-opus-4-6-reasoning
+   (merge reasoning-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_6
+           :thinking (merge thinking-base
+                            {:budget-tokens 4096})})
+
+   :anthropic/claude-sonnet-4-6
+   (merge model-base
+          {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_6})
+
+   :anthropic/claude-sonnet-4-6-reasoning
+   (merge reasoning-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_6
+           :thinking (merge thinking-base
+                            {:budget-tokens 4096})})
+
+   :anthropic/claude-haiku-4-5
+   (merge model-base
+          {:model-name AnthropicChatModelName/CLAUDE_HAIKU_4_5_20251001
+           :max-tokens 2048})
 
    :anthropic/claude-sonnet-4
    (merge model-base
@@ -170,6 +250,51 @@
           {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_5_20250929
            :thinking (merge thinking-base
                             {:budget-tokens 4096})})})
+
+(def model-aliases
+  "Short aliases for commonly used models. Aliases are unnamespaced keywords
+   that resolve to full model keys."
+  {;; Anthropic aliases
+   :sonnet    :anthropic/claude-sonnet-4-6
+   :opus      :anthropic/claude-opus-4-6
+   :haiku     :anthropic/claude-haiku-4-5
+   :sonnet-4-6 :anthropic/claude-sonnet-4-6
+   :opus-4-6  :anthropic/claude-opus-4-6
+   :sonnet-4-5 :anthropic/claude-sonnet-4-5
+   :opus-4-1  :anthropic/claude-opus-4-1
+   :opus-4    :anthropic/claude-opus-4
+   :sonnet-4  :anthropic/claude-sonnet-4
+   ;; Anthropic reasoning aliases
+   :sonnet-reasoning  :anthropic/claude-sonnet-4-6-reasoning
+   :opus-reasoning    :anthropic/claude-opus-4-6-reasoning
+   ;; Google aliases
+   :flash     :google/gemini-2-5-flash
+   :flash-lite :google/gemini-2-5-flash-lite
+   :gemini-pro :google/gemini-2-5-pro
+   :flash-reasoning  :google/gemini-2-5-flash-reasoning
+   :gemini-pro-reasoning :google/gemini-2-5-pro-reasoning
+   ;; OpenAI aliases
+   :gpt-5-4   :openai/gpt-5-4
+   :gpt-5-4-pro :openai/gpt-5-4-pro
+   :gpt-5-2   :openai/gpt-5-2
+   :gpt-5-1   :openai/gpt-5-1
+   :gpt-5     :openai/gpt-5
+   :o4-mini   :openai/o4-mini
+   :o3        :openai/o3
+   :o3-pro    :openai/o3-pro
+   ;; Codex aliases
+   :codex     :openai/gpt-5-4-pro
+   :gpt-5-1-codex :openai/gpt-5-1-codex
+   :gpt-5-1-codex-max :openai/gpt-5-1-codex-max
+   :gpt-5-2-codex :openai/gpt-5-2-codex})
+
+(defn resolve-model-alias
+  "Resolves a model key, checking aliases for unnamespaced keywords.
+   Returns the resolved key (which may be the same as the input)."
+  [model-key]
+  (if (and (keyword? model-key) (nil? (namespace model-key)))
+    (get model-aliases model-key model-key)
+    model-key))
 
 (defn get-provider [model-key]
   (-> model-key namespace keyword))
@@ -405,7 +530,8 @@
   ([model-key config-overrides]
    (create-model-builder model-key config-overrides {:validate? true}))
   ([model-key config-overrides {:keys [validate?] :or {validate? true}}]
-   (let [;; Resolve env refs in config overrides
+   (let [model-key (resolve-model-alias model-key)
+         ;; Resolve env refs in config overrides
          resolved-overrides (resolve-env-refs config-overrides)
          base-config (merge-with-defaults model-key resolved-overrides)
          config (-> base-config
@@ -499,7 +625,8 @@
   ([nrepl-client-map model-key config-overrides]
    (create-model-builder-from-config nrepl-client-map model-key config-overrides {:validate? true}))
   ([nrepl-client-map model-key config-overrides {:keys [validate?] :or {validate? true} :as _options}]
-   (let [user-models (config/get-models nrepl-client-map)
+   (let [model-key (resolve-model-alias model-key)
+         user-models (config/get-models nrepl-client-map)
          ;; Look in user config first, then defaults
          base-config (or (get user-models model-key)
                          (get default-configs model-key))

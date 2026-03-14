@@ -20,8 +20,23 @@
       (is (contains? (set models) :openai/gpt-4-1))
       (is (contains? (set models) :openai/gpt-4-1-mini))
       (is (contains? (set models) :openai/gpt-4-1-nano))
+      (is (contains? (set models) :openai/gpt-5))
+      (is (contains? (set models) :openai/gpt-5-mini))
+      (is (contains? (set models) :openai/gpt-5-nano))
+      (is (contains? (set models) :openai/gpt-5-pro))
+      (is (contains? (set models) :openai/gpt-5-codex))
+      (is (contains? (set models) :openai/gpt-5-1))
+      (is (contains? (set models) :openai/gpt-5-1-codex))
+      (is (contains? (set models) :openai/gpt-5-1-codex-max))
+      (is (contains? (set models) :openai/gpt-5-1-codex-mini))
+      (is (contains? (set models) :openai/gpt-5-2))
+      (is (contains? (set models) :openai/gpt-5-2-pro))
+      (is (contains? (set models) :openai/gpt-5-2-codex))
+      (is (contains? (set models) :openai/gpt-5-4))
+      (is (contains? (set models) :openai/gpt-5-4-pro))
       (is (contains? (set models) :openai/o1))
       (is (contains? (set models) :openai/o1-mini))
+      (is (contains? (set models) :openai/o1-pro))
       (is (contains? (set models) :openai/o3))
       (is (contains? (set models) :openai/o3-mini))
       (is (contains? (set models) :openai/o3-pro))
@@ -36,10 +51,18 @@
       ;; Anthropic models
       (is (contains? (set models) :anthropic/claude-opus-4))
       (is (contains? (set models) :anthropic/claude-opus-4-reasoning))
-      (is (contains? (set models) :anthropic/claude-3-5-haiku))
+      (is (contains? (set models) :anthropic/claude-opus-4-1))
+      (is (contains? (set models) :anthropic/claude-opus-4-1-reasoning))
+      (is (contains? (set models) :anthropic/claude-opus-4-6))
+      (is (contains? (set models) :anthropic/claude-opus-4-6-reasoning))
       (is (contains? (set models) :anthropic/claude-sonnet-4))
       (is (contains? (set models) :anthropic/claude-sonnet-4-reasoning))
-      (is (= 28 (count models))))))
+      (is (contains? (set models) :anthropic/claude-sonnet-4-5))
+      (is (contains? (set models) :anthropic/claude-sonnet-4-5-reasoning))
+      (is (contains? (set models) :anthropic/claude-sonnet-4-6))
+      (is (contains? (set models) :anthropic/claude-sonnet-4-6-reasoning))
+      (is (contains? (set models) :anthropic/claude-haiku-4-5))
+      (is (= 44 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"
@@ -96,7 +119,7 @@
 
   (testing "New Anthropic models"
     (let [opus (model/create-model-builder :anthropic/claude-opus-4 {})
-          haiku (model/create-model-builder :anthropic/claude-3-5-haiku {})]
+          haiku (model/create-model-builder :anthropic/claude-haiku-4-5 {})]
       (is (instance? AnthropicChatModel$AnthropicChatModelBuilder opus))
       (is (instance? AnthropicChatModel$AnthropicChatModelBuilder haiku))))
 
@@ -107,7 +130,7 @@
       (is (= :medium (get-in o3-pro-config [:thinking :effort])))))
 
   (testing "Haiku has lower max tokens"
-    (let [haiku-config (model/merge-with-defaults :anthropic/claude-3-5-haiku {})]
+    (let [haiku-config (model/merge-with-defaults :anthropic/claude-haiku-4-5 {})]
       (is (= 2048 (:max-tokens haiku-config)))))
 
   (testing "Opus reasoning has budget tokens configured"
