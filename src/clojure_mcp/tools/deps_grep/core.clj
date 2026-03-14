@@ -69,22 +69,30 @@
       (when (.exists sources-file)
         sources-path))))
 
-(defn needs-java-sources?
-  "Check if the search options indicate we're looking for Java files."
-  [{:keys [type glob]}]
-  (or (= "java" type)
-      (and glob (re-find #"\.java" glob))))
+(def ^:private binary-extensions
+  "File extensions that are binary and should never be searched."
+  #{".class" ".jar" ".war" ".ear"
+    ".png" ".jpg" ".jpeg" ".gif" ".ico" ".bmp" ".svg" ".webp"
+    ".so" ".dll" ".dylib" ".o" ".a"
+    ".zip" ".gz" ".tar" ".bz2" ".xz"
+    ".ttf" ".otf" ".woff" ".woff2"
+    ".pdf" ".doc" ".docx"})
+
+(defn binary-entry?
+  "Returns true if a jar entry path has a known binary extension."
+  [entry-path]
+  (some #(str/ends-with? (str/lower-case entry-path) %) binary-extensions))
 
 (defn get-jars-with-sources
   "Given a list of jars and search opts, return jars plus any available sources jars.
-   When searching for Java files, downloads missing sources from Maven Central."
+   When type is \"java\", downloads missing sources from Maven Central."
   [jars opts]
   (let [;; First find sources jars already in Maven cache
         existing-sources (->> jars
                               (keep find-sources-jar)
                               (remove (set jars)))]
-    (if (needs-java-sources? opts)
-      ;; For Java searches, also download missing sources
+    (if (= "java" (:type opts))
+      ;; For Java ecosystem jars, download source jars to get searchable text
       (let [jars-with-sources (set (map #(str/replace % #"-sources\.jar$" ".jar")
                                         existing-sources))
             jars-missing-sources (remove jars-with-sources jars)
@@ -92,7 +100,7 @@
             downloaded-sources (deps-sources/ensure-sources-jars! jars-missing-sources)]
         (log/debug "Downloaded" (count downloaded-sources) "sources jars")
         (into (vec jars) (concat existing-sources downloaded-sources)))
-      ;; For non-Java searches, just use existing sources
+      ;; For Clojure ecosystem jars, source is in the jar already
       (into (vec jars) existing-sources))))
 
 (defn parse-library-filter
@@ -153,19 +161,14 @@
                                            (str "(" (str/replace alts "," "|") ")"))))]
       (boolean (re-find (re-pattern (str pattern-regex "$")) path)))))
 
-(defn type-to-glob
-  "Convert a file type (like 'clj') to a glob pattern."
-  [type-str]
-  (when type-str
-    (str "*." type-str)))
-
 (defn filter-entries
-  "Filter jar entries by glob and/or type patterns."
-  [entries {:keys [glob type]}]
-  (let [effective-glob (or glob (type-to-glob type))]
-    (if effective-glob
-      (filter #(glob-matches? effective-glob %) entries)
-      entries)))
+  "Filter jar entries, removing binary files and applying optional glob pattern.
+   Binary extensions (.class, images, native libs, etc.) are always excluded."
+  [entries {:keys [glob]}]
+  (let [text-entries (remove binary-entry? entries)]
+    (if glob
+      (filter #(glob-matches? glob %) text-entries)
+      text-entries)))
 
 (defn search-jar-entry-rg
   "Search using ripgrep. Reads jar entry via Java, pipes content to rg via stdin.
@@ -242,8 +245,10 @@
    - pattern: Regex pattern to search for
    - opts: Map of options
      :library - Required. Maven group or group/artifact to search
-     :glob - Filter files by glob pattern (e.g., \"*.clj\")
-     :type - Filter files by type (e.g., \"clj\", \"java\")
+     :type - Required. Jar ecosystem type: \"clj\" or \"java\"
+             \"clj\" searches the jar directly (source is in the jar)
+             \"java\" downloads source jars from Maven Central
+     :glob - Optional. Filter files by glob pattern (e.g., \"*.java\")
      :output-mode - :content, :files-with-matches, or :count
      :case-insensitive - Case insensitive search
      :line-numbers - Include line numbers (default true for content mode)
@@ -263,7 +268,7 @@
       (if-not base-jars
         {:error "Failed to resolve classpath. Is this a deps.edn project?"}
         (let [library (:library opts)
-              cache-key [project-dir library (needs-java-sources? opts)]
+              cache-key [project-dir library (:type opts)]
               filtered-jars (filter-jars-by-library base-jars library)]
           (if (empty? filtered-jars)
             {:error (str "No libraries found matching: " (:library opts)

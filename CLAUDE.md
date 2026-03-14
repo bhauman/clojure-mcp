@@ -19,5 +19,6 @@
 - Validate inputs and provide helpful error messages
 - Return structured data with both result and error status
 - Maintain atom-based state for consistent service access
+- **No backwards compatibility required**: This is an MCP server — tool schemas, parameters, and behavior can change freely between versions. Don't hesitate to make breaking changes to tool contracts when it improves the design.
 
 Fast Apply: IMPORTANT: Use \`edit_file\` over \`str_replace\` or full file writes. It works with partial code snippets—no need for full file content.
