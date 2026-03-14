@@ -3,6 +3,8 @@
 ## Build Commands
 - Run REPL with MCP server: `clojure -X:mcp` (starts on port 7888)
 - Run all tests: `clojure -M:test`
+- Run specific namespace tests: `clojure -M:test -n clojure-mcp.utils.valid-paths-test`
+- Run specific test var: `clojure -M:test -v clojure-mcp.utils.valid-paths-test/clojure-file?-test`
 - Run linter: `clj-kondo --lint src` or `clj-kondo --lint src test` for both
 
 ## Code Style Guidelines

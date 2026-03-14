@@ -21,7 +21,7 @@
       (throw (ex-info "Missing required parameter: file_path"
                       {:inputs inputs})))
     (when-not (valid-paths/clojure-file? file_path)
-      (throw (ex-info "File must have a Clojure extension (.clj, .cljs, .cljc, .bb, .edn)"
+      (throw (ex-info "File must have a Clojure extension (.clj, .cljs, .cljc, .cljd, .bb, .edn)"
                       {:file_path file_path})))
     ;; Use the utils/validate-path-with-client function to ensure path is valid
     (valid-paths/validate-path-with-client file_path nrepl-client)))

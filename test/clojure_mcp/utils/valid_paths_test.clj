@@ -103,6 +103,12 @@
            (valid-paths/preprocess-path "..")))))
 
 (deftest clojure-file?-test
+  (testing "Detect ClojureDart extension"
+    (is (valid-paths/clojure-file? "test.cljd"))
+    (is (valid-paths/clojure-file? "/path/to/file.cljd")))
+  (testing "Detect Basilisp extension"
+    (is (valid-paths/clojure-file? "test.lpy"))
+    (is (valid-paths/clojure-file? "/path/to/file.lpy")))
   (testing "Detect Babashka shebang"
     (let [tmp (io/file (System/getProperty "java.io.tmpdir") "bb-script.sh")]
       (spit tmp "#!/usr/bin/env bb\n(println :hi)")

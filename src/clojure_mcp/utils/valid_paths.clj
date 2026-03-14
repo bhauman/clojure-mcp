@@ -99,10 +99,11 @@
      - .clj (Clojure)
      - .cljs (ClojureScript)
      - .cljc (Clojure/ClojureScript shared)
+     - .cljd (ClojureDart)
      - .bb (Babashka)
      - .edn (Extensible Data Notation)
      - .lpy (Librepl)
-     
+
      Also detects files starting with a Babashka shebang (`bb`)."
   [file-path]
   (when file-path
@@ -110,6 +111,7 @@
       (or (str/ends-with? lower-path ".clj")
           (str/ends-with? lower-path ".cljs")
           (str/ends-with? lower-path ".cljc")
+          (str/ends-with? lower-path ".cljd")
           (str/ends-with? lower-path ".bb")
           (str/ends-with? lower-path ".lpy")
           (str/ends-with? lower-path ".edn")
