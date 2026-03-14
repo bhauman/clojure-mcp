@@ -66,7 +66,15 @@
       (is (contains? (set models) :anthropic/claude-sonnet-4-6))
       (is (contains? (set models) :anthropic/claude-sonnet-4-6-reasoning))
       (is (contains? (set models) :anthropic/claude-haiku-4-5))
-      (is (= 48 (count models))))))
+      ;; Mistral models
+      (is (contains? (set models) :mistral/mistral-large))
+      (is (contains? (set models) :mistral/mistral-medium))
+      (is (contains? (set models) :mistral/mistral-small))
+      (is (contains? (set models) :mistral/codestral))
+      (is (contains? (set models) :mistral/devstral))
+      (is (contains? (set models) :mistral/magistral-medium))
+      (is (contains? (set models) :mistral/magistral-small))
+      (is (= 55 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"

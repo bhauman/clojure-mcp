@@ -230,7 +230,7 @@ If a model key is not found in your custom configuration, the system automatical
 
 ## Built-in Models
 
-The system includes 48 pre-configured models that can be used without configuration:
+The system includes 55 pre-configured models that can be used without configuration:
 
 ### OpenAI
 - `:openai/gpt-4o`
@@ -252,6 +252,11 @@ The system includes 48 pre-configured models that can be used without configurat
 - `:google/gemini-3-flash`, `:google/gemini-3-pro`
 - `:google/gemini-3-1-flash-lite`, `:google/gemini-3-1-pro`
 
+### Mistral (via OpenAI-compatible API, requires `MISTRAL_API_KEY`)
+- `:mistral/mistral-large`, `:mistral/mistral-medium`, `:mistral/mistral-small`
+- `:mistral/codestral`, `:mistral/devstral`
+- `:mistral/magistral-medium`, `:mistral/magistral-small`
+
 ### Anthropic
 - `:anthropic/claude-opus-4-6`, `:anthropic/claude-opus-4-6-reasoning`
 - `:anthropic/claude-sonnet-4-6`, `:anthropic/claude-sonnet-4-6-reasoning`
@@ -271,6 +276,7 @@ API keys can be provided in three ways (in order of precedence):
    - OpenAI: `OPENAI_API_KEY`
    - Google: `GEMINI_API_KEY`
    - Anthropic: `ANTHROPIC_API_KEY`
+   - Mistral: `MISTRAL_API_KEY`
 
 ## Validation
 

@@ -201,6 +201,49 @@
    (merge model-base
           {:model-name "gemini-3.1-pro-preview"})
 
+   ;; Mistral Models (via OpenAI-compatible API)
+   :mistral/mistral-large
+   (merge model-base
+          {:provider :openai
+           :model-name "mistral-large-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/mistral-medium
+   (merge model-base
+          {:provider :openai
+           :model-name "mistral-medium-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/mistral-small
+   (merge model-base
+          {:provider :openai
+           :model-name "mistral-small-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/codestral
+   (merge model-base
+          {:provider :openai
+           :model-name "codestral-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/devstral
+   (merge model-base
+          {:provider :openai
+           :model-name "devstral-2-25-12"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/magistral-medium
+   (merge reasoning-model-base
+          {:provider :openai
+           :model-name "magistral-medium-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
+   :mistral/magistral-small
+   (merge reasoning-model-base
+          {:provider :openai
+           :model-name "magistral-small-latest"
+           :base-url "https://api.mistral.ai/v1"})
+
    ;; Anthropic Models
    :anthropic/claude-opus-4-1
    (merge model-base
@@ -313,7 +356,17 @@
    :codex     :openai/gpt-5-4-pro
    :gpt-5-1-codex :openai/gpt-5-1-codex
    :gpt-5-1-codex-max :openai/gpt-5-1-codex-max
-   :gpt-5-2-codex :openai/gpt-5-2-codex})
+   :gpt-5-2-codex :openai/gpt-5-2-codex
+   ;; Mistral aliases
+   :mistral       :mistral/mistral-large
+   :mistral-large :mistral/mistral-large
+   :mistral-medium :mistral/mistral-medium
+   :mistral-small :mistral/mistral-small
+   :codestral     :mistral/codestral
+   :devstral      :mistral/devstral
+   :magistral     :mistral/magistral-medium
+   :magistral-medium :mistral/magistral-medium
+   :magistral-small :mistral/magistral-small})
 
 (defn resolve-model-alias
   "Resolves a model key, checking aliases for unnamespaced keywords.
@@ -376,18 +429,30 @@
     ;; Return other values as-is
     :else config))
 
+(def api-key-env-mapping
+  "Maps provider/namespace keywords to environment variable names for API keys."
+  {:openai "OPENAI_API_KEY"
+   :google "GEMINI_API_KEY"
+   :anthropic "ANTHROPIC_API_KEY"
+   :mistral "MISTRAL_API_KEY"})
+
 (defn- ensure-api-key
-  "Ensures API key is present, getting from environment if needed"
-  [config provider]
-  (if (:api-key config)
-    config
-    (let [env-key-mapping {:openai "OPENAI_API_KEY"
-                           :google "GEMINI_API_KEY"
-                           :anthropic "ANTHROPIC_API_KEY"}
-          env-key (get env-key-mapping provider)]
-      (if-let [api-key (and env-key (get-env env-key))]
-        (assoc config :api-key api-key)
-        config))))
+  "Ensures API key is present, getting from environment if needed.
+   Checks the model-key namespace first (e.g. :mistral -> MISTRAL_API_KEY),
+   then falls back to the provider (e.g. :openai -> OPENAI_API_KEY)."
+  ([config provider]
+   (ensure-api-key config provider nil))
+  ([config provider model-key-ns]
+   (if (:api-key config)
+     config
+     ;; Try namespace-specific env var first, then provider env var
+     (let [ns-env-key (get api-key-env-mapping model-key-ns)
+           provider-env-key (get api-key-env-mapping provider)
+           api-key (or (and ns-env-key (get-env ns-env-key))
+                       (and provider-env-key (get-env provider-env-key)))]
+       (if api-key
+         (assoc config :api-key api-key)
+         config)))))
 
 (defn- ensure-provider
   "Ensures provider is present in config, extracting from model-key if needed.
@@ -564,7 +629,7 @@
          config (-> base-config
                     (resolve-env-refs) ; Also resolve any env refs from defaults
                     (ensure-provider model-key)
-                    (as-> cfg (ensure-api-key cfg (:provider cfg))))]
+                    (as-> cfg (ensure-api-key cfg (:provider cfg) (some-> model-key namespace keyword))))]
      ;; Validate if requested
      (when validate?
        (schema/validate-model-key model-key)
@@ -673,7 +738,7 @@
          ;; Extract provider for API key
          provider (:provider config-with-provider)
          ;; Ensure API key
-         final-config (ensure-api-key config-with-provider provider)]
+         final-config (ensure-api-key config-with-provider provider (some-> model-key namespace keyword))]
      ;; Validate if requested
      (when validate?
        (schema/validate-model-key model-key)
