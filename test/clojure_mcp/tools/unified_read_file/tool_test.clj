@@ -5,7 +5,8 @@
    [clojure-mcp.tools.unified-read-file.tool :as unified-read-file-tool]
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.config :as config]
-   [clojure.java.io :as io]))
+   [clojure.java.io :as io]
+   [clojure.string :as str]))
 
 ;; Setup test fixtures
 (test-utils/apply-fixtures *ns*)
@@ -27,9 +28,10 @@
       (try
         (f)
         (finally
-          ;; Clean up
+          ;; Clean up all files recursively
           (when (.exists test-dir)
-            (.delete test-dir)))))))
+            (doseq [file (reverse (file-seq test-dir))]
+              (.delete file))))))))
 
 (use-fixtures :each setup-test-files-fixture)
 
@@ -93,3 +95,91 @@
           formatted-str (first formatted)]
       (is (not (re-find #"truncated" formatted-str))
           "Should not show truncation message when not truncated"))))
+
+;; --- Dash-to-underscore filename correction integration tests ---
+;; The core correction logic is tested in valid_paths_test.clj.
+;; These tests verify the read_file tool pipeline works with the correction.
+
+(deftest dash-to-underscore-correction-test
+  (testing "File with dashes requested, underscore version exists - reads successfully"
+    (let [underscore-file (io/file *test-dir* "core_stuff.clj")
+          _ (spit underscore-file "(ns core-stuff)\n(defn hello [] :world)")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          dash-path (.getAbsolutePath (io/file *test-dir* "core-stuff.clj"))
+          validated (tool-system/validate-inputs tool-instance {:path dash-path})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)]
+      ;; Should succeed (not error)
+      (is (not (:error formatted)) "Should successfully read the corrected file")
+      ;; Should contain the actual file content
+      (is (some #(str/includes? % "core-stuff") (:result formatted))
+          "Should contain the file content")
+      (.delete underscore-file)))
+
+  (testing "File with underscores requested directly - reads successfully"
+    (let [underscore-file (io/file *test-dir* "core_stuff.clj")
+          _ (spit underscore-file "(ns core-stuff)\n(defn hello [] :world)")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          underscore-path (.getAbsolutePath underscore-file)
+          validated (tool-system/validate-inputs tool-instance {:path underscore-path})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)]
+      (is (not (:error formatted)) "Should successfully read the file")
+      (.delete underscore-file)))
+
+  (testing "Neither dash nor underscore version exists - returns normal error"
+    (let [tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          non-existent-path (.getAbsolutePath (io/file *test-dir* "no-such-file.clj"))]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"does not exist"
+                            (tool-system/validate-inputs tool-instance {:path non-existent-path}))
+          "Should throw an error when neither file version exists")))
+
+  (testing "Non-Clojure files (.java) - do NOT auto-correct"
+    (let [underscore-file (io/file *test-dir* "core_stuff.java")
+          _ (spit underscore-file "public class core_stuff {}")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          dash-path (.getAbsolutePath (io/file *test-dir* "core-stuff.java"))]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"does not exist"
+                            (tool-system/validate-inputs tool-instance {:path dash-path}))
+          "Should NOT auto-correct non-Clojure file extensions")
+      (.delete underscore-file)))
+
+  (testing "Directory components with dashes - only filename corrected"
+    (let [dashed-dir (io/file *test-dir* "my-cool-dir")
+          _ (.mkdirs dashed-dir)
+          underscore-file (io/file dashed-dir "my_file.clj")
+          _ (spit underscore-file "(ns my-cool-dir.my-file)")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          dash-path (.getAbsolutePath (io/file dashed-dir "my-file.clj"))
+          validated (tool-system/validate-inputs tool-instance {:path dash-path})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)]
+      (is (not (:error formatted)) "Should read file with dashed directory and corrected filename")
+      (is (str/includes? (:path validated) "my-cool-dir")
+          "Directory dashes should be preserved")
+      (.delete underscore-file)
+      (.delete dashed-dir)))
+
+  (testing "Full pipeline through make-tool-tester with dash correction"
+    (let [underscore-file (io/file *test-dir* "pipeline_test.clj")
+          _ (spit underscore-file "(ns pipeline-test)\n(defn greet [name] (str \"Hello \" name))")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          tool-fn (test-utils/make-tool-tester tool-instance)
+          dash-path (.getAbsolutePath (io/file *test-dir* "pipeline-test.clj"))
+          result (tool-fn {:path dash-path})]
+      (is (not (:error? result)) "Full pipeline should succeed with dash correction")
+      (.delete underscore-file)))
+
+  (testing "Babashka (.bb) files - do NOT auto-correct"
+    (let [underscore-file (io/file *test-dir* "my_script.bb")
+          _ (spit underscore-file "(println :hello)")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          dash-path (.getAbsolutePath (io/file *test-dir* "my-script.bb"))]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"does not exist"
+                            (tool-system/validate-inputs tool-instance {:path dash-path}))
+          "Should NOT auto-correct .bb files")
+      (.delete underscore-file))))
+

@@ -58,16 +58,53 @@
 (defn path-exists? [path]
   (.exists (io/file path)))
 
+(def ^:private clojure-source-extensions
+  "Clojure source extensions that follow the namespace-to-filename
+   dash-to-underscore convention. Shared by clojure-source-ext? and clojure-file?."
+  #{".clj" ".cljs" ".cljc"})
+
+(defn- clojure-source-ext?
+  "Returns true if the file path has a Clojure source extension (.clj, .cljs, .cljc)
+   that follows the dash-to-underscore filename convention."
+  [file-path]
+  (when file-path
+    (let [lower-path (str/lower-case file-path)]
+      (some #(str/ends-with? lower-path %) clojure-source-extensions))))
+
+(defn- try-dash-to-underscore-correction
+  "When a validated path doesn't exist and has a Clojure source extension,
+   tries replacing dashes with underscores in the filename part only
+   (not directory components). Returns the re-validated corrected path
+   if the file exists, nil otherwise."
+  [validated-path current-dir allowed-dirs]
+  (when (clojure-source-ext? validated-path)
+    (let [file (io/file validated-path)
+          parent (.getParentFile file)
+          filename (.getName file)
+          corrected-filename (str/replace filename "-" "_")]
+      (when (not= filename corrected-filename)
+        (let [corrected-file (if parent
+                               (io/file parent corrected-filename)
+                               (io/file corrected-filename))
+              corrected-path (.getPath corrected-file)]
+          (when (path-exists? corrected-path)
+            ;; Re-validate for defense-in-depth (symlink protection)
+            (validate-path corrected-path current-dir allowed-dirs)))))))
+
 (defn validate-path-with-client
   "Validates a path using settings from the nrepl-client.
-   
+
    Parameters:
    - path: The path to validate (can be relative or absolute)
    - nrepl-client-map: The nREPL client map (dereferenced atom)
-   
+
    Returns:
    - The normalized absolute path if valid
-   - Throws an exception if the path is invalid or if required settings are missing"
+   - Throws an exception if the path is invalid or if required settings are missing
+
+   When the validated path doesn't exist and has a Clojure source extension
+   (.clj, .cljs, .cljc), tries replacing dashes with underscores in the
+   filename (not directory components) and returns the corrected path if it exists."
   [path nrepl-client]
   (let [current-dir (config/get-nrepl-user-dir nrepl-client)
         allowed-dirs (config/get-allowed-directories nrepl-client)]
@@ -80,7 +117,11 @@
       (throw (ex-info "Missing allowed-directories in config"
                       {:client-keys (keys nrepl-client)})))
 
-    (validate-path path current-dir allowed-dirs)))
+    (let [validated (validate-path path current-dir allowed-dirs)]
+      (if (path-exists? validated)
+        validated
+        (or (try-dash-to-underscore-correction validated current-dir allowed-dirs)
+            validated)))))
 
 (defn- babashka-shebang?
   [file-path]
@@ -107,9 +148,7 @@
   [file-path]
   (when file-path
     (let [lower-path (str/lower-case file-path)]
-      (or (str/ends-with? lower-path ".clj")
-          (str/ends-with? lower-path ".cljs")
-          (str/ends-with? lower-path ".cljc")
+      (or (clojure-source-ext? file-path)
           (str/ends-with? lower-path ".bb")
           (str/ends-with? lower-path ".lpy")
           (str/ends-with? lower-path ".edn")
