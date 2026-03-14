@@ -230,7 +230,7 @@ If a model key is not found in your custom configuration, the system automatical
 
 ## Built-in Models
 
-The system includes 44 pre-configured models that can be used without configuration:
+The system includes 48 pre-configured models that can be used without configuration:
 
 ### OpenAI
 - `:openai/gpt-4o`
@@ -249,6 +249,8 @@ The system includes 44 pre-configured models that can be used without configurat
 - `:google/gemini-2-5-flash`
 - `:google/gemini-2-5-flash-reasoning`
 - `:google/gemini-2-5-pro-reasoning`
+- `:google/gemini-3-flash`, `:google/gemini-3-pro`
+- `:google/gemini-3-1-flash-lite`, `:google/gemini-3-1-pro`
 
 ### Anthropic
 - `:anthropic/claude-opus-4-6`, `:anthropic/claude-opus-4-6-reasoning`

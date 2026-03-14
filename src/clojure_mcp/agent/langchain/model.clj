@@ -185,6 +185,22 @@
           {:model-name "gemini-2.5-pro"
            :thinking thinking-base})
 
+   :google/gemini-3-flash
+   (merge model-base
+          {:model-name "gemini-3-flash-preview"})
+
+   :google/gemini-3-pro
+   (merge model-base
+          {:model-name "gemini-3-pro-preview"})
+
+   :google/gemini-3-1-flash-lite
+   (merge model-base
+          {:model-name "gemini-3.1-flash-lite-preview"})
+
+   :google/gemini-3-1-pro
+   (merge model-base
+          {:model-name "gemini-3.1-pro-preview"})
+
    ;; Anthropic Models
    :anthropic/claude-opus-4-1
    (merge model-base
@@ -267,10 +283,14 @@
    ;; Anthropic reasoning aliases
    :sonnet-reasoning  :anthropic/claude-sonnet-4-6-reasoning
    :opus-reasoning    :anthropic/claude-opus-4-6-reasoning
-   ;; Google aliases
-   :flash     :google/gemini-2-5-flash
-   :flash-lite :google/gemini-2-5-flash-lite
-   :gemini-pro :google/gemini-2-5-pro
+   ;; Google aliases - latest points to 3.1
+   :flash     :google/gemini-3-1-flash-lite
+   :flash-lite :google/gemini-3-1-flash-lite
+   :gemini-pro :google/gemini-3-1-pro
+   :gemini-3-1-pro :google/gemini-3-1-pro
+   :gemini-3-1-flash-lite :google/gemini-3-1-flash-lite
+   :gemini-3-flash :google/gemini-3-flash
+   :gemini-3-pro :google/gemini-3-pro
    :flash-reasoning  :google/gemini-2-5-flash-reasoning
    :gemini-pro-reasoning :google/gemini-2-5-pro-reasoning
    ;; OpenAI aliases

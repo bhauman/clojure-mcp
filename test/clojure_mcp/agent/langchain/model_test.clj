@@ -48,6 +48,10 @@
       (is (contains? (set models) :google/gemini-2-5-flash))
       (is (contains? (set models) :google/gemini-2-5-flash-reasoning))
       (is (contains? (set models) :google/gemini-2-5-pro-reasoning))
+      (is (contains? (set models) :google/gemini-3-flash))
+      (is (contains? (set models) :google/gemini-3-pro))
+      (is (contains? (set models) :google/gemini-3-1-flash-lite))
+      (is (contains? (set models) :google/gemini-3-1-pro))
       ;; Anthropic models
       (is (contains? (set models) :anthropic/claude-opus-4))
       (is (contains? (set models) :anthropic/claude-opus-4-reasoning))
@@ -62,7 +66,7 @@
       (is (contains? (set models) :anthropic/claude-sonnet-4-6))
       (is (contains? (set models) :anthropic/claude-sonnet-4-6-reasoning))
       (is (contains? (set models) :anthropic/claude-haiku-4-5))
-      (is (= 44 (count models))))))
+      (is (= 48 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"
