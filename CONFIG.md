@@ -95,6 +95,19 @@ Boolean flag to control bash command execution mode (default: `true`). This sett
 - Both modes apply consistent output truncation (8500 chars total, split between stdout/stderr)
 - Local execution may be faster for simple commands but requires the MCP server to have necessary tools installed
 
+### `:shadow-cljs-repl-message`
+Controls whether the shadow-cljs REPL mode status message is included in eval results (default: `true`). When connected to a shadow-cljs nREPL server, a status message about the current CLJS mode is prepended to every eval result. This helps AI assistants understand the REPL state but can be disabled if you find it unnecessary.
+
+**Available values:**
+- `true` (default) - Includes the shadow-cljs mode status message in eval results
+- `false` - Disables the message and skips the mode detection probe entirely
+
+**When to use each setting:**
+- `true` - Best for most users, especially when the AI assistant needs to understand whether the REPL is in CLJS mode
+- `false` - When you manage REPL state yourself (e.g., via CLAUDE.md instructions) and want to reduce noise in eval output
+
+This can also be set via the CLI: `:shadow-cljs-repl-message false`
+
 ### `:dispatch-agent-context`
 Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
 

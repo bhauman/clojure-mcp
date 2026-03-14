@@ -268,6 +268,15 @@
       false
       (boolean value))))
 
+(defn get-shadow-cljs-repl-message
+  "Returns whether the shadow-cljs REPL mode status message should be
+   included in eval results. Defaults to true."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :shadow-cljs-repl-message)]
+    (if (nil? value)
+      true
+      (boolean value))))
+
 (defn clojure-env?
   "Returns true if the nREPL environment is a Clojure environment."
   [nrepl-client-map]

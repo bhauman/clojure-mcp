@@ -529,6 +529,11 @@ When used without `:port`, the MCP server will automatically parse the port from
 
 `:nrepl-env-type :bb`
 
+#### `:shadow-cljs-repl-message`
+**Optional** - Controls whether the shadow-cljs REPL mode status message is included in eval results (default: `true`). When connected to a shadow-cljs nREPL, a status message about CLJS mode is prepended to every eval result. Set to `false` to disable this message.
+
+`:shadow-cljs-repl-message false`
+
 #### `:config-profile`
 **Optional** - Load a built-in configuration profile that adjusts tool availability and descriptions. Useful for tailoring ClojureMCP to specific use cases.
 

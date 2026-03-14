@@ -92,8 +92,9 @@ Examples:
     (try
       (let [client (nrepl/with-port-initialized base-client port)
             env-type (nrepl/get-port-env-type client)
-            ;; Check CLJS mode for shadow-cljs
-            cljs-mode? (when (= env-type :shadow)
+            show-shadow-msg? (config/get-shadow-cljs-repl-message base-client)
+            ;; Check CLJS mode for shadow-cljs (skip probe if message disabled)
+            cljs-mode? (when (and (= env-type :shadow) show-shadow-msg?)
                          (nrepl/shadow-cljs-mode? client session-type))
             ;; Execute the eval
             eval-result (core/evaluate-with-repair client (cond-> inputs
@@ -101,7 +102,8 @@ Examples:
                                                             (nil? timeout_ms) (assoc :timeout_ms timeout)))]
         ;; Add context to result for formatting
         (assoc eval-result :context {:env-type env-type
-                                     :shadow-cljs-mode? cljs-mode?}))
+                                     :shadow-cljs-mode? cljs-mode?
+                                     :show-shadow-message? show-shadow-msg?}))
       (catch java.net.ConnectException e
         {:outputs [[:err (format "Failed to connect to nREPL server on port %d: %s. Ensure an nREPL server is running on that port."
                                  port (.getMessage e))]]

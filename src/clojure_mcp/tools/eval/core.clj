@@ -65,8 +65,9 @@
 
    For shadow-cljs, prepends a mode status message."
   ([outputs] (partition-and-format-outputs outputs nil))
-  ([outputs {:keys [env-type shadow-cljs-mode?] :as _context}]
-   (let [prefix (when (= env-type :shadow)
+  ([outputs {:keys [env-type shadow-cljs-mode? show-shadow-message?]}]
+   (let [prefix (when (and (= env-type :shadow)
+                           (not (false? show-shadow-message?)))
                   [(shadow-cljs-mode-message shadow-cljs-mode?)])
          formatted (mapv #(format-eval-outputs % env-type) (partition-outputs outputs))]
      (if prefix

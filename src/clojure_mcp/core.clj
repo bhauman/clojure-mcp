@@ -270,6 +270,24 @@
                                env-type))]
       (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))))
 
+(def ^:private cli-config-override-keys
+  "Keys from the startup opts that override config.edn values."
+  [:shadow-cljs-repl-message])
+
+(defn- apply-cli-config-overrides
+  "Applies CLI option overrides to the config attached to an nrepl-client-map.
+   Only overrides keys that are explicitly provided (non-nil) in opts."
+  [nrepl-client-map opts]
+  (let [overrides (reduce (fn [m k]
+                            (if (some? (get opts k))
+                              (assoc m k (get opts k))
+                              m))
+                          {}
+                          cli-config-override-keys)]
+    (if (seq overrides)
+      (update nrepl-client-map ::config/config merge overrides)
+      nrepl-client-map)))
+
 (defn create-and-start-nrepl-connection
   "Creates an nREPL client map and loads configuration.
 
@@ -282,7 +300,7 @@
    when the first eval-code call is made.
 
    Takes initial-config map with optional :port, :host, :project-dir, :nrepl-env-type,
-   :config-file, :config-profile.
+   :config-file, :config-profile, :shadow-cljs-repl-message.
    - If :project-dir is provided, uses it directly (no REPL query needed)
    - If :project-dir is NOT provided, queries REPL for project directory (requires :port)
    - If :config-profile is provided, merges profile overlay on top of base config
@@ -293,24 +311,27 @@
     (log/info "Creating nREPL client for port" port)
     (log/info "Starting without nREPL connection (project-dir mode)"))
   (try
-    (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir :nrepl-env-type :config-profile))
+    (let [nrepl-client-map (nrepl/create (apply dissoc initial-config
+                                                :project-dir :nrepl-env-type :config-profile
+                                                cli-config-override-keys))
           cli-env-type (:nrepl-env-type initial-config)
-          _ (log/info "nREPL client map created")]
-      (if project-dir
-        ;; Project dir provided - load config directly, no REPL query needed
-        (let [user-dir (.getCanonicalPath (io/file project-dir))
-              _ (log/info "Working directory set to:" user-dir)
-              config (load-config-handling-validation-errors config-file user-dir config-profile)
-              ;; Use cli-env-type or config's env-type, default to :clj
-              final-env-type (or cli-env-type
-                                 (:nrepl-env-type config)
-                                 :clj)]
-          (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))
-        ;; No project dir - need to query REPL (requires port)
-        (let [;; Detect environment type (uses describe op, no full init needed)
-              env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
-              _ (nrepl/set-port-env-type! nrepl-client-map env-type)]
-          (fetch-config nrepl-client-map config-file cli-env-type env-type project-dir config-profile))))
+          _ (log/info "nREPL client map created")
+          result (if project-dir
+                   ;; Project dir provided - load config directly, no REPL query needed
+                   (let [user-dir (.getCanonicalPath (io/file project-dir))
+                         _ (log/info "Working directory set to:" user-dir)
+                         config (load-config-handling-validation-errors config-file user-dir config-profile)
+                         ;; Use cli-env-type or config's env-type, default to :clj
+                         final-env-type (or cli-env-type
+                                            (:nrepl-env-type config)
+                                            :clj)]
+                     (assoc nrepl-client-map ::config/config (assoc config :nrepl-env-type final-env-type)))
+                   ;; No project dir - need to query REPL (requires port)
+                   (let [;; Detect environment type (uses describe op, no full init needed)
+                         env-type (nrepl/detect-nrepl-env-type nrepl-client-map)
+                         _ (nrepl/set-port-env-type! nrepl-client-map env-type)]
+                     (fetch-config nrepl-client-map config-file cli-env-type env-type project-dir config-profile)))]
+      (apply-cli-config-overrides result initial-config))
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
@@ -369,9 +390,10 @@
                                   (catch Exception _ false))))
 (s/def ::start-nrepl-cmd (s/coll-of string? :kind vector?))
 (s/def ::config-profile (s/or :keyword keyword? :symbol symbol? :string string?))
+(s/def ::shadow-cljs-repl-message boolean?)
 (s/def ::nrepl-args (s/keys :req-un []
                             :opt-un [::port ::host ::config-file ::project-dir ::nrepl-env-type
-                                     ::start-nrepl-cmd ::config-profile]))
+                                     ::start-nrepl-cmd ::config-profile ::shadow-cljs-repl-message]))
 
 (def nrepl-client-atom (atom nil))
 
