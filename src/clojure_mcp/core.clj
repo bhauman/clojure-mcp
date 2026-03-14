@@ -272,21 +272,41 @@
 
 (def ^:private cli-config-override-keys
   "Keys from the startup opts that override config.edn values."
-  [:shadow-cljs-repl-message])
+  [:shadow-cljs-repl-message :enable-tools :disable-tools])
 
 (defn- apply-cli-config-overrides
   "Applies CLI option overrides to the config attached to an nrepl-client-map.
-   Only overrides keys that are explicitly provided (non-nil) in opts."
+   Only overrides keys that are explicitly provided (non-nil) in opts.
+
+   After absolute overrides, applies relative modifiers:
+   - :remove-tools — force-disables tools (adds to :disable-tools, removes from :enable-tools)
+   - :add-tools — force-enables tools (removes from :disable-tools, adds to :enable-tools if set)
+   :add-tools wins over :remove-tools on overlap."
   [nrepl-client-map opts]
   (let [overrides (reduce (fn [m k]
                             (if (some? (get opts k))
                               (assoc m k (get opts k))
                               m))
                           {}
-                          cli-config-override-keys)]
-    (if (seq overrides)
-      (update nrepl-client-map ::config/config merge overrides)
-      nrepl-client-map)))
+                          cli-config-override-keys)
+        result (if (seq overrides)
+                 (update nrepl-client-map ::config/config merge overrides)
+                 nrepl-client-map)
+        remove-tools (when-let [rt (:remove-tools opts)] (set (map keyword rt)))
+        add-tools (when-let [at (:add-tools opts)] (set (map keyword at)))]
+    (cond-> result
+      ;; remove-tools: force-disable (add to :disable-tools, remove from :enable-tools)
+      remove-tools
+      (-> (update-in [::config/config :disable-tools]
+                     (fn [dt] (vec (distinct (concat (or dt []) remove-tools)))))
+          (update-in [::config/config :enable-tools]
+                     (fn [et] (when et (vec (remove remove-tools et))))))
+      ;; add-tools: force-enable (remove from :disable-tools, add to :enable-tools if set)
+      add-tools
+      (-> (update-in [::config/config :disable-tools]
+                     (fn [dt] (vec (remove add-tools (or dt [])))))
+          (update-in [::config/config :enable-tools]
+                     (fn [et] (when et (vec (distinct (concat et add-tools))))))))))
 
 (defn create-and-start-nrepl-connection
   "Creates an nREPL client map and loads configuration.
@@ -313,6 +333,7 @@
   (try
     (let [nrepl-client-map (nrepl/create (apply dissoc initial-config
                                                 :project-dir :nrepl-env-type :config-profile
+                                                :add-tools :remove-tools
                                                 cli-config-override-keys))
           cli-env-type (:nrepl-env-type initial-config)
           _ (log/info "nREPL client map created")
