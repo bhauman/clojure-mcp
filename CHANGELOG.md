@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-13
+
+Major update to the LLM model ecosystem: upgrades LangChain4j to 1.12.2, adds 55 built-in model configurations across five providers (OpenAI, Anthropic, Google, Mistral, and reasoning variants), and introduces short model aliases for faster CLI usage. Mistral models now work out of the box with `MISTRAL_API_KEY`.
+
+### Major Changes
+
+#### LangChain4j 1.12.2 Upgrade
+- Updated from 1.8.0 to 1.12.2, bringing improved Anthropic tool features, streaming error handling, OpenAI streaming fixes, and MCP spec updates
+
+#### Built-in Mistral Support
+- **7 Mistral models** available out of the box: `mistral-large`, `mistral-medium`, `mistral-small`, `codestral`, `devstral`, `magistral-medium`, `magistral-small`
+- Automatically detects `MISTRAL_API_KEY` environment variable — no configuration needed
+- Routes through the OpenAI-compatible API with Mistral's base URL
+
+#### Model Alias System
+- Short aliases resolve to full model keys — use `-m sonnet` instead of `-m :anthropic/claude-sonnet-4-6`
+- Aliases for all providers: `:sonnet`, `:opus`, `:haiku`, `:flash`, `:gemini`, `:mistral`, `:codestral`, `:codex`, `:gpt-5-4`, and many more
+
+### Added
+- **New Anthropic models**: Claude Opus 4.6, Sonnet 4.6, Haiku 4.5 (with reasoning variants)
+- **New OpenAI models**: GPT-5 Pro, GPT-5.1/5.2/5.4, GPT-5 Codex variants, o1-pro
+- **New Google models**: Gemini 3 Flash, Gemini 3 Pro, Gemini 3.1 Flash Lite, Gemini 3.1 Pro
+- **55 total built-in models** across all providers (up from 21)
+- **`:shadow-cljs-repl-message` config flag**: Disable REPL mode status messages in shadow-cljs environments
+
+### Changed
+- **cli-assist profiles**: Enabled `clojure_edit_replace_sexp` as a fallback tool (same pattern as `clojure_edit`)
+- **cli-assist profiles**: Disabled `Clojure Project Info` resource to reduce noise for CLI assistants
+
+### Fixed
+- Fixed `clojure_edit` reference to `clojure_edit_agent` in cli-assist-agent profile
+- Fixed SSE core to use updated API in MCP Java SDK
+- **cljfmt partial formatting**: New `:partial` mode formats only replaced forms, preserving surrounding formatting (#154, #155)
+
 ## [0.2.6] - 2026-02-15
 
 Security hardening for the `deps_read` tool.
