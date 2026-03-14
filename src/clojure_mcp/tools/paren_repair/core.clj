@@ -8,17 +8,8 @@
    [clojure-mcp.sexp.paren-utils :as paren-utils]
    [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.utils.diff :as diff]
-   [clojure-mcp.utils.file :as file-utils]))
-
-(def clojure-extensions
-  "Set of file extensions considered Clojure files."
-  #{".clj" ".cljs" ".cljc" ".edn"})
-
-(defn clojure-file?
-  "Returns true if the file path has a Clojure file extension."
-  [file-path]
-  (let [path-str (str file-path)]
-    (some #(string/ends-with? path-str %) clojure-extensions)))
+   [clojure-mcp.utils.file :as file-utils]
+   [clojure-mcp.utils.valid-paths :as valid-paths]))
 
 (defn repair-file!
   "Repairs delimiter errors in a Clojure file and optionally formats it.
@@ -47,7 +38,7 @@
        :diff nil}
 
       ;; Not a Clojure file
-      (not (clojure-file? file-path))
+      (not (valid-paths/clojure-file? file-path))
       {:success false
        :file-path file-path
        :message "Not a Clojure file (skipping)"

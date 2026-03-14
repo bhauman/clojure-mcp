@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-14
+
+Tool filtering can now be controlled directly from `main/start` opts and the CLI, without needing config files. Also fixes `deps_grep` to require the `:type` parameter and filter out binary file entries.
+
+### Added
+- **Tool filtering CLI opts**: New `:enable-tools`, `:disable-tools`, `:add-tools`, and `:remove-tools` options for `main/start` and `clojure -Tmcp start`, allowing programmatic and CLI control over which tools are exposed
+  - `:enable-tools`/`:disable-tools` — absolute overrides that replace config values
+  - `:add-tools`/`:remove-tools` — relative modifiers applied after config resolution (`:add-tools` wins on overlap)
+  - Useful for combining with `:config-profile :cli-assist` to selectively re-enable or disable tools
+
+### Fixed
+- **`deps_grep`**: Now requires the `:type` parameter and filters out binary file entries from results
+
 ## [0.3.0] - 2026-03-13
 
 Major update to the LLM model ecosystem: upgrades LangChain4j to 1.12.2, adds 55 built-in model configurations across five providers (OpenAI, Anthropic, Google, Mistral, and reasoning variants), and introduces short model aliases for faster CLI usage. Mistral models now work out of the box with `MISTRAL_API_KEY`.

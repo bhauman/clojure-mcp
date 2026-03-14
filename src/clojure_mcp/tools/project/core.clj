@@ -272,7 +272,9 @@
           processed-namespaces (->> source-files
                                     (filter #(or (str/ends-with? % ".clj")
                                                  (str/ends-with? % ".cljs")
-                                                 (str/ends-with? % ".cljc")))
+                                                 (str/ends-with? % ".cljc")
+                                                 (str/ends-with? % ".cljd")
+                                                 (str/ends-with? % ".lpy")))
                                     (map (fn [file-path]
                                              ;; Remove source path prefix from file path
                                            (let [relative-path (reduce (fn [path src-path]
@@ -284,7 +286,7 @@
                                              (-> relative-path
                                                  (str/replace "/" ".")
                                                  (str/replace "_" "-")
-                                                 (str/replace #"\.(clj|cljs|cljc)$" "")))))
+                                                 (str/replace #"\.(clj|cljs|cljc|cljd|lpy)$" "")))))
                                       ;; Sort namespaces alphabetically
                                     sort
                                     (into []))]

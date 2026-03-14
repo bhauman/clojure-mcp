@@ -62,6 +62,11 @@
    Options:
    - :not-cwd - If true, does NOT set project-dir to cwd (default: false)
    - :port - Optional nREPL port (REPL is optional when project-dir is set)
+   - :enable-tools - Allowlist of tool keywords, replaces config's :enable-tools
+   - :disable-tools - Blocklist of tool keywords, replaces config's :disable-tools
+   - :add-tools - Force-enable tools (removes from :disable-tools, adds to :enable-tools if set)
+   - :remove-tools - Force-disable tools (adds to :disable-tools, removes from :enable-tools)
+     :add-tools wins over :remove-tools on overlap.
    - All other options supported by start-mcp-server"
   [opts]
   (let [not-cwd? (get opts :not-cwd false)

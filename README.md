@@ -542,6 +542,36 @@ Available profiles:
 
 `:config-profile :cli-assist`
 
+#### `:enable-tools`
+**Optional** - Allowlist of tool keywords. When provided, replaces any `:enable-tools` value from config. Only the listed tools will be available.
+
+`:enable-tools [:clojure_eval :read_file]`
+
+#### `:disable-tools`
+**Optional** - Blocklist of tool keywords. When provided, replaces any `:disable-tools` value from config. The listed tools will be disabled.
+
+`:disable-tools [:bash :dispatch_agent]`
+
+#### `:add-tools`
+**Optional** - Force-enable specific tools after config resolution. Removes tools from the disable list, and adds them to the enable list if one is active. This is useful for selectively re-enabling tools that a config profile disables.
+
+`:add-tools [:my_custom_agent]`
+
+#### `:remove-tools`
+**Optional** - Force-disable specific tools after config resolution. Adds tools to the disable list, and removes them from the enable list if one is active. This is useful for selectively disabling tools without replacing the entire config.
+
+`:remove-tools [:clojure_eval]`
+
+#### Tool filtering application order
+
+1. Config loaded (home + project + profile merge)
+2. `:enable-tools`/`:disable-tools` from opts replace config values (if provided)
+3. `:remove-tools` applied (force-disable)
+4. `:add-tools` applied (force-enable — wins over `:remove-tools` on overlap)
+5. `ENABLE_TOOLS`/`DISABLE_TOOLS` env vars still win over everything
+
+See [Component Filtering](doc/component-filtering.md) for details on how enable/disable lists work in config files.
+
 ### Example Usage
 
 ```bash
@@ -572,6 +602,15 @@ clojure -Tmcp start :port 7888 :nrepl-env-type :bb
 
 # Using cli-assist profile for CLI coding assistants
 clojure -Tmcp start :config-profile :cli-assist
+
+# cli-assist with a custom agent tool re-enabled
+clojure -Tmcp start :config-profile :cli-assist :add-tools '[:my_custom_agent]'
+
+# cli-assist but also remove clojure_eval
+clojure -Tmcp start :config-profile :cli-assist :remove-tools '[:clojure_eval]'
+
+# Full override — only these two tools
+clojure -Tmcp start :enable-tools '[:clojure_eval :read_file]'
 ```
 
 **Note**: String values need to be properly quoted for the shell, hence `'"value"'` syntax for strings.

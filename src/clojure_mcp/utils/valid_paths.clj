@@ -140,10 +140,11 @@
      - .clj (Clojure)
      - .cljs (ClojureScript)
      - .cljc (Clojure/ClojureScript shared)
+     - .cljd (ClojureDart)
      - .bb (Babashka)
      - .edn (Extensible Data Notation)
      - .lpy (Librepl)
-     
+
      Also detects files starting with a Babashka shebang (`bb`)."
   [file-path]
   (when file-path

@@ -21,9 +21,12 @@
   "Search for patterns in dependency jar files on the classpath.
 - Uses `clojure -Spath` to resolve the exact dependency jars
 - Searches inside jar files for matching content
-- Supports glob patterns to filter file types (e.g., \"*.clj\", \"*.java\")
+- The `type` parameter is required and indicates the jar ecosystem:
+  - \"clj\": Clojure libraries (source is in the jar, searched directly)
+  - \"java\": Java libraries (source jars downloaded from Maven Central)
+- Binary files (.class, images, native libs) are always excluded
+- Optional `glob` parameter narrows which files are searched (e.g., \"*.java\", \"*test*\")
 - Three output modes: content (with line numbers), files_with_matches, count
-- Use this to find code patterns in your project's dependencies
 - Results include both jar path and entry path for use with deps_read tool
 - Requires: clojure CLI. Optional: ripgrep (rg) for context/multiline support
 - For Java sources: also requires curl (downloads sources from Maven Central)")
@@ -37,7 +40,8 @@
                 :glob {:type :string
                        :description "Glob pattern to filter files (e.g., \"*.clj\", \"*.{clj,java}\")"}
                 :type {:type :string
-                       :description "File type to search (e.g., \"clj\", \"java\"). Alternative to glob."}
+                       :enum ["clj" "java"]
+                       :description "Jar ecosystem type. \"clj\" for Clojure libraries (source in jar), \"java\" for Java libraries (downloads source jars from Maven Central)."}
                 :output_mode {:type :string
                               :enum ["content" "files_with_matches" "count"]
                               :description "Output mode: 'content' shows matching lines, 'files_with_matches' shows file paths, 'count' shows match count"}
@@ -45,7 +49,7 @@
                                    :description "Case insensitive search"}
                 :head_limit {:type :integer
                              :description "Limit output to first N results"}}
-   :required [:pattern :library]})
+   :required [:pattern :library :type]})
 
 (defmethod tool-system/validate-inputs :deps-grep [{:keys [nrepl-client-atom]} inputs]
   (let [{:keys [pattern library glob type output_mode case_insensitive head_limit]} inputs
@@ -57,6 +61,10 @@
       (throw (ex-info "Missing required parameter: pattern" {:inputs inputs})))
     (when-not library
       (throw (ex-info "Missing required parameter: library" {:inputs inputs})))
+    (when-not type
+      (throw (ex-info "Missing required parameter: type (must be \"clj\" or \"java\")" {:inputs inputs})))
+    (when-not (#{"clj" "java"} type)
+      (throw (ex-info (str "Invalid type: \"" type "\". Must be \"clj\" or \"java\"") {:inputs inputs})))
 
     {:project-dir project-dir
      :pattern pattern
