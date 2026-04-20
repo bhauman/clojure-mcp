@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **cljfmt upgraded** from `0.13.1` to `0.16.4`. This unlocks new cljfmt options that users can opt into via their project's `cljfmt.edn` (or `.cljfmt.edn`) — notably `:align-form-columns?` (let/binding alignment), `:align-map-columns?`, `:blank-lines-separate-alignment?`, `:max-column-alignment-gap`, and `:align-single-column-lines?`. Defaults are unchanged; existing formatting behavior is preserved unless you opt in.
+- **Breaking (cljfmt upstream, 0.16.0)**: cljfmt now ignores `.clj` config files by default. If your project uses `.cljfmt.clj` to configure cljfmt, rename it to `cljfmt.edn` or `.cljfmt.edn`.
+
 ## [0.3.1] - 2026-03-14
 
 Tool filtering can now be controlled directly from `main/start` opts and the CLI, without needing config files. Also fixes `deps_grep` to require the `:type` parameter and filter out binary file entries.

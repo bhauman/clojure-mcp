@@ -17,7 +17,7 @@
 
         ;; Clojure source manipulation
         rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}
-        dev.weavejester/cljfmt {:mvn/version "0.13.1"}
+        dev.weavejester/cljfmt {:mvn/version "0.16.4"}
         borkdude/edamame {:mvn/version "1.5.35"}
         org.clojars.oakes/parinfer {:mvn/version "0.4.0"}
 
