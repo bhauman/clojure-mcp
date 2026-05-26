@@ -36,6 +36,10 @@
 (defmethod tool-system/tool-name ::figwheel-eval [_]
   "clojurescript_eval")
 
+(defmethod tool-system/tool-annotations ::figwheel-eval [_]
+  {:title "Evaluate ClojureScript"
+   :destructive? true})
+
 (defmethod tool-system/tool-description ::figwheel-eval [_]
   "Takes a ClojureScript Expression and evaluates it in the current namespace. For example, providing `(+ 1 2)` will evaluate to 3.
 

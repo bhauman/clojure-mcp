@@ -21,6 +21,11 @@
 (defmethod tool-system/tool-name :glob-files [_]
   "glob_files")
 
+(defmethod tool-system/tool-annotations :glob-files [_]
+  {:title "Find Files by Pattern"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :glob-files [_]
   "Fast file pattern matching tool that works with any codebase size.
  - Supports glob patterns like \"**/*.clj\" or \"src/**/*.cljs\".

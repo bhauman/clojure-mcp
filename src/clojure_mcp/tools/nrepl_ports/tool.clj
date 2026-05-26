@@ -21,6 +21,11 @@
 (defmethod tool-system/tool-name :list-nrepl-ports [_]
   "list_nrepl_ports")
 
+(defmethod tool-system/tool-annotations :list-nrepl-ports [_]
+  {:title "List nREPL Servers"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :list-nrepl-ports [_]
   "Discover and list all running nREPL servers on this machine.
  - Checks for .nrepl-port files in the current directory

@@ -18,6 +18,10 @@
      session-type (assoc :session-type session-type))))
 
 ;; Implement the required multimethods for the eval tool
+(defmethod tool-system/tool-annotations ::clojure-eval [_]
+  {:title "Evaluate Clojure Code"
+   :destructive? true})
+
 (defmethod tool-system/tool-description ::clojure-eval [_]
   "Takes a Clojure Expression and evaluates it in the current namespace. For example, providing \"(+ 1 2)\" will evaluate to 3.
 

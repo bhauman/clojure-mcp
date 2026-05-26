@@ -71,6 +71,10 @@
 (defmethod tool-system/tool-name :scratch-pad [_]
   "scratch_pad")
 
+(defmethod tool-system/tool-annotations :scratch-pad [_]
+  {:title "Persistent Scratch Pad"
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :scratch-pad [_]
   "A persistent scratch pad for storing structured data between tool calls. Accepts any JSON value (objects, arrays, strings, numbers, booleans, null) and stores them at nested paths using set_path, get_path, delete_path operations.
 
@@ -337,6 +341,7 @@ Viewing tasks:
    :id (tool-system/tool-id tool-config)
    :description (tool-system/tool-description tool-config)
    :schema (tool-system/tool-schema tool-config)
+   :annotations (tool-system/tool-annotations tool-config)
    :tool-fn (fn [_ params callback]
               (if (nil? params)
                 (let [msg (str "Error: Received `null` arguments for scratch_pad call."

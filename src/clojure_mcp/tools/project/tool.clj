@@ -15,6 +15,11 @@
 (defmethod tool-system/tool-name :clojure-inspect-project [_]
   "clojure_inspect_project")
 
+(defmethod tool-system/tool-annotations :clojure-inspect-project [_]
+  {:title "Inspect Clojure Project"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :clojure-inspect-project [_]
   "Analyzes and provides detailed information about a Clojure project's structure, 
 including dependencies, source files, namespaces, and environment details.

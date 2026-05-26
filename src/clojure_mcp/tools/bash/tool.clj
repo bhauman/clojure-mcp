@@ -42,6 +42,10 @@
 (defmethod tool-system/tool-name :bash [_]
   "bash")
 
+(defmethod tool-system/tool-annotations :bash [_]
+  {:title "Execute Bash Command"
+   :destructive? true})
+
 (defmethod tool-system/tool-description :bash [_]
   "Execute bash shell commands on the host system.
 

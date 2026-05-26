@@ -17,6 +17,11 @@
 (defmethod tool-system/tool-name :paren-repair [_]
   "paren_repair")
 
+(defmethod tool-system/tool-annotations :paren-repair [_]
+  {:title "Repair Delimiters"
+   :destructive? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :paren-repair [_]
   "Fix delimiter errors (unbalanced parentheses, brackets, braces) in a Clojure file using parinfer.
 

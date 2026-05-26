@@ -16,6 +16,11 @@
 (defmethod tool-system/tool-name :file-edit [_]
   "file_edit")
 
+(defmethod tool-system/tool-annotations :file-edit [_]
+  {:title "Edit File Text"
+   :destructive? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :file-edit [_]
   "Edit a file by replacing a specific text string with a new one. For safety, this tool requires that the string to replace appears exactly once in the file. 
 

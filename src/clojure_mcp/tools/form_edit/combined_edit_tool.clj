@@ -32,6 +32,11 @@
 (defmethod tool-system/tool-name :clojure-edit-form [_]
   "clojure_edit")
 
+(defmethod tool-system/tool-annotations :clojure-edit-form [_]
+  {:title "Edit Clojure Form"
+   :destructive? true
+   :idempotent? true})
+
 ;; Tool description implementation
 (defmethod tool-system/tool-description :clojure-edit-form [_]
   "Edits a top-level form (`defn`, `def`, `defmethod`, `ns`, `deftest`) in a Clojure file using the specified operation.

@@ -16,6 +16,7 @@
            [io.modelcontextprotocol.spec
             McpSchema$ServerCapabilities
             McpSchema$Tool
+            McpSchema$ToolAnnotations
             McpSchema$CallToolRequest
             McpSchema$CallToolResult
             McpSchema$TextContent
@@ -67,13 +68,32 @@
       (.isError error?)
       (.build)))
 
+(defn- ->tool-annotations
+  "Builds an McpSchema$ToolAnnotations from a Clojure annotation map, or nil
+   if the map is nil/empty. Keys (all optional):
+     :title           - human-readable name (String)
+     :read-only?      - Boolean (nil means unspecified)
+     :destructive?    - Boolean
+     :idempotent?     - Boolean
+     :open-world?     - Boolean
+     :return-direct?  - Boolean
+   nil values are preserved as 'unspecified' per the MCP spec."
+  ^McpSchema$ToolAnnotations
+  [{:keys [title read-only? destructive? idempotent? open-world? return-direct?]
+    :as annotations}]
+  (when (seq annotations)
+    (McpSchema$ToolAnnotations.
+     title read-only? destructive? idempotent? open-world? return-direct?)))
+
 (defn create-async-tool
   "Creates an AsyncToolSpecification with the given parameters.
-   
+
    Takes a map with the following keys:
     :name         - The name of the tool
     :description  - A description of what the tool does
     :schema       - JSON schema for the tool's input parameters
+    :annotations  - (Optional) MCP ToolAnnotations as a Clojure map. See
+                    `->tool-annotations` for the recognized keys.
     :service-atom - The atom holding the nREPL client connection.
     :tool-fn      - Function that implements the tool's logic.
                     Signature: (fn [exchange args-map nrepl-client clj-result-k] ... )
@@ -81,13 +101,15 @@
                       * arg-map      - map with string keys representing the mcp tool call args
                       * nrepl-client - the validated and dereferenced nREPL client
                       * clj-result-k - continuation fn taking vector of strings and boolean error flag."
-  [{:keys [name description schema tool-fn]}]
+  [{:keys [name description schema annotations tool-fn]}]
   (let [schema-json (json/write-str schema)
-        mcp-tool (-> (McpSchema$Tool/builder)
-                     (.name name)
-                     (.description description)
-                     (.inputSchema json-mapper schema-json)
-                     (.build))
+        tool-annotations (->tool-annotations annotations)
+        mcp-tool (cond-> (McpSchema$Tool/builder)
+                   true (.name name)
+                   true (.description description)
+                   true (.inputSchema json-mapper schema-json)
+                   tool-annotations (.annotations tool-annotations)
+                   true (.build))
         mono-fn (create-mono-from-callback
                  (fn [exchange arg-map mono-fill-k]
                    (let [clj-result-k

@@ -15,6 +15,11 @@
 (defmethod tool-system/tool-name :deps-read [_]
   "deps_read")
 
+(defmethod tool-system/tool-annotations :deps-read [_]
+  {:title "Read from Dependency"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :deps-read [_]
   "Read a file from inside a dependency jar.
 - Takes file_path in 'jar-path:entry-path' format (from deps_grep results)

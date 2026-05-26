@@ -43,6 +43,14 @@
    Dispatches on :tool-type in the tool-config."
   (fn [tool-config _inputs] (:tool-type tool-config)))
 
+(defmulti tool-annotations
+  "Returns the MCP ToolAnnotations as a Clojure map (or nil for none).
+   Recognized keys: :title :read-only? :destructive? :idempotent?
+   :open-world? :return-direct?. Dispatches on :tool-type."
+  :tool-type)
+
+(defmethod tool-annotations :default [_tool-config] nil)
+
 (defmulti format-results
   "Formats the results from tool execution into the expected MCP response format.
    Must return a map with :result (a vector or sequence of strings) and :error (boolean).
@@ -89,6 +97,7 @@
    :id (tool-id tool-config)
    :description (tool-description tool-config)
    :schema (tool-schema tool-config)
+   :annotations (tool-annotations tool-config)
    :tool-fn (fn [_ params callback]
               (try
                 (let [keywordized-params (keywordize-keys-preserve-underscores params)

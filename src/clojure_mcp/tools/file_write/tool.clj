@@ -23,6 +23,11 @@
 (defmethod tool-system/tool-name :file-write [_]
   "file_write")
 
+(defmethod tool-system/tool-annotations :file-write [_]
+  {:title "Write File"
+   :destructive? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :file-write [_]
   "Write a file to the local filesystem. Overwrites the existing file if there is one.
 

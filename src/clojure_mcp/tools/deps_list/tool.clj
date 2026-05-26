@@ -17,6 +17,11 @@
 (defmethod tool-system/tool-name :deps-list [_]
   "deps_list")
 
+(defmethod tool-system/tool-annotations :deps-list [_]
+  {:title "List Dependencies"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :deps-list [_]
   "List all dependencies on the project classpath with Maven coordinates.
 - Shows group/artifact and version for each dependency

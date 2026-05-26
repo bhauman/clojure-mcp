@@ -38,6 +38,11 @@
 (defmethod tool-system/tool-name :clojure-update-sexp [{:keys [multi-op]}]
   (if multi-op "clojure_update_sexp" "clojure_edit_replace_sexp"))
 
+(defmethod tool-system/tool-annotations :clojure-update-sexp [{:keys [multi-op]}]
+  {:title (if multi-op "Update S-Expression" "Replace S-Expression")
+   :destructive? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :clojure-update-sexp [{:keys [multi-op]}]
   (slurp
    (io/resource

@@ -21,6 +21,11 @@
 (defmethod tool-system/tool-name :grep [_]
   "grep")
 
+(defmethod tool-system/tool-annotations :grep [_]
+  {:title "Search Files by Content"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :grep [_]
   "Fast content search tool that works with any codebase size.
 - Finds the paths to files that have matching contents using regular expressions.

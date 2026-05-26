@@ -40,6 +40,11 @@
 (defmethod tool-system/tool-name :unified-read-file [_]
   "read_file")
 
+(defmethod tool-system/tool-annotations :unified-read-file [_]
+  {:title "Read File"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :unified-read-file [{:keys [max-lines max-line-length]}]
   (str "Smart file reader with pattern-based exploration for Clojure files.
    

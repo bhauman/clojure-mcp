@@ -17,6 +17,11 @@
 (defmethod tool-system/tool-name :deps-grep [_]
   "deps_grep")
 
+(defmethod tool-system/tool-annotations :deps-grep [_]
+  {:title "Search Dependencies"
+   :read-only? true
+   :idempotent? true})
+
 (defmethod tool-system/tool-description :deps-grep [_]
   "Search for patterns in dependency jar files on the classpath.
 - Uses `clojure -Spath` to resolve the exact dependency jars
