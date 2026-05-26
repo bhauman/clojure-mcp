@@ -122,15 +122,15 @@
       (.delete tmp))))
 
 (deftest dash-to-underscore-correction-test
-  (let [test-dir (io/file (System/getProperty "java.io.tmpdir") "valid-paths-dash-test")
+  (let [test-dir (.toFile (java.nio.file.Files/createTempDirectory
+                           "valid-paths-dash-test"
+                           (make-array java.nio.file.attribute.FileAttribute 0)))
         canonical-dir (.getCanonicalPath test-dir)
         make-client (fn []
                       {:clojure-mcp.config/config
                        {:nrepl-user-dir canonical-dir
                         :allowed-directories [canonical-dir]}})]
     (try
-      (.mkdirs test-dir)
-
       (testing "Clojure file with dashes corrected to underscores when underscore version exists"
         (let [underscore-file (io/file test-dir "core_stuff.clj")
               _ (spit underscore-file "(ns core-stuff)")
