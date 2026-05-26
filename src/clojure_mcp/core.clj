@@ -16,6 +16,7 @@
            [io.modelcontextprotocol.spec
             McpSchema$ServerCapabilities
             McpSchema$Tool
+            McpSchema$CallToolRequest
             McpSchema$CallToolResult
             McpSchema$TextContent
             McpSchema$Prompt
@@ -28,7 +29,12 @@
             McpSchema$TextResourceContents
             McpSchema$ReadResourceResult]
            [reactor.core.publisher Mono]
-           [io.modelcontextprotocol.json McpJsonMapper]))
+           [io.modelcontextprotocol.json McpJsonMapper]
+           [io.modelcontextprotocol.json.jackson3 JacksonMcpJsonMapper]
+           [tools.jackson.databind.json JsonMapper]))
+
+(defonce ^McpJsonMapper json-mapper
+  (JacksonMcpJsonMapper. (JsonMapper.)))
 
 (defn create-mono-from-callback
   "Creates a function that takes the exchange and the arguments map and
@@ -56,7 +62,10 @@
     :else (McpSchema$TextContent. " ")))
 
 (defn adapt-results ^McpSchema$CallToolResult [list-str error?]
-  (McpSchema$CallToolResult. (vec (keep adapt-result list-str)) error?))
+  (-> (McpSchema$CallToolResult/builder)
+      (.content (vec (keep adapt-result list-str)))
+      (.isError error?)
+      (.build)))
 
 (defn create-async-tool
   "Creates an AsyncToolSpecification with the given parameters.
@@ -74,7 +83,6 @@
                       * clj-result-k - continuation fn taking vector of strings and boolean error flag."
   [{:keys [name description schema tool-fn]}]
   (let [schema-json (json/write-str schema)
-        json-mapper (McpJsonMapper/getDefault)
         mcp-tool (-> (McpSchema$Tool/builder)
                      (.name name)
                      (.description description)
@@ -89,9 +97,10 @@
     (McpServerFeatures$AsyncToolSpecification.
      mcp-tool
      (reify java.util.function.BiFunction
-       (apply [_this exchange arguments]
-         (log/debug (str "Args from MCP: " (pr-str arguments)))
-         (mono-fn exchange arguments))))))
+       (apply [_this exchange request]
+         (let [arguments (.arguments ^McpSchema$CallToolRequest request)]
+           (log/debug (str "Args from MCP: " (pr-str arguments)))
+           (mono-fn exchange arguments)))))))
 
 (defn adapt-prompt-result
   "Adapts a Clojure prompt result map into an McpSchema$GetPromptResult.
@@ -164,7 +173,12 @@
                       * request      - The request object
                       * clj-result-k - continuation fn taking a vector of strings"
   [{:keys [url name description mime-type resource-fn]}]
-  (let [resource (McpSchema$Resource. url name description mime-type nil)
+  (let [resource (-> (McpSchema$Resource/builder)
+                     (.uri url)
+                     (.name name)
+                     (.description description)
+                     (.mimeType mime-type)
+                     (.build))
         mono-fn (create-mono-from-callback
                  (fn [exchange request mono-fill-k]
                    (resource-fn
@@ -216,7 +230,7 @@
   []
   (log/info "Starting MCP server")
   (try
-    (let [transport-provider (StdioServerTransportProvider. (McpJsonMapper/getDefault))
+    (let [transport-provider (StdioServerTransportProvider. json-mapper)
           server (-> (McpServer/async transport-provider)
                      (.serverInfo "clojure-server" "0.1.11")
                      (.capabilities (-> (McpSchema$ServerCapabilities/builder)
