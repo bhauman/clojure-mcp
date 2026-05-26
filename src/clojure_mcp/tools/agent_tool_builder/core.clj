@@ -94,7 +94,6 @@
   [nrepl-client-atom agent-config]
   (let [cache-key (keyword (str "agent-tool-builder-" (name (:id agent-config))))
         cached-agent (get @nrepl-client-atom cache-key)]
-
     (or cached-agent
         (let [new-agent (build-agent-from-config nrepl-client-atom agent-config)]
           ;; Cache the agent
