@@ -173,7 +173,22 @@
           builder (model/create-model-builder :anthropic/claude-opus-4-8-reasoning {})]
       (is (= :adaptive (get-in config [:thinking :type])))
       (is (= :summarized (get-in config [:thinking :display])))
-      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder)))))
+      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder))))
+
+  (testing "Anthropic models accept effort levels including :xhigh and :max"
+    (doseq [effort [:low :medium :high :xhigh :max]]
+      (let [builder (model/create-model-builder
+                     :anthropic/claude-opus-4-8-reasoning
+                     {:thinking {:effort effort}})]
+        (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder)
+            (str "effort " effort " should validate and build")))))
+
+  (testing "Thinking overrides merge with defaults instead of replacing them"
+    (let [config (model/merge-with-defaults :anthropic/claude-opus-4-8-reasoning
+                                            {:thinking {:effort :xhigh}})]
+      (is (= :adaptive (get-in config [:thinking :type]))
+          "Partial thinking override should keep :type from defaults")
+      (is (= :xhigh (get-in config [:thinking :effort]))))))
 
 (deftest test-builder-modifications
   (testing "Builders can be modified before building"

@@ -451,9 +451,19 @@
 (defn get-provider [model-key]
   (-> model-key namespace keyword))
 
+(defn merge-model-config
+  "Merges a base model config with overrides. The :thinking map is merged
+   key-wise so a partial override like {:thinking {:effort :high}} refines
+   the base thinking configuration instead of replacing it."
+  [base overrides]
+  (let [merged (merge base overrides)]
+    (if (and (map? (:thinking base)) (map? (:thinking overrides)))
+      (assoc merged :thinking (merge (:thinking base) (:thinking overrides)))
+      merged)))
+
 (defn merge-with-defaults [model-key config-overrides]
   (let [defaults (get default-configs model-key {})]
-    (merge defaults config-overrides)))
+    (merge-model-config defaults config-overrides)))
 
 (def ^:dynamic *env-overrides*
   "Dynamic var for overriding environment variables in tests.
@@ -565,7 +575,11 @@
         ;; :thinking :type (:enabled or :adaptive) takes precedence over
         ;; the legacy boolean :thinking :enabled flag
         thinking-type (or (some-> (get-in config [:thinking :type]) name)
-                          (when (get-in config [:thinking :enabled]) "enabled"))]
+                          (when (get-in config [:thinking :enabled]) "enabled"))
+        ;; The builder has no first-class setter for output_config.effort,
+        ;; but customParameters merges into the request body (see
+        ;; langchain4j#4817)
+        effort (get-in config [:thinking :effort])]
     (-> builder
         (apply-common-params config)
         (cond->
@@ -574,6 +588,7 @@
          (:top-k config) (.topK (int (:top-k config)))
           ;; Thinking configuration
          thinking-type (.thinkingType thinking-type)
+         effort (.customParameters {"output_config" {"effort" (name effort)}})
          (get-in config [:thinking :display])
          (.thinkingDisplay (name (get-in config [:thinking :display])))
          (get-in config [:thinking :return]) (.returnThinking true)
@@ -593,7 +608,8 @@
   (when thinking-params
     (let [effort (:effort thinking-params :medium)
           budget (or (:budget-tokens thinking-params)
-                     (get {:low 1024 :medium 4096 :high 8192} effort))]
+                     (get {:low 1024 :medium 4096 :high 8192
+                           :xhigh 16384 :max 24576} effort))]
       (-> (GeminiThinkingConfig/builder)
           (.includeThoughts true)
           (.thinkingBudget (int budget))
@@ -810,7 +826,7 @@
          resolved-base (resolve-env-refs base-config)
          resolved-overrides (resolve-env-refs config-overrides)
          ;; Merge resolved configs
-         merged-config (merge resolved-base resolved-overrides)
+         merged-config (merge-model-config resolved-base resolved-overrides)
          ;; Ensure provider is set (from config or model-key)
          config-with-provider (ensure-provider merged-config model-key)
          ;; Extract provider for API key

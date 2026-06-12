@@ -62,7 +62,8 @@
    [:display {:optional true} [:enum :summarized :omitted]]
    [:return {:optional true} :boolean]
    [:send {:optional true} :boolean]
-   [:effort {:optional true} [:enum :low :medium :high]]
+   ;; :xhigh and :max are Anthropic-only (Claude Opus 4.6+ / Sonnet 4.6+)
+   [:effort {:optional true} [:enum :low :medium :high :xhigh :max]]
    [:budget-tokens {:optional true} [:int {:min 1 :max 100000}]]])
 
 (def ModelConfig

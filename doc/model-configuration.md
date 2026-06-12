@@ -277,6 +277,22 @@ Note: Claude Opus 4.7+ and Claude Fable 5 reject sampling parameters
 `-reasoning` variants use adaptive thinking (`:thinking {:type :adaptive}`)
 instead. Claude Fable 5 always has thinking enabled server-side.
 
+Thinking depth on these models is controlled with `:thinking {:effort ...}`,
+which is sent as Anthropic's `output_config.effort`. Levels are `:low`,
+`:medium`, `:high` (the API default), `:xhigh`, and `:max` — the latter two
+are Anthropic-only. For example:
+
+```clojure
+{:models {:anthropic/opus-deep {:model-name "claude-opus-4-8"
+                                :max-tokens 8192
+                                :thinking {:type :adaptive
+                                           :effort :xhigh}}}}
+```
+
+Partial `:thinking` overrides merge with a built-in model's defaults, so
+`{:thinking {:effort :xhigh}}` on `:anthropic/claude-opus-4-8-reasoning`
+keeps adaptive thinking enabled.
+
 ## API Keys
 
 API keys can be provided in three ways (in order of precedence):
