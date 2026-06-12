@@ -35,6 +35,22 @@
    :send true
    :effort :medium})
 
+(def adaptive-model-base
+  "Base configuration for Anthropic models with adaptive thinking
+   (Claude Opus 4.7 and later, Claude Fable 5). These models reject
+   sampling params (:temperature, :top-p, :top-k) and thinking
+   :budget-tokens, so neither belongs in their defaults."
+  {:max-tokens 8192
+   :max-retries 3
+   :timeout 120000})
+
+(def adaptive-thinking-base
+  "Thinking configuration for adaptive-thinking Anthropic models."
+  {:type :adaptive
+   :display :summarized
+   :return true
+   :send true})
+
 (def default-configs
   {;; OpenAI Models
    :openai/gpt-4o
@@ -113,14 +129,34 @@
           {:model-name "gpt-5.2-codex"
            :thinking {:effort :medium}})
 
+   :openai/gpt-5-3-codex
+   (merge model-base
+          {:model-name "gpt-5.3-codex"
+           :thinking {:effort :medium}})
+
    :openai/gpt-5-4
    (merge model-base
           {:model-name "gpt-5.4"
            :thinking {:effort :medium}})
 
+   :openai/gpt-5-4-mini
+   (merge model-base
+          {:model-name "gpt-5.4-mini"
+           :thinking {:effort :medium}})
+
    :openai/gpt-5-4-pro
    (merge model-base
           {:model-name "gpt-5.4-pro"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-5
+   (merge model-base
+          {:model-name "gpt-5.5"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-5-pro
+   (merge model-base
+          {:model-name "gpt-5.5-pro"
            :thinking {:effort :medium}})
 
    :openai/o1
@@ -195,11 +231,15 @@
 
    :google/gemini-3-1-flash-lite
    (merge model-base
-          {:model-name "gemini-3.1-flash-lite-preview"})
+          {:model-name "gemini-3.1-flash-lite"})
 
    :google/gemini-3-1-pro
    (merge model-base
           {:model-name "gemini-3.1-pro-preview"})
+
+   :google/gemini-3-5-flash
+   (merge model-base
+          {:model-name "gemini-3.5-flash"})
 
    ;; Mistral Models (via OpenAI-compatible API)
    :mistral/mistral-large
@@ -245,6 +285,29 @@
            :base-url "https://api.mistral.ai/v1"})
 
    ;; Anthropic Models
+   :anthropic/claude-fable-5
+   ;; Fable 5 always thinks server-side; no thinking params are sent.
+   (merge adaptive-model-base
+          {:model-name "claude-fable-5"})
+
+   :anthropic/claude-opus-4-8
+   (merge adaptive-model-base
+          {:model-name "claude-opus-4-8"})
+
+   :anthropic/claude-opus-4-8-reasoning
+   (merge adaptive-model-base
+          {:model-name "claude-opus-4-8"
+           :thinking adaptive-thinking-base})
+
+   :anthropic/claude-opus-4-7
+   (merge adaptive-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_7})
+
+   :anthropic/claude-opus-4-7-reasoning
+   (merge adaptive-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_7
+           :thinking adaptive-thinking-base})
+
    :anthropic/claude-opus-4-1
    (merge model-base
           {:model-name "claude-opus-4-1-20250805"})
@@ -314,9 +377,13 @@
   "Short aliases for commonly used models. Aliases are unnamespaced keywords
    that resolve to full model keys."
   {;; Anthropic aliases
+   :fable     :anthropic/claude-fable-5
+   :fable-5   :anthropic/claude-fable-5
    :sonnet    :anthropic/claude-sonnet-4-6
-   :opus      :anthropic/claude-opus-4-6
+   :opus      :anthropic/claude-opus-4-8
    :haiku     :anthropic/claude-haiku-4-5
+   :opus-4-8  :anthropic/claude-opus-4-8
+   :opus-4-7  :anthropic/claude-opus-4-7
    :sonnet-4-6 :anthropic/claude-sonnet-4-6
    :opus-4-6  :anthropic/claude-opus-4-6
    :sonnet-4-5 :anthropic/claude-sonnet-4-5
@@ -325,14 +392,15 @@
    :sonnet-4  :anthropic/claude-sonnet-4
    ;; Anthropic reasoning aliases
    :sonnet-reasoning  :anthropic/claude-sonnet-4-6-reasoning
-   :opus-reasoning    :anthropic/claude-opus-4-6-reasoning
-   ;; Google aliases - latest points to 3.1
+   :opus-reasoning    :anthropic/claude-opus-4-8-reasoning
+   ;; Google aliases - pro points to 3.1, flash to 3.5
    :gemini    :google/gemini-3-1-pro
-   :gemini-flash :google/gemini-3-1-flash-lite
-   :flash     :google/gemini-3-1-flash-lite
+   :gemini-flash :google/gemini-3-5-flash
+   :flash     :google/gemini-3-5-flash
    :flash-lite :google/gemini-3-1-flash-lite
    :gemini-pro :google/gemini-3-1-pro
    ;; Google 3.x aliases
+   :gemini-3-5-flash :google/gemini-3-5-flash
    :gemini-3-1-pro :google/gemini-3-1-pro
    :gemini-3-1-flash-lite :google/gemini-3-1-flash-lite
    :gemini-3-flash :google/gemini-3-flash
@@ -344,19 +412,23 @@
    :flash-reasoning  :google/gemini-2-5-flash-reasoning
    :gemini-pro-reasoning :google/gemini-2-5-pro-reasoning
    ;; OpenAI aliases
+   :gpt-5-5   :openai/gpt-5-5
+   :gpt-5-5-pro :openai/gpt-5-5-pro
    :gpt-5-4   :openai/gpt-5-4
    :gpt-5-4-pro :openai/gpt-5-4-pro
+   :gpt-5-4-mini :openai/gpt-5-4-mini
    :gpt-5-2   :openai/gpt-5-2
    :gpt-5-1   :openai/gpt-5-1
    :gpt-5     :openai/gpt-5
    :o4-mini   :openai/o4-mini
    :o3        :openai/o3
    :o3-pro    :openai/o3-pro
-   ;; Codex aliases
-   :codex     :openai/gpt-5-4-pro
+   ;; Codex aliases - Codex now runs on the mainline gpt-5.5 model
+   :codex     :openai/gpt-5-5
    :gpt-5-1-codex :openai/gpt-5-1-codex
    :gpt-5-1-codex-max :openai/gpt-5-1-codex-max
    :gpt-5-2-codex :openai/gpt-5-2-codex
+   :gpt-5-3-codex :openai/gpt-5-3-codex
    ;; Mistral aliases
    :mistral       :mistral/mistral-large
    :mistral-large :mistral/mistral-large
@@ -489,7 +561,11 @@
 ;; Anthropic implementation
 (defmethod create-builder :anthropic
   [config]
-  (let [builder (AnthropicChatModel/builder)]
+  (let [builder (AnthropicChatModel/builder)
+        ;; :thinking :type (:enabled or :adaptive) takes precedence over
+        ;; the legacy boolean :thinking :enabled flag
+        thinking-type (or (some-> (get-in config [:thinking :type]) name)
+                          (when (get-in config [:thinking :enabled]) "enabled"))]
     (-> builder
         (apply-common-params config)
         (cond->
@@ -497,7 +573,9 @@
          (:max-tokens config) (.maxTokens (int (:max-tokens config)))
          (:top-k config) (.topK (int (:top-k config)))
           ;; Thinking configuration
-         (get-in config [:thinking :enabled]) (.thinkingType "enabled")
+         thinking-type (.thinkingType thinking-type)
+         (get-in config [:thinking :display])
+         (.thinkingDisplay (name (get-in config [:thinking :display])))
          (get-in config [:thinking :return]) (.returnThinking true)
          (get-in config [:thinking :send]) (.sendThinking true)
          (get-in config [:thinking :budget-tokens])

@@ -32,8 +32,12 @@
       (is (contains? (set models) :openai/gpt-5-2))
       (is (contains? (set models) :openai/gpt-5-2-pro))
       (is (contains? (set models) :openai/gpt-5-2-codex))
+      (is (contains? (set models) :openai/gpt-5-3-codex))
       (is (contains? (set models) :openai/gpt-5-4))
+      (is (contains? (set models) :openai/gpt-5-4-mini))
       (is (contains? (set models) :openai/gpt-5-4-pro))
+      (is (contains? (set models) :openai/gpt-5-5))
+      (is (contains? (set models) :openai/gpt-5-5-pro))
       (is (contains? (set models) :openai/o1))
       (is (contains? (set models) :openai/o1-mini))
       (is (contains? (set models) :openai/o1-pro))
@@ -52,13 +56,19 @@
       (is (contains? (set models) :google/gemini-3-pro))
       (is (contains? (set models) :google/gemini-3-1-flash-lite))
       (is (contains? (set models) :google/gemini-3-1-pro))
+      (is (contains? (set models) :google/gemini-3-5-flash))
       ;; Anthropic models
+      (is (contains? (set models) :anthropic/claude-fable-5))
       (is (contains? (set models) :anthropic/claude-opus-4))
       (is (contains? (set models) :anthropic/claude-opus-4-reasoning))
       (is (contains? (set models) :anthropic/claude-opus-4-1))
       (is (contains? (set models) :anthropic/claude-opus-4-1-reasoning))
       (is (contains? (set models) :anthropic/claude-opus-4-6))
       (is (contains? (set models) :anthropic/claude-opus-4-6-reasoning))
+      (is (contains? (set models) :anthropic/claude-opus-4-7))
+      (is (contains? (set models) :anthropic/claude-opus-4-7-reasoning))
+      (is (contains? (set models) :anthropic/claude-opus-4-8))
+      (is (contains? (set models) :anthropic/claude-opus-4-8-reasoning))
       (is (contains? (set models) :anthropic/claude-sonnet-4))
       (is (contains? (set models) :anthropic/claude-sonnet-4-reasoning))
       (is (contains? (set models) :anthropic/claude-sonnet-4-5))
@@ -74,7 +84,7 @@
       (is (contains? (set models) :mistral/devstral))
       (is (contains? (set models) :mistral/magistral-medium))
       (is (contains? (set models) :mistral/magistral-small))
-      (is (= 55 (count models))))))
+      (is (= 65 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"
@@ -147,7 +157,23 @@
 
   (testing "Opus reasoning has budget tokens configured"
     (let [opus-reasoning (model/merge-with-defaults :anthropic/claude-opus-4-reasoning {})]
-      (is (= 4096 (get-in opus-reasoning [:thinking :budget-tokens]))))))
+      (is (= 4096 (get-in opus-reasoning [:thinking :budget-tokens])))))
+
+  (testing "Adaptive thinking models have no sampling params or budget tokens"
+    (doseq [model-key [:anthropic/claude-fable-5
+                       :anthropic/claude-opus-4-7-reasoning
+                       :anthropic/claude-opus-4-8-reasoning]]
+      (let [config (model/merge-with-defaults model-key {})]
+        (is (nil? (:temperature config)) (str model-key " should not set temperature"))
+        (is (nil? (get-in config [:thinking :budget-tokens]))
+            (str model-key " should not set budget-tokens")))))
+
+  (testing "Opus 4.8 reasoning uses adaptive thinking"
+    (let [config (model/merge-with-defaults :anthropic/claude-opus-4-8-reasoning {})
+          builder (model/create-model-builder :anthropic/claude-opus-4-8-reasoning {})]
+      (is (= :adaptive (get-in config [:thinking :type])))
+      (is (= :summarized (get-in config [:thinking :display])))
+      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder)))))
 
 (deftest test-builder-modifications
   (testing "Builders can be modified before building"

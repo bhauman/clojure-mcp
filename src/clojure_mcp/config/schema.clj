@@ -58,6 +58,8 @@
   "Schema for thinking/reasoning configuration in models"
   [:map {:closed true}
    [:enabled {:optional true} :boolean]
+   [:type {:optional true} [:enum :enabled :adaptive]]
+   [:display {:optional true} [:enum :summarized :omitted]]
    [:return {:optional true} :boolean]
    [:send {:optional true} :boolean]
    [:effort {:optional true} [:enum :low :medium :high]]

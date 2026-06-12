@@ -230,7 +230,7 @@ If a model key is not found in your custom configuration, the system automatical
 
 ## Built-in Models
 
-The system includes 55 pre-configured models that can be used without configuration:
+The system includes 65 pre-configured models that can be used without configuration:
 
 ### OpenAI
 - `:openai/gpt-4o`
@@ -238,7 +238,9 @@ The system includes 55 pre-configured models that can be used without configurat
 - `:openai/gpt-5`, `:openai/gpt-5-mini`, `:openai/gpt-5-nano`, `:openai/gpt-5-pro`, `:openai/gpt-5-codex`
 - `:openai/gpt-5-1`, `:openai/gpt-5-1-codex`, `:openai/gpt-5-1-codex-max`, `:openai/gpt-5-1-codex-mini`
 - `:openai/gpt-5-2`, `:openai/gpt-5-2-pro`, `:openai/gpt-5-2-codex`
-- `:openai/gpt-5-4`, `:openai/gpt-5-4-pro`
+- `:openai/gpt-5-3-codex`
+- `:openai/gpt-5-4`, `:openai/gpt-5-4-mini`, `:openai/gpt-5-4-pro`
+- `:openai/gpt-5-5`, `:openai/gpt-5-5-pro`
 - `:openai/o1`, `:openai/o1-mini`, `:openai/o1-pro`
 - `:openai/o3`, `:openai/o3-mini`, `:openai/o3-pro`
 - `:openai/o4-mini`, `:openai/o4-mini-reasoning`
@@ -251,6 +253,7 @@ The system includes 55 pre-configured models that can be used without configurat
 - `:google/gemini-2-5-pro-reasoning`
 - `:google/gemini-3-flash`, `:google/gemini-3-pro`
 - `:google/gemini-3-1-flash-lite`, `:google/gemini-3-1-pro`
+- `:google/gemini-3-5-flash`
 
 ### Mistral (via OpenAI-compatible API, requires `MISTRAL_API_KEY`)
 - `:mistral/mistral-large`, `:mistral/mistral-medium`, `:mistral/mistral-small`
@@ -258,6 +261,9 @@ The system includes 55 pre-configured models that can be used without configurat
 - `:mistral/magistral-medium`, `:mistral/magistral-small`
 
 ### Anthropic
+- `:anthropic/claude-fable-5`
+- `:anthropic/claude-opus-4-8`, `:anthropic/claude-opus-4-8-reasoning`
+- `:anthropic/claude-opus-4-7`, `:anthropic/claude-opus-4-7-reasoning`
 - `:anthropic/claude-opus-4-6`, `:anthropic/claude-opus-4-6-reasoning`
 - `:anthropic/claude-sonnet-4-6`, `:anthropic/claude-sonnet-4-6-reasoning`
 - `:anthropic/claude-opus-4-1`, `:anthropic/claude-opus-4-1-reasoning`
@@ -265,6 +271,11 @@ The system includes 55 pre-configured models that can be used without configurat
 - `:anthropic/claude-sonnet-4-5`, `:anthropic/claude-sonnet-4-5-reasoning`
 - `:anthropic/claude-sonnet-4`, `:anthropic/claude-sonnet-4-reasoning`
 - `:anthropic/claude-haiku-4-5`
+
+Note: Claude Opus 4.7+ and Claude Fable 5 reject sampling parameters
+(`:temperature`, `:top-p`, `:top-k`) and thinking `:budget-tokens` — their
+`-reasoning` variants use adaptive thinking (`:thinking {:type :adaptive}`)
+instead. Claude Fable 5 always has thinking enabled server-side.
 
 ## API Keys
 
