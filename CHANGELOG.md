@@ -2,9 +2,36 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-17
+
+Refreshes the built-in LLM model catalog for the latest provider releases: upgrades LangChain4j to 1.16.2 and adds the newest Anthropic (Claude Opus 4.8, Claude Fable 5), OpenAI (GPT-5.5 family), and Google (Gemini 3.5 Flash) models — 65 built-in models in total. You can now control reasoning depth on Anthropic's adaptive-thinking models via configurable effort levels. Also adds MCP tool annotations, ClojureDart (`.cljd`) support, and auto-correction of dash/underscore filename mismatches in path validation.
+
+### Major Changes
+
+#### LangChain4j 1.16.2 Upgrade & New Models
+- Updated LangChain4j from 1.12.2 to 1.16.2 across all four artifacts (core, OpenAI, Anthropic, Google Gemini)
+- **New Anthropic models**: `claude-opus-4-8`, `claude-opus-4-7`, and `claude-fable-5` (with reasoning variants). Aliases: `:opus` now resolves to Opus 4.8, plus `:fable`/`:fable-5`, `:opus-4-8`, `:opus-4-7`, and `:opus-reasoning`
+- **New OpenAI models**: GPT-5.5, GPT-5.5 Pro, GPT-5.4 Mini, and GPT-5.3 Codex. Aliases: `:gpt-5-5`, `:gpt-5-5-pro`, `:gpt-5-4-mini`, `:gpt-5-3-codex`, and `:codex` now resolves to GPT-5.5
+- **New Google models**: Gemini 3.5 Flash (`:flash`/`:gemini-flash` now resolve to it) and `gemini-3.1-flash-lite`
+- **65 total built-in models** (up from 55)
+
+#### Configurable Reasoning Effort for Anthropic Adaptive Thinking
+- Anthropic adaptive-thinking models (Opus 4.7+, Fable 5) accept a reasoning effort level via `{:thinking {:effort ...}}` — `:low`, `:medium`, `:high`, `:xhigh`, or `:max` (`:xhigh`/`:max` are Anthropic-only)
+- Adaptive-thinking models correctly omit sampling params (`:temperature`, `:top-p`, `:top-k`) and thinking `:budget-tokens`, which these models reject
+- Partial `:thinking` overrides now merge with model defaults instead of replacing them, so refining one key (e.g. `{:thinking {:effort :high}}`) preserves the rest of the configuration
+
+### Added
+- **MCP tool annotations**: Built-in tools now expose MCP `ToolAnnotations` (read-only / destructive / idempotent hints) so clients can present and gate tools more accurately
+- **ClojureDart support**: `.cljd` files are now recognized as Clojure files, with file-type detection consolidated across the codebase
+- **`/release` slash command**: Automates cutting a release — branch check, changelog update, version tag, push, and GitHub release
+
 ### Changed
+- **MCP Java SDK** updated to 1.1.3
 - **cljfmt upgraded** from `0.13.1` to `0.16.4`. This unlocks new cljfmt options that users can opt into via their project's `cljfmt.edn` (or `.cljfmt.edn`) — notably `:align-form-columns?` (let/binding alignment), `:align-map-columns?`, `:blank-lines-separate-alignment?`, `:max-column-alignment-gap`, and `:align-single-column-lines?`. Defaults are unchanged; existing formatting behavior is preserved unless you opt in.
 - **Breaking (cljfmt upstream, 0.16.0)**: cljfmt now ignores `.clj` config files by default. If your project uses `.cljfmt.clj` to configure cljfmt, rename it to `cljfmt.edn` or `.cljfmt.edn`.
+
+### Fixed
+- **Path validation**: File paths with dash/underscore mismatches are now auto-corrected, so a path like `my-ns/core.clj` resolves to `my_ns/core.clj` on disk when the underscore form exists (#48, #161)
 
 ## [0.3.1] - 2026-03-14
 
