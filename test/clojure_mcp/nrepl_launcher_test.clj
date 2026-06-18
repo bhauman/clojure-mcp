@@ -1,7 +1,8 @@
 (ns clojure-mcp.nrepl-launcher-test
   (:require [clojure.test :refer [deftest testing is are]]
             [clojure-mcp.nrepl-launcher :as launcher])
-  (:import [java.io File]))
+  (:import [java.io File]
+           [java.net InetAddress ServerSocket]))
 
 (deftest parse-port-from-output-test
   ;; Test parsing nREPL port numbers from various output formats
@@ -169,3 +170,73 @@
         ;; setup-process-cleanup has try-catch around destroyOnExit for Java
         ;; version compatibility
         (is (some? mock-process))))))
+
+(deftest port-reachable?-test
+  (testing "port-reachable?"
+    (testing "returns true when something is listening on the port"
+      (let [server (ServerSocket. 0 0 (InetAddress/getLoopbackAddress))
+            port (.getLocalPort server)]
+        (try
+          (is (true? (launcher/port-reachable? "localhost" port 500)))
+          (finally
+            (.close server)))))
+
+    (testing "returns false when no listener exists"
+      ;; Grab an ephemeral port, immediately release it, and probe.
+      ;; The port may be reused by another process but typically isn't
+      ;; in a tight window like this.
+      (let [server (ServerSocket. 0 0 (InetAddress/getLoopbackAddress))
+            port (.getLocalPort server)]
+        (.close server)
+        (is (false? (launcher/port-reachable? "localhost" port 500)))))))
+
+(deftest maybe-start-fallback-nrepl-test
+  (testing "maybe-start-fallback-nrepl"
+    (testing "returns args unchanged when :fallback-nrepl is unset"
+      (let [args {:port 7888}]
+        (is (= args (launcher/maybe-start-fallback-nrepl args)))))
+
+    (testing "returns args unchanged when :fallback-nrepl is false"
+      (let [args {:port 7888 :fallback-nrepl false}]
+        (is (= args (launcher/maybe-start-fallback-nrepl args)))))
+
+    (testing "attaches to an existing reachable nREPL without spawning"
+      (let [server (ServerSocket. 0 0 (InetAddress/getLoopbackAddress))
+            port (.getLocalPort server)]
+        (try
+          (let [args {:port port :fallback-nrepl true
+                      :fallback-nrepl-cmd ["should-not-run"]
+                      :start-nrepl-cmd ["should-also-not-run"]}
+                result (launcher/maybe-start-fallback-nrepl args)]
+            (is (= port (:port result)) "uses the reachable port")
+            (is (nil? (:nrepl-process result)) "did not spawn a process")
+            ;; Fallback-mode keys and :start-nrepl-cmd are dropped so the
+            ;; downstream pipeline doesn't double-process.
+            (is (nil? (:fallback-nrepl result)))
+            (is (nil? (:fallback-nrepl-cmd result)))
+            (is (nil? (:fallback-nrepl-dir result)))
+            (is (nil? (:start-nrepl-cmd result))))
+          (finally
+            (.close server)))))))
+
+(deftest default-fallback-nrepl-cmd-test
+  (testing "default-fallback-nrepl-cmd"
+    (testing "includes clojure, -Sdeps, and nrepl.cmdline"
+      (let [cmd (launcher/default-fallback-nrepl-cmd)]
+        (is (= "clojure" (first cmd)))
+        (is (some #{"-Sdeps"} cmd))
+        (is (some #{"nrepl.cmdline"} cmd))))
+
+    (testing "embeds the runtime nREPL version, not a hardcoded one"
+      (let [cmd (launcher/default-fallback-nrepl-cmd)
+            sdeps-arg (->> cmd
+                           (drop-while #(not= "-Sdeps" %))
+                           second)]
+        (is (some? sdeps-arg))
+        ;; Should mention the nrepl coordinate using the loaded version.
+        (is (re-find (re-pattern
+                      (str "nrepl/nrepl\\s*\\{:mvn/version\\s*\""
+                           (java.util.regex.Pattern/quote
+                            (:version-string @(requiring-resolve 'nrepl.version/version)))
+                           "\""))
+                     sdeps-arg))))))

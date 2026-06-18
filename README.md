@@ -509,6 +509,27 @@ When used without `:port`, the MCP server will automatically parse the port from
 
 `:start-nrepl-cmd ["lein" "repl" ":headless"]` or `:start-nrepl-cmd ["clojure" "-M:nrepl"]`
 
+#### `:fallback-nrepl`
+**Optional** - When `true`, ClojureMCP will first try to attach to `:port`. If nothing is listening there (or `:port` is omitted entirely), it spawns a local nREPL on an **ephemeral** port and connects to that. The fallback never squats on your configured `:port`, so a later editor session can still claim it.
+
+This is intended for users who don't always have an editor-managed nREPL running — for example, when launching Claude Desktop without first starting a project REPL, or when working in small projects via Vim. Without this flag, ClojureMCP fails to start if it can't reach `:port`, which Claude Desktop surfaces as a "Server disconnected" error.
+
+The default command is built from clojure-mcp's own nREPL dependency (so no version is hardcoded) and runs through `clojure -Sdeps ... -M -m nrepl.cmdline`. The user's `~/.clojure/deps.edn` is still merged in by the `clojure` CLI, so libraries you keep globally available (e.g. Criterium) remain on the spawned REPL's classpath.
+
+The spawned process is cleaned up automatically when the MCP server shuts down.
+
+`:fallback-nrepl true`
+
+#### `:fallback-nrepl-cmd`
+**Optional** - Overrides the default fallback command. Must be a vector of strings. Only used when `:fallback-nrepl` is `true`. Do not include an explicit port in the command; the launcher needs to parse the discovered port from the process output.
+
+`:fallback-nrepl-cmd ["lein" "repl" ":headless"]`
+
+#### `:fallback-nrepl-dir`
+**Optional** - Working directory for the spawned fallback REPL. Defaults to `:project-dir` if set, otherwise to `$HOME`. Useful when you want the fallback REPL to pick up a project's `deps.edn` automatically.
+
+`:fallback-nrepl-dir "/path/to/scratch"`
+
 #### `:config-file`
 **Optional** - Specify the location of a configuration file. Must be a path to an existing file.
 
@@ -587,6 +608,11 @@ clojure -Tmcp start :start-nrepl-cmd '["clojure" "-M:nrepl"]'
 
 # Auto-start with explicit port (uses fixed port, no parsing)
 clojure -Tmcp start :port 7888 :start-nrepl-cmd '["clojure" "-M:nrepl"]'
+
+# Attach to port 7888 if available, otherwise spawn a fallback nREPL on
+# an ephemeral port. Useful for Claude Desktop when you don't always
+# have an editor-managed REPL running.
+clojure -Tmcp start :not-cwd true :port 7888 :fallback-nrepl true
 
 # For Claude Desktop: must provide project-dir since it doesn't run from your project
 clojure -Tmcp start :start-nrepl-cmd '["lein" "repl" ":headless"]' :project-dir '"/path/to/your/clojure/project"'

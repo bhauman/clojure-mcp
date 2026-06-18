@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **Opt-in nREPL fallback**: New `:fallback-nrepl` option. When set, ClojureMCP first probes `:port` and attaches if reachable; if not, it spawns a local nREPL on an **ephemeral** port (never the configured `:port`, so a later editor session can still claim it). The default command is built from clojure-mcp's own nREPL dependency, so no version is hardcoded, and `~/.clojure/deps.edn` is still merged in. Companion options `:fallback-nrepl-cmd` (override default command) and `:fallback-nrepl-dir` (working dir; default `:project-dir` or `$HOME`) are also available. Default behavior is unchanged — the flag is opt-in.
+
 ### Changed
 - **HTTP transport replaced with Streamable HTTP**: The legacy HTTP+SSE transport has been replaced with the MCP Streamable HTTP transport (`HttpServletStreamableServerTransportProvider`), which exposes a single `/mcp` endpoint for client POSTs, the server→client SSE stream (GET), and session termination (DELETE).
   - Namespaces renamed: `clojure-mcp.sse-core` → `clojure-mcp.streamable-http-core`, `clojure-mcp.sse-main` → `clojure-mcp.streamable-http-main`
