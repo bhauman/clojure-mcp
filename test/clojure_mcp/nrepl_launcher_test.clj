@@ -217,7 +217,21 @@
             (is (nil? (:fallback-nrepl-dir result)))
             (is (nil? (:start-nrepl-cmd result))))
           (finally
-            (.close server)))))))
+            (.close server)))))
+
+    (testing "fallback spawn overrides remote :host with localhost"
+      ;; Without this override, the downstream connect would target
+      ;; the user-supplied remote host on the spawned ephemeral port,
+      ;; which would fail.
+      (with-redefs [launcher/port-reachable? (constantly false)
+                    launcher/start-nrepl-process
+                    (fn [_] {:port 54321 :process :fake-process})]
+        (let [args {:host "remote.example" :port 7888 :fallback-nrepl true}
+              result (launcher/maybe-start-fallback-nrepl args)]
+          (is (= "localhost" (:host result))
+              "remote :host is replaced with localhost after spawn")
+          (is (= 54321 (:port result)) "uses the spawned port")
+          (is (= :fake-process (:nrepl-process result))))))))
 
 (deftest default-fallback-nrepl-cmd-test
   (testing "default-fallback-nrepl-cmd"

@@ -7,7 +7,7 @@
             [clojure.string :as str]
             [nrepl.version :as nrepl-version]
             [taoensso.timbre :as log])
-  (:import [java.io BufferedReader]
+  (:import [java.io BufferedReader IOException]
            [java.net InetSocketAddress Socket]
            [java.util.concurrent TimeUnit]))
 
@@ -245,12 +245,15 @@
 
    Used by the fallback launcher to decide whether to attach to an
    already-running nREPL or spawn a new one."
-  [^String host ^long port ^long timeout-ms]
+  [^String host port timeout-ms]
   (try
     (with-open [socket (Socket.)]
       (.connect socket (InetSocketAddress. host (int port)) (int timeout-ms))
       true)
-    (catch Exception _ false)))
+    (catch IOException _ false)
+    (catch IllegalArgumentException e
+      (log/warn e "Invalid host/port passed to port-reachable?")
+      false)))
 
 (def ^:private fallback-probe-timeout-ms 500)
 
@@ -296,7 +299,10 @@
                                     {:start-nrepl-cmd cmd
                                      :project-dir dir})]
         (-> nrepl-args
-            (assoc :port port :nrepl-process process)
+            ;; Spawned fallback nREPL listens locally; override any
+            ;; user-supplied remote :host so the downstream connect
+            ;; targets the spawned process, not the unreachable host.
+            (assoc :host "localhost" :port port :nrepl-process process)
             (dissoc :fallback-nrepl :fallback-nrepl-cmd :fallback-nrepl-dir
                     :start-nrepl-cmd))))))
 
