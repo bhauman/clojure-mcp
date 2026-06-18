@@ -455,21 +455,23 @@ Point your deps.edn to your custom server:
 
 ### Using Alternative Transports
 
-The new pattern also supports different transport mechanisms. For example, using SSE (Server-Sent Events):
+The new pattern also supports different transport mechanisms. For example, using the Streamable HTTP transport (the MCP successor to the legacy HTTP+SSE transport, exposing a single `/mcp` endpoint):
 
 ```clojure
-(ns my-company.sse-server
+(ns my-company.http-server
   (:require [clojure-mcp.main :as main]
-            [clojure-mcp.sse-core :as sse-core]))
+            [clojure-mcp.streamable-http-core :as streamable-http-core]))
 
-(defn start-sse-mcp-server [opts]
-  ;; Use SSE transport instead of stdio
-  (sse-core/build-and-start-mcp-server
+(defn start-http-mcp-server [opts]
+  ;; Use the Streamable HTTP transport instead of stdio
+  (streamable-http-core/build-and-start-mcp-server
    opts
    {:make-tools-fn main/make-tools
     :make-prompts-fn main/make-prompts
     :make-resources-fn main/make-resources}))
 ```
+
+Run the built-in example with `clojure -X:mcp-http` (defaults to port 8078; override with `:mcp-http-port`).
 
 ## Conclusion
 

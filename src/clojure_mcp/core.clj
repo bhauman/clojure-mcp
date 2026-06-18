@@ -558,7 +558,7 @@
 (defn setup-mcp-server
   "Sets up an MCP server by building components, creating the server, and registering components.
    
-   This function encapsulates the common pattern used by both stdio and SSE transports:
+   This function encapsulates the common pattern used by both stdio and Streamable HTTP transports:
    1. Build components using factory functions
    2. Create the MCP server (transport-specific)
    3. Register components with filtering

@@ -26,8 +26,8 @@ The project allows AI assistants to:
   - Supports `:tools-config` for tool-specific configurations
   - Provides `get-tool-config` and `get-tools-config` helpers
 - `/src/clojure_mcp/linting.clj`: Code quality and formatting utilities
-- `/src/clojure_mcp/sse_core.clj`: Server-Sent Events transport implementation
-- `/src/clojure_mcp/sse_main.clj`: Example SSE server using the new pattern
+- `/src/clojure_mcp/streamable_http_core.clj`: Streamable HTTP transport implementation
+- `/src/clojure_mcp/streamable_http_main.clj`: Example Streamable HTTP server using the new pattern
 
 ### Tool Implementations
 
@@ -503,8 +503,8 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
    - Pipeline steps follow a thread-first pattern with error short-circuiting
 
 4. **Alternative Transports**:
-   - Use `sse-core/build-and-start-mcp-server` for SSE transport
-   - See `sse-main.clj` for an example implementation
+   - Use `streamable-http-core/build-and-start-mcp-server` for the Streamable HTTP transport
+   - See `streamable-http-main.clj` for an example implementation (run via `clojure -X:mcp-http`)
 
 ## Recent Organizational Changes
 

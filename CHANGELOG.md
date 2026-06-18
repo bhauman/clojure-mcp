@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- **HTTP transport replaced with Streamable HTTP**: The legacy HTTP+SSE transport has been replaced with the MCP Streamable HTTP transport (`HttpServletStreamableServerTransportProvider`), which exposes a single `/mcp` endpoint for client POSTs, the server→client SSE stream (GET), and session termination (DELETE).
+  - Namespaces renamed: `clojure-mcp.sse-core` → `clojure-mcp.streamable-http-core`, `clojure-mcp.sse-main` → `clojure-mcp.streamable-http-main`
+  - Alias renamed: `:mcp-sse` → `:mcp-http`; option renamed: `:mcp-sse-port` → `:mcp-http-port`
+  - Server function renamed: `mcp-sse-server` → `mcp-streamable-http-server`
+
 ## [0.4.0] - 2026-06-17
 
 Refreshes the built-in LLM model catalog for the latest provider releases: upgrades LangChain4j to 1.16.2 and adds the newest Anthropic (Claude Opus 4.8, Claude Fable 5), OpenAI (GPT-5.5 family), and Google (Gemini 3.5 Flash) models — 65 built-in models in total. You can now control reasoning depth on Anthropic's adaptive-thinking models via configurable effort levels. Also adds MCP tool annotations, ClojureDart (`.cljd`) support, and auto-correction of dash/underscore filename mismatches in path validation.
