@@ -19,27 +19,34 @@
 
 ;; helpers for setting up an sse mcp server
 
-(defn mcp-sse-server []
-  (log/info "Starting SSE MCP server")
-  (try
-    (let [transport-provider (-> (HttpServletSseServerTransportProvider/builder)
-                                 (.messageEndpoint "/mcp/message")
-                                 (.build))
-          server (-> (McpServer/async transport-provider)
-                     (.serverInfo "clojure-server" "0.1.0")
-                     (.capabilities (-> (McpSchema$ServerCapabilities/builder)
-                                        (.tools true)
-                                        (.prompts true)
-                                        (.resources true true)
-                                        #_(.logging)
-                                        (.build)))
-                     (.build))]
-      (log/info "SSE MCP server initialized successfully")
-      {:provider-servlet transport-provider
-       :mcp-server server})
-    (catch Exception e
-      (log/error e "Failed to initialize SSE MCP server")
-      (throw e))))
+(defn mcp-sse-server
+  "Creates an SSE mcp server.
+
+   Optional `instructions` is a string advertised to the client at
+   initialization; nil omits the instructions field."
+  ([] (mcp-sse-server nil))
+  ([instructions]
+   (log/info "Starting SSE MCP server")
+   (try
+     (let [transport-provider (-> (HttpServletSseServerTransportProvider/builder)
+                                  (.messageEndpoint "/mcp/message")
+                                  (.build))
+           server (cond-> (-> (McpServer/async transport-provider)
+                              (.serverInfo "clojure-server" "0.1.0")
+                              (.capabilities (-> (McpSchema$ServerCapabilities/builder)
+                                                 (.tools true)
+                                                 (.prompts true)
+                                                 (.resources true true)
+                                                 #_(.logging)
+                                                 (.build))))
+                    (some? instructions) (.instructions instructions)
+                    :always (.build))]
+       (log/info "SSE MCP server initialized successfully")
+       {:provider-servlet transport-provider
+        :mcp-server server})
+     (catch Exception e
+       (log/error e "Failed to initialize SSE MCP server")
+       (throw e)))))
 
 (defn host-mcp-servlet
   "Main function to start the embedded Jetty server."
@@ -90,7 +97,8 @@
                                     nrepl-client-map)
         _ (reset! core/nrepl-client-atom nrepl-client-with-process)
         {:keys [mcp-server provider-servlet]}
-        (core/setup-mcp-server core/nrepl-client-atom working-dir component-factories mcp-sse-server)]
+        (core/setup-mcp-server core/nrepl-client-atom working-dir component-factories
+                               #(mcp-sse-server (config/get-mcp-instructions @core/nrepl-client-atom)))]
     ;; hold onto this so you can shut it down if necessary
     (swap! core/nrepl-client-atom assoc :mcp-server mcp-server)
     ;; Start the HTTP server with the servlet

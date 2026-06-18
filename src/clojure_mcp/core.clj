@@ -2,6 +2,7 @@
   (:require [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.spec.alpha :as s]
+            [clojure.string :as string]
             [taoensso.timbre :as log]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
@@ -248,26 +249,31 @@
 ;; helper tool to demonstrate how all this gets hooked together
 
 (defn mcp-server
-  "Creates a basic stdio mcp server"
-  []
-  (log/info "Starting MCP server")
-  (try
-    (let [transport-provider (StdioServerTransportProvider. json-mapper)
-          server (-> (McpServer/async transport-provider)
-                     (.serverInfo "clojure-server" "0.1.11")
-                     (.capabilities (-> (McpSchema$ServerCapabilities/builder)
-                                        (.tools true)
-                                        (.prompts true)
-                                        (.resources true true) ;; resources method takes two boolean parameters
-                                        #_(.logging)
-                                        (.build)))
-                     (.build))]
+  "Creates a basic stdio mcp server.
 
-      (log/info "MCP server initialized successfully")
-      server)
-    (catch Exception e
-      (log/error e "Failed to initialize MCP server")
-      (throw e))))
+   Optional `instructions` is a non-blank string advertised to the client at
+   initialization; nil/blank omits the instructions field."
+  ([] (mcp-server nil))
+  ([instructions]
+   (log/info "Starting MCP server")
+   (try
+     (let [transport-provider (StdioServerTransportProvider. json-mapper)
+           server (cond-> (-> (McpServer/async transport-provider)
+                              (.serverInfo "clojure-server" "0.1.11")
+                              (.capabilities (-> (McpSchema$ServerCapabilities/builder)
+                                                 (.tools true)
+                                                 (.prompts true)
+                                                 (.resources true true) ;; resources method takes two boolean parameters
+                                                 #_(.logging)
+                                                 (.build))))
+                    (not (string/blank? instructions)) (.instructions instructions)
+                    :always (.build))]
+
+       (log/info "MCP server initialized successfully")
+       server)
+     (catch Exception e
+       (log/error e "Failed to initialize MCP server")
+       (throw e)))))
 
 (defn load-config-handling-validation-errors
   ([config-file user-dir]
@@ -622,7 +628,8 @@
                                         working-dir
                                         component-factories
                                         ;; stdio server creation thunk returns map
-                                        (fn [] {:mcp-server (mcp-server)}))
+                                        (fn [] {:mcp-server (mcp-server
+                                                             (config/get-mcp-instructions @nrepl-client-atom))}))
         mcp (:mcp-server server-result)]
     (swap! nrepl-client-atom assoc :mcp-server mcp)
     nil))

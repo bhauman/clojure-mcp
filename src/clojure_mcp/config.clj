@@ -356,6 +356,32 @@
 (defn get-mcp-client-hint [nrepl-client-map]
   (get-config nrepl-client-map :mcp-client))
 
+(def default-mcp-instructions
+  "Default MCP server instructions advertised to the client at initialization.
+   Purely informational: it makes the Clojure tooling discoverable (the natural
+   keywords here are what tool search matches on) without naming specific tools."
+  (str "Clojure tooling is available for this project.\n\n"
+       "- A persistent nREPL connection tool is available for evaluating and "
+       "testing Clojure and ClojureScript code.\n"
+       "- Parenthesis-safe, structure-aware tools are available for editing "
+       "Clojure source files.\n"
+       "- A tool is available for repairing unbalanced parentheses."))
+
+(defn get-mcp-instructions
+  "Returns the MCP server instructions string to advertise at initialization,
+   or nil when instructions are disabled.
+
+   Config key :mcp-instructions —
+   - absent:           returns default-mcp-instructions
+   - non-blank string: returns that string
+   - false:            disabled, returns nil"
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :mcp-instructions)]
+    (cond
+      (false? value) nil
+      (string? value) (when-not (string/blank? value) value)
+      :else default-mcp-instructions)))
+
 (defn get-dispatch-agent-context
   "Returns dispatch agent context configuration.
    Can be:

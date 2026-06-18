@@ -9,7 +9,13 @@
 ;; Enabled resources:
 ;;   (none)
 
-{:disable-tools
+{:mcp-instructions
+ "Clojure tooling is available to complement the built-in editing tools.
+
+- A persistent nREPL connection tool is available for evaluating and testing Clojure and ClojureScript code.
+- Parenthesis-safe Clojure editing and paren-repair tools are available as fallbacks for when the built-in editor cannot apply a change to a Clojure file."
+
+ :disable-tools
  [:read_file
   :grep
   :glob_files

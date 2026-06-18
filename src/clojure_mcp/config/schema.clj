@@ -281,6 +281,10 @@
 
    ;; MCP client hints
    [:mcp-client {:optional true} [:maybe NonBlankString]]
+
+   ;; Server instructions advertised to the MCP client at initialization.
+   ;; A non-blank string overrides the default; false disables instructions.
+   [:mcp-instructions {:optional true} [:or NonBlankString [:= false]]]
    [:dispatch-agent-context {:optional true}
     [:or :boolean [:sequential Path]]]
 

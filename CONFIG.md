@@ -117,6 +117,22 @@ Primes the dispatch agent with details about your code to help it find answers m
 
 NOTE: May consume more API tokens or even exceed the context window of the LLM
 
+### `:mcp-instructions`
+The server-level instructions advertised to the MCP client during initialization. Clients surface these to the LLM as guidance about what the server offers, so they make the Clojure tooling discoverable up front (the wording also doubles as keyword hints for clients that use tool search).
+
+**Available values:**
+- _(unset, default)_ - Advertises a built-in default noting that a persistent nREPL connection tool is available for evaluating and testing Clojure/ClojureScript, parenthesis-safe structural editing tools are available, and a paren-repair tool is available. The default intentionally names no specific tools.
+- A non-blank string - Advertises your own text instead of the default.
+- `false` - Disables instructions entirely (no `instructions` field is sent).
+
+**Per-profile override:**
+Config profiles are merged last, so a profile can set its own `:mcp-instructions` to tailor the message for that mode (or `false` to disable it). The shipped `cli-assist` and `cli-assist-agent` profiles do this, since in those modes the editing tools are fallbacks. Precedence (highest to lowest): profile → project config → user-home config → built-in default.
+
+**When to use each setting:**
+- Default - Fine for most setups; announces the available Clojure tooling without naming specific tools.
+- Custom string - When you want to describe a specialized toolset or workflow to the model.
+- `false` - When the client already has equivalent guidance, or you want to keep initialization minimal.
+
 ### Intermediate-Level Customization
 
 Additional options allow you to fine-tune, augment, and even override default behavior.
