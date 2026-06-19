@@ -304,3 +304,16 @@
             "cat ../../../../etc/passwd"
             test-dir
             [test-dir]))))))
+
+(deftest validate-path-all-test
+  (let [cwd (.getCanonicalPath (io/file (System/getProperty "java.io.tmpdir")))]
+    (testing ":all disables containment — a path outside cwd is accepted"
+      (is (string? (valid-paths/validate-path "/etc/hosts" cwd :all))))
+
+    (testing ":all still normalizes relative paths against cwd"
+      (is (= (.getCanonicalPath (io/file cwd "sub/file.clj"))
+             (valid-paths/validate-path "sub/file.clj" cwd :all))))
+
+    (testing "a directory vector still enforces containment"
+      (is (thrown? Exception
+                   (valid-paths/validate-path "/etc/hosts" cwd [cwd]))))))

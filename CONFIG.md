@@ -11,7 +11,13 @@ via the `:config-file` CLI arg (see README “CLI options”).
 These basic settings affect how clojure-mcp interacts with your local system.
 
 ### `:allowed-directories`
-Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute.
+Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute. The project's working directory is always allowed implicitly.
+
+**Available values:**
+- A vector of paths (default) - tool access is restricted to these directories and their subdirectories (plus the working directory). Example: `:allowed-directories ["." "../sibling-project" "/Users/me/shared"]`
+- `:all` - **disables path containment entirely**, allowing tools to read and edit files anywhere on the filesystem. Use with caution — there is no directory restriction. Example: `:allowed-directories :all`
+
+Note: `~` is not expanded; use literal absolute paths. (Project inspection, which scans the allowed set, falls back to just the working directory when `:all` is set, since the whole filesystem can't be enumerated.)
 
 ### `:cljfmt`
 Controls cljfmt formatting behavior in editing pipelines (default: `true`). Determines whether and how formatting is applied when editing Clojure forms.

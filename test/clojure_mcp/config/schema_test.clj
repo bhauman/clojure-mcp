@@ -4,7 +4,8 @@
             [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure-mcp.config.schema :as schema]))
+            [clojure-mcp.config.schema :as schema]
+            [clojure-mcp.config :as config]))
 
 ;; ==============================================================================
 ;; Test Data
@@ -92,6 +93,27 @@
   (testing "Config with all cljfmt values"
     (doseq [v [true false :partial]]
       (is (schema/valid? {:cljfmt v})))))
+
+(deftest allowed-directories-all-test
+  (testing ":allowed-directories :all is a valid config value"
+    (is (schema/valid? {:allowed-directories :all}))
+    (is (nil? (schema/explain-config {:allowed-directories :all}))))
+
+  (testing "a vector of paths is still valid"
+    (is (schema/valid? {:allowed-directories ["/tmp"]})))
+
+  (testing "a non-:all keyword is rejected"
+    (let [errors (schema/explain-config {:allowed-directories :nope})]
+      (is (some? errors))
+      (is (contains? errors :allowed-directories))))
+
+  (testing "process-config passes :all through unchanged (no working-dir cons / vectorize)"
+    (let [user-dir (System/getProperty "user.dir")]
+      (is (= :all (:allowed-directories
+                   (config/process-config {:allowed-directories :all} user-dir))))
+      ;; sanity: a vector still folds in the working dir
+      (is (vector? (:allowed-directories
+                    (config/process-config {:allowed-directories []} user-dir)))))))
 
 ;; ==============================================================================
 ;; Invalid Configuration Tests

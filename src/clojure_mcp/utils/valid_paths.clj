@@ -5,12 +5,13 @@
 
 (defn validate-path
   "Validates that a path is within allowed directories.
-   
+
    Parameters:
    - path: The path to validate (can be relative or absolute)
    - current-working-directory: The absolute path of the current working directory
-   - allowed-directories: A sequence of absolute paths representing allowed directories
-   
+   - allowed-directories: A sequence of absolute paths representing allowed
+     directories, or the keyword :all to disable containment (accept any path)
+
    Returns:
    - The normalized absolute path if valid
    - Throws an exception if the path is not within any allowed directory"
@@ -23,37 +24,40 @@
       (throw (ex-info (str "Current working directory must be absolute \nCWD:" current-working-directory)
                       {:cwd current-working-directory})))
 
-    ;; Validate all allowed directories are absolute
-    (let [non-absolute (filter #(not (.isAbsolute (io/file %))) allowed-directories)]
-      (when (seq non-absolute)
-        (throw (ex-info "All allowed directories must be absolute paths"
-                        {:non-absolute-dirs non-absolute}))))
-
-    ;; Normalize the allowed directories upfront
-    (let [canonical-allowed-dirs (map #(.getCanonicalPath (io/file %))
-                                      (filter identity allowed-directories))
-
-          ;; Normalize the path (resolve relative paths against CWD)
-          abs-path-file (if (.isAbsolute path-file)
+    ;; Normalize the path (resolve relative paths against CWD)
+    (let [abs-path-file (if (.isAbsolute path-file)
                           path-file
                           (io/file cwd-file path))
           normalized-path (.getCanonicalPath abs-path-file)]
 
-      ;; Check if path is within any allowed directory
-      (if (or (empty? canonical-allowed-dirs) ;; If no allowed directories, accept all paths
-              (some (fn [allowed-canonical]
-                      ;; Check if normalized path starts with allowed dir plus separator
-                      ;; or if it equals the allowed dir exactly
-                      (or (= normalized-path allowed-canonical)
-                          (str/starts-with? normalized-path
-                                            (str allowed-canonical
-                                                 (System/getProperty "file.separator")))))
-                    canonical-allowed-dirs))
+      (if (= :all allowed-directories)
+        ;; Path containment disabled — accept any normalized path
         normalized-path
-        (throw (ex-info (str "Your path:\n" normalized-path
-                             " is outside the allowed directories:\n" (str/join "\n" allowed-directories))
-                        {:path normalized-path
-                         :allowed-dirs allowed-directories}))))))
+
+        (do
+          ;; Validate all allowed directories are absolute
+          (let [non-absolute (filter #(not (.isAbsolute (io/file %))) allowed-directories)]
+            (when (seq non-absolute)
+              (throw (ex-info "All allowed directories must be absolute paths"
+                              {:non-absolute-dirs non-absolute}))))
+
+          ;; Check if path is within any allowed directory
+          (let [canonical-allowed-dirs (map #(.getCanonicalPath (io/file %))
+                                            (filter identity allowed-directories))]
+            (if (or (empty? canonical-allowed-dirs) ;; If no allowed directories, accept all paths
+                    (some (fn [allowed-canonical]
+                            ;; Check if normalized path starts with allowed dir plus separator
+                            ;; or if it equals the allowed dir exactly
+                            (or (= normalized-path allowed-canonical)
+                                (str/starts-with? normalized-path
+                                                  (str allowed-canonical
+                                                       (System/getProperty "file.separator")))))
+                          canonical-allowed-dirs))
+              normalized-path
+              (throw (ex-info (str "Your path:\n" normalized-path
+                                   " is outside the allowed directories:\n" (str/join "\n" allowed-directories))
+                              {:path normalized-path
+                               :allowed-dirs allowed-directories})))))))))
 
 (defn path-exists? [path]
   (.exists (io/file path)))

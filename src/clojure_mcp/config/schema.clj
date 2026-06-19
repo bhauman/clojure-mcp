@@ -262,7 +262,7 @@
   [:map {:closed true} ;; Closed to enable spell-checking for typos
 
    ;; Core configuration
-   [:allowed-directories {:optional true} [:sequential Path]]
+   [:allowed-directories {:optional true} [:or [:= :all] [:sequential Path]]]
    [:write-file-guard {:optional true} [:enum :full-read :partial-read false]]
    [:cljfmt {:optional true} [:or :boolean [:= :partial]]]
    [:bash-over-nrepl {:optional true} :boolean]

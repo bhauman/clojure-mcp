@@ -341,8 +341,13 @@
       cached-info)
     ;; No cache, compute the project info
     (let [nrepl-client @nrepl-client-atom
-          allowed-directories (config/get-allowed-directories nrepl-client)
           working-directory (config/get-nrepl-user-dir nrepl-client)
+          raw-allowed (config/get-allowed-directories nrepl-client)
+          ;; :all disables path containment; fall back to the working dir for
+          ;; enumeration/scanning since we can't list the entire filesystem
+          allowed-directories (if (= :all raw-allowed)
+                                (when working-directory [working-directory])
+                                raw-allowed)
           nrepl-env-type (config/get-nrepl-env-type nrepl-client)]
       ;; Guard: need working-directory and allowed-directories for project inspection
       (if (or (nil? working-directory) (empty? allowed-directories))

@@ -139,10 +139,12 @@
       user-dir (assoc :nrepl-user-dir (.getCanonicalPath ud))
       true
       (assoc :allowed-directories
-             (->> (cons user-dir allowed-directories)
-                  (keep #(relative-to user-dir %))
-                  distinct
-                  vec))
+             (if (= :all allowed-directories)
+               :all
+               (->> (cons user-dir allowed-directories)
+                    (keep #(relative-to user-dir %))
+                    distinct
+                    vec)))
       (some? (:cljfmt config))
       (assoc :cljfmt (if (= :partial (:cljfmt config))
                        :partial

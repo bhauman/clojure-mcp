@@ -126,9 +126,11 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                       (if (.exists dir-file)
                         (if (.isDirectory dir-file)
                           (let [current-dirs (config/get-allowed-directories @nrepl-client-atom)
-                                new-dirs (-> (concat current-dirs [normalized-path])
-                                             distinct
-                                             vec)]
+                                new-dirs (if (= :all current-dirs)
+                                           :all ; already unrestricted, nothing to add
+                                           (-> (concat current-dirs [normalized-path])
+                                               distinct
+                                               vec))]
                             (config/set-config! nrepl-client-atom :allowed-directories new-dirs)
                             (clj-result-k
                              {:description (str "Added directory: " normalized-path)
