@@ -2,14 +2,23 @@
 
 ## [Unreleased]
 
-### Added
-- **Opt-in nREPL fallback**: New `:fallback-nrepl` option. When set, ClojureMCP first probes `:port` and attaches if reachable; if not, it spawns a local nREPL on an **ephemeral** port (never the configured `:port`, so a later editor session can still claim it). The default command is built from clojure-mcp's own nREPL dependency, so no version is hardcoded, and `~/.clojure/deps.edn` is still merged in. Companion options `:fallback-nrepl-cmd` (override default command) and `:fallback-nrepl-dir` (working dir; default `:project-dir` or `$HOME`) are also available. Default behavior is unchanged — the flag is opt-in.
+## [0.5.0] - 2026-06-19
 
-### Changed
-- **HTTP transport replaced with Streamable HTTP**: The legacy HTTP+SSE transport has been replaced with the MCP Streamable HTTP transport (`HttpServletStreamableServerTransportProvider`), which exposes a single `/mcp` endpoint for client POSTs, the server→client SSE stream (GET), and session termination (DELETE).
-  - Namespaces renamed: `clojure-mcp.sse-core` → `clojure-mcp.streamable-http-core`, `clojure-mcp.sse-main` → `clojure-mcp.streamable-http-main`
-  - Alias renamed: `:mcp-sse` → `:mcp-http`; option renamed: `:mcp-sse-port` → `:mcp-http-port`
-  - Server function renamed: `mcp-sse-server` → `mcp-streamable-http-server`
+Modernizes the HTTP transport to the MCP Streamable HTTP spec (a single `/mcp` endpoint), adds a `:cli-assist-full` profile that brings ClojureMCP's structure-aware editing and smart file reading back as first-class tools for agent-driven CLI workflows, and introduces an opt-in `:fallback-nrepl` that auto-spawns a local nREPL when one isn't already running. Also adds configurable server instructions and an `:allowed-directories :all` escape hatch.
+
+### Major Changes
+
+#### HTTP transport replaced with Streamable HTTP
+The legacy HTTP+SSE transport has been replaced with the MCP Streamable HTTP transport (`HttpServletStreamableServerTransportProvider`), which exposes a single `/mcp` endpoint for client POSTs, the server→client SSE stream (GET), and session termination (DELETE).
+- **Breaking** — Namespaces renamed: `clojure-mcp.sse-core` → `clojure-mcp.streamable-http-core`, `clojure-mcp.sse-main` → `clojure-mcp.streamable-http-main`
+- **Breaking** — Alias renamed: `:mcp-sse` → `:mcp-http`; option renamed: `:mcp-sse-port` → `:mcp-http-port`
+- **Breaking** — Server function renamed: `mcp-sse-server` → `mcp-streamable-http-server`
+
+### Added
+- **`:cli-assist-full` config profile**: Like `:cli-assist`, but promotes ClojureMCP's `read_file`, `clojure_edit`, `clojure_edit_replace_sexp`, and `paren_repair` to **first-class** tools (no "fallback" framing) for agent-driven workflows where the agent drives and reviews later. Its instructions steer the assistant to route **all** Clojure-file edits through the Clojure tools, sidestepping the host editor's "file modified since read" conflict without any permission configuration. Activate with `:config-profile :cli-assist-full`.
+- **Opt-in nREPL fallback**: New `:fallback-nrepl` option. When set, ClojureMCP first probes `:port` and attaches if reachable; if not, it spawns a local nREPL on an **ephemeral** port (never the configured `:port`, so a later editor session can still claim it). The default command is built from clojure-mcp's own nREPL dependency, so no version is hardcoded, and `~/.clojure/deps.edn` is still merged in. Companion options `:fallback-nrepl-cmd` (override default command) and `:fallback-nrepl-dir` (working dir; default `:project-dir` or `$HOME`) are also available. Default behavior is unchanged — the flag is opt-in.
+- **Configurable MCP server instructions**: New `:mcp-instructions` config option sets the server-level instructions advertised to the MCP client during initialization, so you can tailor how the Clojure tooling is described to the LLM (or set `false` to disable it).
+- **`:allowed-directories :all`**: Setting `:allowed-directories` to `:all` disables path containment entirely, allowing the file tools to read and edit anywhere on the filesystem (use with caution). A vector of paths continues to restrict access as before.
 
 ## [0.4.0] - 2026-06-17
 
