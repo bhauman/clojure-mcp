@@ -100,6 +100,12 @@
     (catch Exception _
       nil)))
 
+(defn single-line-code
+  "Collapse embedded newlines in a code fragment so synthetic summaries stay on one line."
+  [s]
+  (when s
+    (str/replace s #"\s*\n\s*" " ")))
+
 (defn get-form-summary
   "Get a summarized representation of a Clojure form showing only up to the argument list.
    Adapted from form-edit/core.clj"
@@ -139,7 +145,7 @@
                                       (z/right maybe-docstring)
                                       maybe-docstring)]
                        (if (and args-loc (= (z/tag args-loc) :vector))
-                         (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                         (str "(" form-type " " form-name " " (single-line-code (z/string args-loc)) " ...)")
                          (str "(" form-type " " form-name " [...] ...)")))
 
               "defmacro" (let [zloc-down (z/down zloc)
@@ -151,7 +157,7 @@
                                           (z/right maybe-docstring)
                                           maybe-docstring)]
                            (if (and args-loc (= (z/tag args-loc) :vector))
-                             (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                             (str "(" form-type " " form-name " " (single-line-code (z/string args-loc)) " ...)")
                              (str "(" form-type " " form-name " [...] ...)")))
 
               "defmethod" (let [zloc-down (z/down zloc)
@@ -171,7 +177,7 @@
                                              (= (z/tag loc) :vector) loc
                                              :else (recur (z/right loc))))]
                             (if (and args-loc (= (z/tag args-loc) :vector))
-                              (str "(" form-type " " method-name " " dispatch-str " " (z/string args-loc) " ...)")
+                              (str "(" form-type " " method-name " " dispatch-str " " (single-line-code (z/string args-loc)) " ...)")
                               (str "(" form-type " " method-name " " dispatch-str " [...] ...)")))
 
               "def" (str "(" form-type " " form-name " ...)")
@@ -184,8 +190,8 @@
       (try
         (let [raw-str (z/string zloc)]
           (if (< (count raw-str) 60)
-            raw-str
-            (str (subs raw-str 0 57) "...")))
+            (single-line-code raw-str)
+            (str (single-line-code (subs raw-str 0 57)) "...")))
         (catch Exception _
           nil)))))
 
@@ -234,11 +240,11 @@
     (catch Exception _ [])))
 
 (defn number-view-content
-  "Number expanded or multi-line content on every line; collapsed single-line content only on its first line."
-  [content line expanded?]
+  "Number every line only for verbatim displayed content; synthetic summaries get the form start line."
+  [content line number-all-lines?]
   (cond
     (nil? line) content
-    (or expanded? (str/includes? content "\n")) (read-core/add-line-numbers content line)
+    number-all-lines? (read-core/add-line-numbers content line)
     :else (str (format "%6d\t" line) content)))
 
 (defn process-form-node
@@ -357,7 +363,7 @@
                                               ;; Show collapsed summary for non-matching forms
                                               (or (get-form-summary zloc)
                                                   (:content form)))
-                                    numbered-content (number-view-content content (:line form) should-expand)]
+                                    numbered-content (number-view-content content (:line form) (or should-expand (= "ns" (:type form))))]
                                 ;; Wrap platform-specific forms in reader conditional syntax.
                                 ;; Line numbers stay at column 1 so they remain easy to scan.
                                 (if platform

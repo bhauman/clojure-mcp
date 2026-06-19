@@ -166,6 +166,15 @@
       (is (re-find #"(?m)^\s*2\t  \(:require \[clojure\.string :as str\]\)\)$" view))
       (is (re-find #"(?m)^\s*4\t\(defn f \[\] \.\.\.\)$" view)))))
 
+(deftest test-multiline-arg-vector-summary-stays-on-start-line
+  (testing "synthetic summaries do not invent continuation line numbers"
+    (let [source "(ns test.args)\n\n(defn foo\n  \"docstring\"\n  [a\n   b]\n  (+ a b))\n\n(defn other [] :ok)"
+          result (collapsed/generate-collapsed-view* source nil nil)
+          view (:view result)]
+      (is (re-find #"(?m)^\s*3\t\(defn foo \[a b\] \.\.\.\)$" view))
+      (is (not (re-find #"(?m)^\s*4\t.*b\]" view)))
+      (is (re-find #"(?m)^\s*9\t\(defn other \[\] \.\.\.\)$" view)))))
+
 (deftest test-content-pattern-matching
   (testing "Pattern matching on form content"
     (let [result (collapsed/generate-collapsed-view* basic-source nil "time")]
