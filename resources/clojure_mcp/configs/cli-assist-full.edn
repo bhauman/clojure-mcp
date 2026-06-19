@@ -14,17 +14,18 @@
 ;;   - :write-file-guard false   -> clojure-mcp never hard-blocks on staleness
 ;;                                  (safe: the editors above are content-addressed,
 ;;                                   they reparse the file fresh on every call)
-;;   - :mcp-instructions steers ALL Clojure edits through the clojure tools so the
-;;     host's native Edit never trips its own "modified since read" check on .clj.
+;;   - :mcp-instructions steers ALL Clojure reads AND edits through the clojure
+;;     tools, so the host's native Read/Edit never trips its own "modified since
+;;     read" check on .clj (and reads stay token-efficient via the collapsed view).
 
 {:mcp-instructions
- "Clojure tooling is available and PREFERRED for all Clojure source files (.clj, .cljs, .cljc, .bb, .edn).
+ "Clojure tooling is available and PREFERRED for all Clojure source files (.clj, .cljs, .cljc, .bb, .edn). For these files, do BOTH your reading AND your editing with the Clojure tools below, rather than your environment's own generic file-reading and file-editing tools (whatever they happen to be named in your harness).
 
-- Read Clojure files with `read_file`: it returns a collapsed, structure-aware view (function signatures only by default, expandable by name/content pattern) that is far more token-efficient than a raw read.
-- Edit Clojure files with `clojure_edit` (replace/insert a whole top-level form), `clojure_edit_replace_sexp` (replace a targeted expression), and `paren_repair` (fix unbalanced parentheses). These match by code structure rather than exact text, validate parentheses on the way in, and avoid the repeated string-match failures of generic editors.
-- A persistent nREPL connection tool is available for evaluating and testing Clojure and ClojureScript code.
+- READ Clojure files with `read_file` instead of a generic file reader. It returns a collapsed, structure-aware view (function signatures only by default, expandable by `name_pattern`/`content_pattern`) that is far more token-efficient than a raw read, and it still supports line ranges via `line_offset`/`limit` and `collapsed: false` when you need the full text.
+- EDIT Clojure files with `clojure_edit` (replace/insert a whole top-level form), `clojure_edit_replace_sexp` (replace a targeted expression), and `paren_repair` (fix unbalanced parentheses) instead of a generic text editor or patch tool. These match by code structure rather than exact text, validate parentheses on the way in, and avoid the repeated string-match failures of generic editors.
+- EVALUATE and test Clojure/ClojureScript through the persistent nREPL connection tool (`clojure_eval`).
 
-IMPORTANT — use the Clojure tools above for ALL edits to Clojure files, not the built-in Edit/Write tools. The Clojure tools rewrite files on disk; after one of them edits a file, the built-in Edit tool will see the file as changed and refuse with a \"file has been modified since read\" error until it re-reads. Routing every Clojure-file edit through the Clojure tools avoids this entirely. Keep using the built-in tools for non-Clojure files."
+WHY keep every read and edit in these tools: the Clojure edit tools rewrite files on disk. If you interleave them with your environment's own editor on the same file, that editor will often refuse to edit a file that changed on disk since it last read it (forcing a re-read), and a generic reader spends far more tokens dumping whole files. Routing every Clojure read and edit through these tools avoids both problems. Use your environment's own tools for non-Clojure files."
 
  :disable-tools
  [:grep
