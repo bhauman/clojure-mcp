@@ -1,0 +1,10 @@
+[mcp_servers.clojure-mcp]
+command = "clojure"
+args = [
+    "-X:mcp",
+    ":config-profile",
+    ":cli-assist-full",
+]
+
+[mcp_servers.clojure-mcp.tools.clojure_edit]
+approval_mode = "approve"
