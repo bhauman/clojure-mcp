@@ -17,6 +17,7 @@
    [rewrite-clj.zip :as z]
    [rewrite-clj.node :as n]
    [clojure.string :as str]
+   [clojure-mcp.tools.unified-read-file.core :as read-core]
    [clojure-mcp.utils.file :as file-utils]))
 
 (defn seq-node? [node]
@@ -42,37 +43,6 @@
                  (and (not include-comments) (= tag :comment))))))
     (catch Exception _
       false)))
-
-(defn extract-forms-from-reader-conditional
-  "Extract forms from inside reader conditionals like #?(:clj ...) and #?@(:clj [...])"
-  [reader-node]
-  (try
-    (let [children (n/children reader-node)]
-      (when (>= (count children) 2)
-        (let [token (n/string (first children))
-              splicing? (= "?@" token)
-              content-node (second children)]
-          (when (seq-node? content-node)
-            (let [content-children (n/children content-node)
-                  ;; Filter out whitespace and newline nodes
-                  non-whitespace (filter #(valid-node-to-include? % false) content-children)
-                  ;; Group into platform/form pairs
-                  pairs (partition 2 non-whitespace)]
-              (mapcat (fn [[platform form-node]]
-                        (when (and platform form-node)
-                          (if (and splicing? (= :vector (n/tag form-node)))
-                            ;; For splicing, extract forms from the vector
-                            (let [vector-children (n/children form-node)]
-                              (map (fn [child]
-                                     {:node child
-                                      :platform (n/sexpr platform)})
-                                   (filter #(valid-node-to-include? % false)
-                                           vector-children)))
-                            ;; Regular reader conditional
-                            [{:node form-node
-                              :platform (n/sexpr platform)}])))
-                      pairs))))))
-    (catch Exception _ [])))
 
 (defn valid-form-to-include?
   "Checks if a form should be included in analysis, excluding comments unless specified."
@@ -219,8 +189,60 @@
         (catch Exception _
           nil)))))
 
+(defn position-line
+  "Returns the 1-indexed source line for a zipper location when available."
+  [zloc]
+  (try
+    (first (z/position zloc))
+    (catch Exception _ nil)))
+
+(defn zloc-children
+  "Returns the direct zipper children of zloc, excluding rewrite-clj navigation errors."
+  [zloc]
+  (loop [loc (try (z/down zloc) (catch Exception _ nil))
+         children []]
+    (if loc
+      (recur (try (z/right loc) (catch Exception _ nil))
+             (conj children loc))
+      children)))
+
+(defn extract-forms-from-reader-conditional-zloc
+  "Extract forms from inside reader conditionals while preserving zipper positions."
+  [reader-zloc]
+  (try
+    (let [token-loc (z/down reader-zloc)
+          splicing? (= "?@" (some-> token-loc z/string))
+          content-loc (some-> token-loc z/right)]
+      (when (and content-loc (seq-node? (z/node content-loc)))
+        (let [non-whitespace (filter #(valid-form-to-include? % false)
+                                     (zloc-children content-loc))
+              pairs (partition 2 non-whitespace)]
+          (mapcat (fn [[platform-loc form-loc]]
+                    (when (and platform-loc form-loc)
+                      (let [platform (z/sexpr platform-loc)]
+                        (if (and splicing? (= :vector (z/tag form-loc)))
+                          (map (fn [child-loc]
+                                 {:node (z/node child-loc)
+                                  :zloc child-loc
+                                  :platform platform})
+                               (filter #(valid-form-to-include? % false)
+                                       (zloc-children form-loc)))
+                          [{:node (z/node form-loc)
+                            :zloc form-loc
+                            :platform platform}]))))
+                  pairs))))
+    (catch Exception _ [])))
+
+(defn number-view-content
+  "Number expanded or multi-line content on every line; collapsed single-line content only on its first line."
+  [content line expanded?]
+  (cond
+    (nil? line) content
+    (or expanded? (str/includes? content "\n")) (read-core/add-line-numbers content line)
+    :else (str (format "%6d\t" line) content)))
+
 (defn process-form-node
-  "Process a form node and extract metadata, now including zloc"
+  "Process a form node and extract metadata, now including zloc and source line."
   [node platform zloc]
   (try
     (let [sexpr (n/sexpr node)
@@ -228,8 +250,8 @@
           form-type (when (and (seq? sexpr) (symbol? (first sexpr)))
                       (name (first sexpr)))
           form-content (n/string node)
-          ;; If zloc is a reader-macro (happens with reader conditionals), 
-          ;; create a proper zloc from the node inside
+          ;; If zloc is a reader-macro (happens with legacy reader conditional extraction),
+          ;; create a proper zloc from the node inside.
           actual-zloc (if (= :reader-macro (try (z/tag zloc) (catch Exception _ nil)))
                         (z/of-node node)
                         zloc)]
@@ -238,6 +260,7 @@
          :type form-type
          :content form-content
          :platform platform
+         :line (position-line zloc)
          :zloc actual-zloc}))
     (catch Exception _ nil)))
 
@@ -246,7 +269,7 @@
    Enhanced to also preserve zipper locations for collapsed view generation."
   [source-str include-comments]
   (try
-    (let [zloc (z/of-string source-str)]
+    (let [zloc (z/of-string source-str {:track-position? true})]
       (loop [loc zloc
              forms []]
         (if (nil? loc)
@@ -254,12 +277,10 @@
           (cond
             ;; Handle reader conditionals
             (= :reader-macro (z/tag loc))
-            (let [reader-forms (extract-forms-from-reader-conditional (z/node loc))
-                  ;; For reader conditionals, we use the parent zloc since individual forms
-                  ;; inside don't have their own independent zlocs
+            (let [reader-forms (extract-forms-from-reader-conditional-zloc loc)
                   processed-forms (->> reader-forms
-                                       (map (fn [{:keys [node platform]}]
-                                              (process-form-node node platform loc)))
+                                       (map (fn [{:keys [node platform zloc]}]
+                                              (process-form-node node platform zloc)))
                                        (filter some?))]
               (recur (try (z/right loc) (catch Exception _ nil))
                      (into forms processed-forms)))
@@ -335,13 +356,15 @@
                                               (:content form)
                                               ;; Show collapsed summary for non-matching forms
                                               (or (get-form-summary zloc)
-                                                  (:content form)))]
-                                ;; Wrap platform-specific forms in reader conditional syntax
+                                                  (:content form)))
+                                    numbered-content (number-view-content content (:line form) should-expand)]
+                                ;; Wrap platform-specific forms in reader conditional syntax.
+                                ;; Line numbers stay at column 1 so they remain easy to scan.
                                 (if platform
-                                  (str "#?(" platform "\n   "
-                                       (str/replace content "\n" "\n   ")
+                                  (str "#?(" platform "\n"
+                                       numbered-content
                                        ")")
-                                  content))))
+                                  numbered-content))))
                           forms)
           view-string (str/join "\n\n" (filter some? view-parts))]
 

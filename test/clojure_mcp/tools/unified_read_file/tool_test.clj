@@ -96,6 +96,42 @@
       (is (not (re-find #"truncated" formatted-str))
           "Should not show truncation message when not truncated"))))
 
+(deftest format-raw-file-line-number-test
+  (testing "raw output lines are numbered with offset applied"
+    (let [result {:content "line3\nline4"
+                  :path "/test/file.txt"
+                  :line-count 2
+                  :offset 2
+                  :truncated? false}
+          formatted-str (first (unified-read-file-tool/format-raw-file result 2000))]
+      (is (str/includes? formatted-str "     3\tline3"))
+      (is (str/includes? formatted-str "     4\tline4"))))
+
+  (testing "empty raw output does not invent a line number"
+    (let [result {:content ""
+                  :path "/test/empty.txt"
+                  :line-count 0
+                  :offset 0
+                  :truncated? false}
+          formatted-str (first (unified-read-file-tool/format-raw-file result 2000))]
+      (is (not (re-find #"\s1\t" formatted-str))))))
+
+(deftest collapsed-clojure-line-number-format-test
+  (testing "expanded collapsed-view forms number every source line"
+    (let [test-file (io/file *test-dir* "numbered.clj")
+          _ (spit test-file "(ns numbered)\n\n(defn target\n  [x]\n  (inc x))\n\n(defn other [] :ok)")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          validated (tool-system/validate-inputs tool-instance {:path (.getAbsolutePath test-file)
+                                                                :name_pattern "target"})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)
+          formatted-str (first (:result formatted))]
+      (is (not (:error formatted)))
+      (is (re-find #"(?m)^\s*3\t\(defn target$" formatted-str))
+      (is (re-find #"(?m)^\s*4\t  \[x\]$" formatted-str))
+      (is (re-find #"(?m)^\s*5\t  \(inc x\)\)$" formatted-str))
+      (is (re-find #"(?m)^\s*7\t\(defn other \[\] \.\.\.\)$" formatted-str)))))
+
 ;; --- Dash-to-underscore filename correction integration tests ---
 ;; The core correction logic is tested in valid_paths_test.clj.
 ;; These tests verify the read_file tool pipeline works with the correction.

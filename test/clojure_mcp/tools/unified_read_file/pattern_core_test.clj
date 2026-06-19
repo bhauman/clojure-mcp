@@ -1,5 +1,6 @@
 (ns clojure-mcp.tools.unified-read-file.pattern-core-test
   (:require [clojure.test :refer [deftest testing is]]
+            [clojure.string :as str]
             [clojure-mcp.tools.unified-read-file.pattern-core :as collapsed]))
 
 ;; Test data
@@ -145,6 +146,26 @@
       (is (= 2 (get-in result [:pattern-info :expanded-forms])))
       (is (= 3 (get-in result [:pattern-info :collapsed-forms]))))))
 
+(deftest test-expanded-forms-number-every-line
+  (testing "expanded forms get source line numbers on every line"
+    (let [result (collapsed/generate-collapsed-view* basic-source "simple-function" nil)
+          view (:view result)]
+      (is (re-find #"(?m)^\s*1\t\(ns test\.example\)$" view))
+      (is (re-find #"(?m)^\s*3\t\(defn simple-function$" view))
+      (is (re-find #"(?m)^\s*4\t  \"A simple function\"$" view))
+      (is (re-find #"(?m)^\s*5\t  \[x y\]$" view))
+      (is (re-find #"(?m)^\s*6\t  \(\+ x y\)\)$" view))
+      (is (re-find #"(?m)^\s*8\t\(defn complex-function \[\.\.\.\] \.\.\.\)$" view)))))
+
+(deftest test-multiline-collapsed-forms-number-every-line
+  (testing "multi-line namespace forms are numbered throughout collapsed view"
+    (let [source "(ns test.multiline\n  (:require [clojure.string :as str]))\n\n(defn f [] :ok)"
+          result (collapsed/generate-collapsed-view* source nil nil)
+          view (:view result)]
+      (is (re-find #"(?m)^\s*1\t\(ns test\.multiline$" view))
+      (is (re-find #"(?m)^\s*2\t  \(:require \[clojure\.string :as str\]\)\)$" view))
+      (is (re-find #"(?m)^\s*4\t\(defn f \[\] \.\.\.\)$" view)))))
+
 (deftest test-content-pattern-matching
   (testing "Pattern matching on form content"
     (let [result (collapsed/generate-collapsed-view* basic-source nil "time")]
@@ -179,16 +200,22 @@
 
 (deftest test-reader-conditionals
   (testing "Reader conditionals collapsed view"
-    (let [result (collapsed/generate-collapsed-view* reader-conditional-source nil nil)]
-      (is (re-find #"#\?\(:clj\n   \(defn server-fn \[\] \.\.\.\)\)" (:view result)))
-      (is (re-find #"#\?\(:cljs\n   \(defn client-fn \[\] \.\.\.\)\)" (:view result)))
-      (is (re-find #"#\?\(:clj\n   \(def server-port \.\.\.\)\)" (:view result)))))
+    (let [result (collapsed/generate-collapsed-view* reader-conditional-source nil nil)
+          view (:view result)]
+      (is (re-find #"#\?\(:clj\n[ \t]*\d+\t\(defn server-fn \[\] \.\.\.\)\)" view))
+      (is (re-find #"#\?\(:cljs\n[ \t]*\d+\t\(defn client-fn \[\] \.\.\.\)\)" view))
+      (is (re-find #"#\?\(:clj\n[ \t]*\d+\t\(def server-port \.\.\.\)\)" view))))
 
-  (testing "Expanding reader conditional forms"
-    (let [result (collapsed/generate-collapsed-view* reader-conditional-source "server-fn|start-server" nil)]
+  (testing "Expanding reader conditional forms numbers every expanded source line"
+    (let [result (collapsed/generate-collapsed-view* reader-conditional-source "server-fn|start-server" nil)
+          view (:view result)]
       (is (= 2 (get-in result [:pattern-info :expanded-forms])))
-      (is (re-find #"\"Server-side function\"" (:view result)))
-      (is (re-find #"println \"Starting server\"" (:view result))))))
+      (is (re-find #"(?m)^[ \t]*\d+\t\(defn server-fn$" view))
+      (is (re-find #"(?m)^[ \t]*\d+\t     \"Server-side function\"$" view))
+      (is (re-find #"(?m)^[ \t]*\d+\t     \[\]$" view))
+      (is (re-find #"(?m)^[ \t]*\d+\t     :server\)\)" view))
+      (is (re-find #"(?m)^[ \t]*\d+\t\(defn start-server \[\]$" view))
+      (is (re-find #"(?m)^[ \t]*\d+\t       \(println \"Starting server\"\)\)" view)))))
 
 (deftest test-spec-forms
   (testing "Spec forms with keywords"
@@ -237,7 +264,8 @@
 
   (testing "Source with only namespace"
     (let [result (collapsed/generate-collapsed-view* "(ns test.only)" nil nil)]
-      (is (= "(ns test.only)" (:view result)))
+      (is (str/ends-with? (:view result) "\t(ns test.only)"))
+      (is (re-find #"^\s*1\t" (:view result)))
       (is (= 1 (get-in result [:pattern-info :total-forms])))))
 
   (testing "Invalid regex patterns"

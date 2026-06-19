@@ -96,3 +96,20 @@
       (is (map? result))
       (is (contains? result :error))
       (is (str/includes? (:error result) "is not a file")))))
+
+(deftest add-line-numbers-test
+  (testing "numbers each line starting at one"
+    (is (= "     1\talpha\n     2\tbeta"
+           (read-file-core/add-line-numbers "alpha\nbeta" 1))))
+
+  (testing "honors non-zero starting lines"
+    (is (= "    10\talpha\n    11\tbeta"
+           (read-file-core/add-line-numbers "alpha\nbeta" 10))))
+
+  (testing "preserves trailing blank lines"
+    (is (= "     1\talpha\n     2\t"
+           (read-file-core/add-line-numbers "alpha\n" 1))))
+
+  (testing "expected line count distinguishes empty files from blank lines"
+    (is (= "" (read-file-core/add-line-numbers "" 1 0)))
+    (is (= "     1\t" (read-file-core/add-line-numbers "" 1 1)))))

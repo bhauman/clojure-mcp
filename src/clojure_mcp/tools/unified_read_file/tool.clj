@@ -59,6 +59,7 @@ can give patterns to match the names for top level definitions
 `name_pattern` or match the bodies of top level definitions `content_pattern`.
 
 The functions that match these patterns will be the only functions expanded in collapsed view.
+Collapsed Clojure output includes cat -n style line numbers: collapsed single-line forms show the top-level form's starting line, and expanded or multi-line displayed forms show every line.
 
 For defmethod forms:
 - The name includes both the method name and the dispatch value (e.g., \"area :rectangle\")
@@ -69,7 +70,7 @@ For text files (non-Clojure):
 - When `collapsed: true` and a pattern is provided (`content_pattern` or `name_pattern`), shows only lines matching the pattern with 10 lines of context before and after
 
 For all other file types:
-- Collapsed view will not be applied and will return the raw contents of the file
+- Collapsed view will not be applied and raw output will prefix every returned line with a cat -n style line number
 
 Parameters:
 - path: Path to the file (required)
@@ -258,13 +259,14 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
 (defn format-raw-file
   "Formats raw file content with markdown."
   [result _max-lines]
-  (let [{:keys [content path _size line-count _offset truncated? _line-lengths-truncated? total-line-count]} result
+  (let [{:keys [content path _size line-count offset truncated? _line-lengths-truncated? total-line-count]} result
         file-type (last (str/split path #"\."))
         lang-hint (when file-type (str file-type))
+        numbered-content (core/add-line-numbers content (inc (or offset 0)) line-count)
         preamble (str "### " path "\n"
                       (when truncated?
                         (str "File truncated (showing " line-count " of " total-line-count " lines)\n\n")))]
-    [(str preamble "```" lang-hint "\n" content "\n```")]))
+    [(str preamble "```" lang-hint "\n" numbered-content "\n```")]))
 
 (defn format-text-collapsed-view
   "Formats text file collapsed view with markdown."

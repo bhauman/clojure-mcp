@@ -6,6 +6,26 @@
    [clojure.string :as str]
    [clojure-mcp.utils.file :as file-utils]))
 
+(defn add-line-numbers
+  "Prefix each line of content with a cat -n style line number (\"%6d\\t\")
+   starting at start-line. If expected-line-count is provided, it disambiguates
+   empty files from files containing blank lines."
+  ([content start-line]
+   (add-line-numbers content start-line nil))
+  ([content start-line expected-line-count]
+   (let [content (or content "")
+         lines (cond
+                 (and expected-line-count (zero? expected-line-count)) []
+                 (empty? content) [""]
+                 :else (str/split content #"\n" -1))
+         lines (if expected-line-count
+                 (take expected-line-count lines)
+                 lines)]
+     (str/join "\n"
+               (map-indexed (fn [i line]
+                              (format "%6d\t%s" (+ start-line i) line))
+                            lines)))))
+
 (defn find-matching-line-indices
   "Find all line indices that match the given pattern."
   [lines pattern]
