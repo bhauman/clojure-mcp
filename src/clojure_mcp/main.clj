@@ -62,6 +62,15 @@
    Options:
    - :not-cwd - If true, does NOT set project-dir to cwd (default: false)
    - :port - Optional nREPL port (REPL is optional when project-dir is set)
+   - :fallback-nrepl - If true, attach to :port when reachable, otherwise
+     spawn a local nREPL on an ephemeral port (does not collide with
+     :port). Useful when you don't always have an editor-managed nREPL
+     running.
+   - :fallback-nrepl-cmd - Vector of strings overriding the default
+     fallback command. Default reuses clojure-mcp's own nREPL version
+     via -Sdeps so ~/.clojure/deps.edn is still merged in.
+   - :fallback-nrepl-dir - Working directory for the spawned fallback
+     REPL. Default: :project-dir if set, else $HOME.
    - :enable-tools - Allowlist of tool keywords, replaces config's :enable-tools
    - :disable-tools - Blocklist of tool keywords, replaces config's :disable-tools
    - :add-tools - Force-enable tools (removes from :disable-tools, adds to :enable-tools if set)

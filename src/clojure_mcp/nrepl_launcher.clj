@@ -5,9 +5,30 @@
             [clojure.java.io :as io]
             [clojure.java.process :as process]
             [clojure.string :as str]
+            [nrepl.version :as nrepl-version]
             [taoensso.timbre :as log])
-  (:import [java.io BufferedReader]
+  (:import [java.io BufferedReader IOException]
+           [java.net InetSocketAddress Socket]
            [java.util.concurrent TimeUnit]))
+
+(defn default-fallback-nrepl-cmd
+  "Build the default command for the opt-in fallback nREPL.
+
+   The nREPL coordinate is taken from the version of nREPL that
+   clojure-mcp itself depends on (read from `nrepl.version`), so the
+   subprocess uses whatever version is already on clojure-mcp's
+   classpath rather than a hardcoded one.
+
+   The user's ~/.clojure/deps.edn is still merged in by the `clojure`
+   CLI, so commonly available dev libraries (Criterium, etc.) remain on
+   the spawned REPL's classpath."
+  []
+  ["clojure"
+   "-Sdeps"
+   (str "{:deps {nrepl/nrepl {:mvn/version \""
+        (:version-string nrepl-version/version)
+        "\"}}}")
+   "-M" "-m" "nrepl.cmdline"])
 
 (defn parse-port-from-output
   "Parse nREPL port number from process output.
@@ -217,6 +238,73 @@
   (if (and start-nrepl-cmd (not project-dir))
     (assoc nrepl-args :project-dir (System/getProperty "user.dir"))
     nrepl-args))
+
+(defn port-reachable?
+  "Probes whether a TCP connection can be opened to host:port within
+   timeout-ms. Returns true if the connection succeeds, false otherwise.
+
+   Used by the fallback launcher to decide whether to attach to an
+   already-running nREPL or spawn a new one."
+  [^String host port timeout-ms]
+  (try
+    (with-open [socket (Socket.)]
+      (.connect socket (InetSocketAddress. host (int port)) (int timeout-ms))
+      true)
+    (catch IOException _ false)
+    (catch IllegalArgumentException e
+      (log/warn e "Invalid host/port passed to port-reachable?")
+      false)))
+
+(def ^:private fallback-probe-timeout-ms 500)
+
+(defn maybe-start-fallback-nrepl
+  "If :fallback-nrepl is enabled, ensure an nREPL is reachable -
+   attaching to one if :port is provided and answering, otherwise
+   spawning a local nREPL using `default-fallback-nrepl-cmd` (or an
+   explicit :fallback-nrepl-cmd override).
+
+   The spawned REPL runs in :fallback-nrepl-dir (default: :project-dir
+   when supplied, else the user's home directory) so it inherits
+   ~/.clojure/deps.edn.
+
+   When :fallback-nrepl is true this path takes over from
+   :start-nrepl-cmd's always-start behaviour; :start-nrepl-cmd is
+   dropped from the returned args to prevent downstream double-start.
+
+   Returns nrepl-args possibly updated with the spawned :port and
+   :nrepl-process. Returns nrepl-args unchanged when the flag is unset."
+  [{:keys [fallback-nrepl host port project-dir
+           fallback-nrepl-cmd fallback-nrepl-dir]
+    :as nrepl-args}]
+  (cond
+    (not fallback-nrepl)
+    nrepl-args
+
+    (and port (port-reachable? (or host "localhost") port fallback-probe-timeout-ms))
+    (do
+      (log/debug "Fallback nREPL: existing nREPL reachable on port" port "- attaching")
+      (dissoc nrepl-args
+              :fallback-nrepl :fallback-nrepl-cmd :fallback-nrepl-dir
+              :start-nrepl-cmd))
+
+    :else
+    (let [cmd (or fallback-nrepl-cmd (default-fallback-nrepl-cmd))
+          dir (or fallback-nrepl-dir project-dir (System/getProperty "user.home"))]
+      (log/info "Fallback nREPL:"
+                (if port
+                  (str "port " port " unreachable;")
+                  "no port provided;")
+                "spawning local nREPL in" dir)
+      (let [{:keys [port process]} (start-nrepl-process
+                                    {:start-nrepl-cmd cmd
+                                     :project-dir dir})]
+        (-> nrepl-args
+            ;; Spawned fallback nREPL listens locally; override any
+            ;; user-supplied remote :host so the downstream connect
+            ;; targets the spawned process, not the unreachable host.
+            (assoc :host "localhost" :port port :nrepl-process process)
+            (dissoc :fallback-nrepl :fallback-nrepl-cmd :fallback-nrepl-dir
+                    :start-nrepl-cmd))))))
 
 (defn maybe-start-nrepl-process
   "Main wrapper that conditionally starts an nREPL process.
