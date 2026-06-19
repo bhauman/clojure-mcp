@@ -145,7 +145,17 @@
      - :host (optional) - nREPL server host (defaults to localhost)
      - :mcp-http-port (optional) - HTTP port for the server (defaults to 8078)
      - :project-dir (optional) - Root directory for the project. If provided, port is optional.
-     - :start-nrepl-cmd (optional) - Command to start nREPL server
+     - :start-nrepl-cmd (optional) - Command to start nREPL server (always
+       starts a fresh nREPL; ignored when :fallback-nrepl is also set)
+     - :fallback-nrepl (optional) - When true, attempts to attach to
+       :port first; if unreachable (or no :port given), spawns a local
+       nREPL on an ephemeral port. Does not collide with the configured
+       :port. See clojure-mcp.nrepl-launcher/maybe-start-fallback-nrepl.
+     - :fallback-nrepl-cmd (optional) - Override the default fallback
+       command. Vector of strings. Default uses `clojure` with nREPL
+       pulled in via -Sdeps.
+     - :fallback-nrepl-dir (optional) - Working directory for the
+       spawned fallback REPL. Default: :project-dir if set, else $HOME.
 
    - component-factories: Map with factory functions
      - :make-tools-fn - (fn [nrepl-client-atom working-dir] ...) returns seq of tools
@@ -155,11 +165,13 @@
    Auto-start conditions (must satisfy ONE):
    1. Both :start-nrepl-cmd AND :project-dir provided in nrepl-args
    2. Current directory contains .clojure-mcp/config.edn with :start-nrepl-cmd
+   3. :fallback-nrepl is true (handled separately by the fallback launcher)
 
    Returns: nil"
   [nrepl-args component-factories]
   (-> nrepl-args
       core/validate-options
+      nrepl-launcher/maybe-start-fallback-nrepl
       nrepl-launcher/maybe-start-nrepl-process
       core/ensure-port-if-needed
       (build-and-start-mcp-server-impl component-factories)))
