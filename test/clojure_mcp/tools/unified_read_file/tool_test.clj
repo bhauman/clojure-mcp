@@ -82,8 +82,11 @@
                   :truncated? true}
           formatted (unified-read-file-tool/format-raw-file result 2000)
           formatted-str (first formatted)]
-      (is (re-find #"showing 3 of 2000 lines" formatted-str)
-          "Should show total line count (2000), not file size (118628)")))
+      (is (re-find #"File truncated: showing 3 of 2000 lines" formatted-str)
+          "Should show total line count (2000), not file size (118628)")
+      (is (not (str/includes? formatted-str "118628")))
+      (is (not (str/includes? formatted-str "/test/file.txt")))
+      (is (not (str/includes? formatted-str "```")))))
 
   (testing "Non-truncated file doesn't show truncation message"
     (let [result {:content "line1\nline2"
@@ -105,7 +108,9 @@
                   :truncated? false}
           formatted-str (first (unified-read-file-tool/format-raw-file result 2000))]
       (is (str/includes? formatted-str "     3\tline3"))
-      (is (str/includes? formatted-str "     4\tline4"))))
+      (is (str/includes? formatted-str "     4\tline4"))
+      (is (not (str/includes? formatted-str "/test/file.txt")))
+      (is (not (str/includes? formatted-str "```")))))
 
   (testing "empty raw output does not invent a line number"
     (let [result {:content ""
@@ -127,6 +132,11 @@
           formatted (tool-system/format-results tool-instance result)
           formatted-str (first (:result formatted))]
       (is (not (:error formatted)))
+      (is (str/includes? formatted-str "\n\n...\n\n"))
+      (is (not (str/includes? formatted-str "THIS IS A COLLAPSED VIEW")))
+      (is (not (str/includes? formatted-str "Usage Tips")))
+      (is (not (str/includes? formatted-str "```")))
+      (is (not (str/includes? formatted-str (.getAbsolutePath test-file))))
       (is (re-find #"(?m)^\s*3\t\(defn target$" formatted-str))
       (is (re-find #"(?m)^\s*4\t  \[x\]$" formatted-str))
       (is (re-find #"(?m)^\s*5\t  \(inc x\)\)$" formatted-str))

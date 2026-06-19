@@ -372,7 +372,7 @@
                                        ")")
                                   numbered-content))))
                           forms)
-          view-string (str/join "\n\n" (filter some? view-parts))]
+          view-string (str/join "\n\n...\n\n" (filter some? view-parts))]
 
       {:view view-string
        :pattern-info {:name-pattern name-pattern

@@ -150,6 +150,7 @@
   (testing "expanded forms get source line numbers on every line"
     (let [result (collapsed/generate-collapsed-view* basic-source "simple-function" nil)
           view (:view result)]
+      (is (str/includes? view "\n\n...\n\n"))
       (is (re-find #"(?m)^\s*1\t\(ns test\.example\)$" view))
       (is (re-find #"(?m)^\s*3\t\(defn simple-function$" view))
       (is (re-find #"(?m)^\s*4\t  \"A simple function\"$" view))
@@ -274,6 +275,7 @@
   (testing "Source with only namespace"
     (let [result (collapsed/generate-collapsed-view* "(ns test.only)" nil nil)]
       (is (str/ends-with? (:view result) "\t(ns test.only)"))
+      (is (not (str/includes? (:view result) "\n\n...\n\n")))
       (is (re-find #"^\s*1\t" (:view result)))
       (is (= 1 (get-in result [:pattern-info :total-forms])))))
 

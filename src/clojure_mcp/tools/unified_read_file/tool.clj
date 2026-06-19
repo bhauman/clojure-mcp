@@ -60,6 +60,8 @@ can give patterns to match the names for top level definitions
 
 The functions that match these patterns will be the only functions expanded in collapsed view.
 Collapsed Clojure output includes cat -n style line numbers: collapsed single-line forms show the top-level form's starting line, and expanded or multi-line displayed forms show every line.
+Collapsed sections are separated by a line containing `...`.
+Successful reads return line-numbered content directly, without markdown fences, file-name preambles, or repeated usage tips.
 
 For defmethod forms:
 - The name includes both the method name and the dispatch value (e.g., \"area :rectangle\")
@@ -223,61 +225,25 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
                         (str (file-content/mime-type path)))})))
 
 (defn format-clojure-view
-  "Formats Clojure file view with markdown and usage advice."
-  [content path pattern-info]
-  (let [{:keys [name-pattern content-pattern _match-count total-forms expanded-forms collapsed-forms]} pattern-info
-        pattern-text (cond
-                       (and name-pattern content-pattern)
-                       (str "name_pattern: \"" name-pattern "\" and content_pattern: \"" content-pattern "\"")
-                       name-pattern
-                       (str "name_pattern: \"" name-pattern "\"")
-                       content-pattern
-                       (str "content_pattern: \"" content-pattern "\"")
-                       :else
-                       "no patterns")
-        form-stats (when (and total-forms expanded-forms collapsed-forms)
-                     (str " (" expanded-forms " expanded, " collapsed-forms " collapsed)"))
-        preamble (str "# THIS IS A COLLAPSED VIEW " path "\n"
-                      "Set `collapsed: false` to view the entire file\n"
-                      (when (or name-pattern content-pattern)
-                        (str "Matching " pattern-text form-stats "\n"))
-                      "*** `" path "`\n")
-
-        usage-tips (str "\n\n## `read_file` Tool Usage Tips\n\n"
-                        "- Use `name_pattern` with regex to match function names (e.g., \"validate.*\")\n"
-                        "- Use `content_pattern` to find code containing specific text (e.g., \"try|catch\")\n"
-                        "- For defmethod forms: Include the dispatch value (e.g., \"area :rectangle\" or \"dispatch-with-vector \\[:feet :inches\\]\")\n"
-                        "- For namespaced methods: Include namespace (e.g., \"tool-system/validate-inputs :clojure-eval\")\n"
-                        "- For spec forms: Pattern match on keywords (e.g., \"::user\" or \":domain/user\")\n"
-                        "- Reader conditionals display with platform syntax: #?(:clj ...)\n"
-                        "- Set `collapsed: false` to view the entire file\n")]
-
-    [(str preamble "```clojure\n" content "\n```" usage-tips)]))
+  "Formats Clojure file view."
+  [content _path _pattern-info]
+  [content])
 
 ;; Formatter helper functions for different content types
 
 (defn format-raw-file
-  "Formats raw file content with markdown."
+  "Formats raw file content."
   [result _max-lines]
-  (let [{:keys [content path _size line-count offset truncated? _line-lengths-truncated? total-line-count]} result
-        file-type (last (str/split path #"\."))
-        lang-hint (when file-type (str file-type))
+  (let [{:keys [content line-count offset truncated? total-line-count]} result
         numbered-content (core/add-line-numbers content (inc (or offset 0)) line-count)
-        preamble (str "### " path "\n"
-                      (when truncated?
-                        (str "File truncated (showing " line-count " of " total-line-count " lines)\n\n")))]
-    [(str preamble "```" lang-hint "\n" numbered-content "\n```")]))
+        truncation-notice (when truncated?
+                            (str "File truncated: showing " line-count " of " total-line-count " lines\n\n"))]
+    [(str truncation-notice numbered-content)]))
 
 (defn format-text-collapsed-view
-  "Formats text file collapsed view with markdown."
-  [content path pattern-info]
-  (let [{:keys [pattern match-count total-lines blocks-count]} pattern-info
-        preamble (str "# COLLAPSED VIEW: " path "\n"
-                      "Pattern: \"" pattern "\"\n"
-                      "Found " match-count " matches in " total-lines " lines"
-                      (when blocks-count (str ", showing " blocks-count " block(s)")) "\n"
-                      "*** `" path "`\n")]
-    [(str preamble "```\n" content "\n```")]))
+  "Formats text file collapsed view."
+  [content _path _pattern-info]
+  [content])
 
 (defmethod tool-system/format-results :unified-read-file [{:keys [max-lines]} result]
   (if (:error result)
