@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-19
+
+Refines the `:cli-assist-full` profile's instructions so the assistant routes Clojure-file **reads** through `read_file` as firmly as it already routes edits through the structural tools, and rewrites the guidance to be harness-agnostic — referring to the host's native file tools by role rather than by name so it reads correctly under Claude Code, Codex, and Gemini CLI.
+
+### Changed
+- **`:cli-assist-full` instructions**: Strengthened the read-side steering (do *all* Clojure reads via `read_file`, not just edits via the structural tools) and removed Claude-Code-specific tool names (`Read`/`Edit`/`Write`) and error text, describing the host's generic file tools by role instead so the guidance applies across CLI harnesses (Claude Code, Codex, Gemini CLI).
+
 ## [0.5.0] - 2026-06-19
 
 Modernizes the HTTP transport to the MCP Streamable HTTP spec (a single `/mcp` endpoint), adds a `:cli-assist-full` profile that brings ClojureMCP's structure-aware editing and smart file reading back as first-class tools for agent-driven CLI workflows, and introduces an opt-in `:fallback-nrepl` that auto-spawns a local nREPL when one isn't already running. Also adds configurable server instructions and an `:allowed-directories :all` escape hatch.
