@@ -11,7 +11,7 @@
 Focus on understanding and explaining code rather than making changes.
 Be concise and clear in your explanations."
 
- ;; Context controls whether to include project summary and code index
+ ;; Context controls whether to include project summary and project structure
  :context false ; Set to true to include project context
 
  ;; Specify which tools the agent can use

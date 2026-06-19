@@ -11,7 +11,7 @@
    :name "dispatch_agent"
    :description (slurp (io/resource "clojure_mcp/tools/dispatch_agent/description.md"))
    :system-message (slurp (io/resource "clojure_mcp/tools/dispatch_agent/system_message.md"))
-   :context true ; Uses default code index and project summary
+   :context true ; Uses default project summary and project structure
    :enable-tools [:LS :read_file :grep :glob_files :clojure_inspect_project]
    :memory-size 100})
 
@@ -52,7 +52,7 @@
    :description "Parent agent with all tools and Clojure REPL system prompt"
    :system-message (str (slurp (io/resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md"))
                         (slurp (io/resource "clojure-mcp/prompts/system/clojure_form_edit.md")))
-   ;; :context true ; Uses default code index and project summary
+   ;; :context true ; Uses default project summary and project structure
    :enable-tools [:all] ; Give access to all available tools
    :memory-size false})
 

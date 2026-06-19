@@ -114,16 +114,9 @@
                 {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
    :main-opts ["-e" "(require 'clojure-mcp.test-helper)" "-m" "cognitect.test-runner"]}
 
-  :index
-  {:exec-fn clojure-mcp.code-indexer/map-project
-   :exec-args {}
-   ;; Override with: clojure -X:index :dirs '["src" "lib"]' :include-tests true :out-file '"my-index.txt"'
-   }
-
   :build {:deps {io.github.clojure/tools.build
                  {:git/tag "v0.9.2" :git/sha "fe6b140"}
                  slipset/deps-deploy {:mvn/version "0.2.0"}}
           :ns-default build}
   :neil {:project {:name clojure-mcp/clojure-mcp}}}}
-
 

@@ -54,7 +54,7 @@ Each agent configuration supports the following keys:
   - References models defined in `:models` config
   - Falls back to default if not specified
 - **`:context`** - What context to provide the agent:
-  - `true` - Include PROJECT_SUMMARY.md and code index
+  - `true` - Include PROJECT_SUMMARY.md and current project structure
   - `false` or `nil` - No context
   - `["file1.md", "file2.clj"]` - Specific file paths
 - **`:enable-tools`** - Controls which tools the agent can use:
@@ -301,7 +301,6 @@ The `:context` field controls what information the agent has access to:
 Includes:
 - `PROJECT_SUMMARY.md` if it exists
 - Current project structure from `clojure-inspect-project`
-- `.clojure-mcp/code_index.txt` if it exists
 
 ### Custom File Context
 ```clojure

@@ -387,7 +387,7 @@
 (defn get-dispatch-agent-context
   "Returns dispatch agent context configuration.
    Can be:
-   - true/false (boolean) - whether to use default code index
+   - true/false (boolean) - whether to use default project context
    - list of file paths - specific files to load into context
    Defaults to true for backward compatibility."
   [nrepl-client-map]

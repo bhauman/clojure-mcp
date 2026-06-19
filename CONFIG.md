@@ -118,7 +118,7 @@ This can also be set via the CLI: `:shadow-cljs-repl-message false`
 Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
 
 **Available values:**
-- `true` (default) - Adds `PROJECT_SUMMARY.md` (if available) and `./.clojure-mcp/code_index.txt` into context
+- `true` (default) - Adds `PROJECT_SUMMARY.md` (if available) and the current project structure into context
 - Specifies a vector of specific files sent to `dispatch_agent`
 
 NOTE: May consume more API tokens or even exceed the context window of the LLM

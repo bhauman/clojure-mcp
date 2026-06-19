@@ -13,7 +13,7 @@
            :description "Specialized agent for researching code patterns and finding examples across the codebase"
            :system-message "You are a research specialist focused on finding code patterns, examples, and understanding project structure. Be thorough in your analysis and provide specific file locations and code snippets."
            :model :anthropic/claude-3-5-sonnet-20241022 ; Optional: specific model
-           :context true ; Use default project context (PROJECT_SUMMARY.md and code index)
+           :context true ; Use default project context (PROJECT_SUMMARY.md and project structure)
            :enable-tools [:grep :glob_files :read_file :clojure_inspect_project] ; Must specify tools explicitly
            :disable-tools nil}
 

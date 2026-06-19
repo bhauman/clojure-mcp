@@ -34,7 +34,7 @@
    - nrepl-client-atom: The nREPL client atom
    - working-directory: The working directory path
    - context-config: Can be:
-     - true: use default code index and project summary
+     - true: use default project summary and project structure
      - sequential: use specific file paths
      - false/nil: no context
    
@@ -42,8 +42,7 @@
   [nrepl-client-atom working-directory context-config]
   (cond
     (true? context-config)
-    (let [code-index-file (io/file working-directory ".clojure-mcp" "code_index.txt")
-          proj-summary-file (io/file working-directory "PROJECT_SUMMARY.md")
+    (let [proj-summary-file (io/file working-directory "PROJECT_SUMMARY.md")
           {:keys [outputs error]} (when nrepl-client-atom
                                     (project-core/inspect-project nrepl-client-atom))
           context-strings (cond-> []
@@ -53,12 +52,7 @@
 
                             (and (not error) outputs)
                             (conj (str "This is the current project structure:\n"
-                                       (string/join "\n" outputs)))
-
-                            (.exists code-index-file)
-                            (conj (str "This is a code index of the code in this project.
-Please use it to inform you as to which files should be investigated.\n=======================\n"
-                                       (file-utils/slurp-utf8 code-index-file))))]
+                                       (string/join "\n" outputs))))]
       context-strings)
 
     (sequential? context-config)

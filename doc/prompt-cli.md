@@ -94,7 +94,7 @@ The CLI properly initializes the nREPL connection with:
 By default, the CLI uses the `parent-agent-config` which includes:
 - The Clojure REPL system prompt
 - Access to all available tools
-- Project context (code index and summary)
+- Project context (summary and project structure)
 - Stateless memory (each invocation is independent)
 
 ## Custom Agent Configuration
