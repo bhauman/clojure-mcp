@@ -110,6 +110,9 @@
     (is (= "     1\talpha\n     2\t"
            (read-file-core/add-line-numbers "alpha\n" 1))))
 
+  (testing "empty content without expected line count produces no numbered line"
+    (is (= "" (read-file-core/add-line-numbers "" 1))))
+
   (testing "expected line count distinguishes empty files from blank lines"
     (is (= "" (read-file-core/add-line-numbers "" 1 0)))
     (is (= "     1\t" (read-file-core/add-line-numbers "" 1 1)))))

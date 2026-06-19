@@ -14,11 +14,12 @@
    (add-line-numbers content start-line nil))
   ([content start-line expected-line-count]
    (let [content (or content "")
+         has-expected-count? (some? expected-line-count)
          lines (cond
-                 (and expected-line-count (zero? expected-line-count)) []
-                 (empty? content) [""]
+                 (and has-expected-count? (zero? expected-line-count)) []
+                 (empty? content) (if has-expected-count? [""] [])
                  :else (str/split content #"\n" -1))
-         lines (if expected-line-count
+         lines (if has-expected-count?
                  (take expected-line-count lines)
                  lines)]
      (str/join "\n"
