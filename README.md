@@ -94,6 +94,15 @@ codex mcp add clojure-mcp -- clojure -Tmcp start :config-profile :cli-assist
 gemini mcp add clojure-mcp clojure -Tmcp start :config-profile :cli-assist
 ```
 
+**Prefer clojure-mcp's editing/reading tools?** If you let the agent drive and care
+less about the native inline diff, swap `:cli-assist` for `:cli-assist-full`. It makes
+`read_file`, `clojure_edit`, `clojure_edit_replace_sexp`, and `paren_repair`
+first-class (instead of fallbacks) and instructs the assistant to do **all**
+Clojure-file edits through them — which sidesteps the host editor's "file modified
+since read" conflict without any permission configuration. (Power users who want a
+hard guarantee can additionally add Claude Code `permissions.deny` rules like
+`"Edit(/**/*.clj)"` so the native editor can't touch Clojure files at all.)
+
 ### Check install by starting the server
 
 From your project directory:
@@ -539,6 +548,7 @@ When used without `:port`, the MCP server will automatically parse the port from
 
 Available profiles:
 * `:cli-assist` - Minimal toolset for CLI coding assistants (Claude Code, Codex, Gemini CLI). Disables redundant tools and configures `clojure_edit` as a fallback for when native Edit fails.
+* `:cli-assist-full` - Like `:cli-assist`, but promotes clojure-mcp's `read_file`, `clojure_edit`, `clojure_edit_replace_sexp`, and `paren_repair` to **first-class** tools (no "fallback" framing) for an agent-driven workflow. Its instructions steer the assistant to route **all** Clojure-file edits through the clojure tools, which avoids the host editor's "file modified since read" conflict without any host permission setup.
 
 `:config-profile :cli-assist`
 
@@ -602,6 +612,9 @@ clojure -Tmcp start :port 7888 :nrepl-env-type :bb
 
 # Using cli-assist profile for CLI coding assistants
 clojure -Tmcp start :config-profile :cli-assist
+
+# Like cli-assist, but clojure-mcp's read/edit tools are first-class (agent-driven workflow)
+clojure -Tmcp start :config-profile :cli-assist-full
 
 # cli-assist with a custom agent tool re-enabled
 clojure -Tmcp start :config-profile :cli-assist :add-tools '[:my_custom_agent]'

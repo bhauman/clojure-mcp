@@ -1,0 +1,60 @@
+;; cli-assist-full profile: clojure-mcp's structural editing + smart reader
+;; brought back as FIRST-CLASS tools, for use alongside a CLI assistant
+;; (e.g. Claude Code) where the agent drives and reviews later.
+;;
+;; First-class tools:
+;;   - read_file                 (collapsed, structure-aware reader)
+;;   - clojure_edit              (top-level form replace/insert)
+;;   - clojure_edit_replace_sexp (targeted expression replacement)
+;;   - paren_repair              (repair unbalanced parens)
+;;   - clojure_eval              (REPL evaluation)
+;;   - list_nrepl_ports          (discover running nREPL servers)
+;;
+;; Dirty-file handling (no Claude Code permission setup required):
+;;   - :write-file-guard false   -> clojure-mcp never hard-blocks on staleness
+;;                                  (safe: the editors above are content-addressed,
+;;                                   they reparse the file fresh on every call)
+;;   - :mcp-instructions steers ALL Clojure edits through the clojure tools so the
+;;     host's native Edit never trips its own "modified since read" check on .clj.
+
+{:mcp-instructions
+ "Clojure tooling is available and PREFERRED for all Clojure source files (.clj, .cljs, .cljc, .bb, .edn).
+
+- Read Clojure files with `read_file`: it returns a collapsed, structure-aware view (function signatures only by default, expandable by name/content pattern) that is far more token-efficient than a raw read.
+- Edit Clojure files with `clojure_edit` (replace/insert a whole top-level form), `clojure_edit_replace_sexp` (replace a targeted expression), and `paren_repair` (fix unbalanced parentheses). These match by code structure rather than exact text, validate parentheses on the way in, and avoid the repeated string-match failures of generic editors.
+- A persistent nREPL connection tool is available for evaluating and testing Clojure and ClojureScript code.
+
+IMPORTANT — use the Clojure tools above for ALL edits to Clojure files, not the built-in Edit/Write tools. The Clojure tools rewrite files on disk; after one of them edits a file, the built-in Edit tool will see the file as changed and refuse with a \"file has been modified since read\" error until it re-reads. Routing every Clojure-file edit through the Clojure tools avoids this entirely. Keep using the built-in tools for non-Clojure files."
+
+ :disable-tools
+ [:grep
+  :glob_files
+  :bash
+  :file_edit
+  :file_write
+  :scratch_pad
+  :dispatch_agent
+  :architect
+  :code_critique
+  :clojure_edit_agent
+  :clojure_inspect_project]
+
+ :disable-prompts
+ ["create-update-project-summary"
+  "plan-and-execute"
+  "chat-session-summarize"
+  "chat-session-resume"
+  "ACT/add-dir"
+  "ACT/scratch_pad_load"
+  "ACT/scratch_pad_save_as"
+  "save_new_prompt"
+  "clojure_repl_system_prompt"]
+
+ :disable-resources
+ ["PROJECT_SUMMARY.md"
+  "README.md"
+  "CLAUDE.md"
+  "LLM_CODE_STYLE.md"
+  "Clojure Project Info"]
+
+ :write-file-guard false}

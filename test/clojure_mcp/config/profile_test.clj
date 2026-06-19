@@ -89,3 +89,35 @@
   (testing "cli-assist profile disables write-file-guard"
     (let [profile-config (config/load-config-profile :cli-assist)]
       (is (false? (:write-file-guard profile-config))))))
+
+(deftest test-cli-assist-full-profile-contents
+  (testing "cli-assist-full promotes clojure-mcp edit/read tools to first-class"
+    (let [profile-config (config/load-config-profile :cli-assist-full)
+          disable-tools (:disable-tools profile-config)]
+      ;; First-class tools must NOT be disabled (read_file is the key delta vs cli-assist)
+      (is (not (some #{:read_file} disable-tools)))
+      (is (not (some #{:clojure_edit} disable-tools)))
+      (is (not (some #{:clojure_edit_replace_sexp} disable-tools)))
+      (is (not (some #{:paren_repair} disable-tools)))
+      (is (not (some #{:clojure_eval} disable-tools)))
+      (is (not (some #{:list_nrepl_ports} disable-tools)))
+      ;; Position/whole-file editors stay disabled so :write-file-guard false is safe
+      (is (some #{:file_edit} disable-tools))
+      (is (some #{:file_write} disable-tools))
+      ;; Tools the host CLI already provides stay disabled
+      (is (some #{:grep} disable-tools))
+      (is (some #{:glob_files} disable-tools))
+      (is (some #{:bash} disable-tools))
+      (is (some #{:clojure_inspect_project} disable-tools))))
+
+  (testing "cli-assist-full restores first-class descriptions (no :tools-config override)"
+    (let [profile-config (config/load-config-profile :cli-assist-full)]
+      (is (not (contains? profile-config :tools-config)))))
+
+  (testing "cli-assist-full disables write-file-guard"
+    (let [profile-config (config/load-config-profile :cli-assist-full)]
+      (is (false? (:write-file-guard profile-config)))))
+
+  (testing "cli-assist-full provides its own steering mcp-instructions"
+    (let [profile-config (config/load-config-profile :cli-assist-full)]
+      (is (string? (:mcp-instructions profile-config))))))
