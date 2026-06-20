@@ -8,3 +8,27 @@ args = [
 
 [mcp_servers.clojure-mcp.tools.clojure_edit]
 approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.clojure_edit_replace_sexp]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.clojure_eval]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.deps_grep]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.deps_list]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.deps_read]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.list_nrepl_ports]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.paren_repair]
+approval_mode = "approve"
+
+[mcp_servers.clojure-mcp.tools.read_file]
+approval_mode = "approve"
