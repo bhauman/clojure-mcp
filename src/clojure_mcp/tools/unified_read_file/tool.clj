@@ -60,7 +60,7 @@ can give patterns to match the names for top level definitions
 
 The functions that match these patterns will be the only functions expanded in collapsed view.
 Collapsed Clojure output includes cat -n style line numbers: collapsed single-line forms show the top-level form's starting line, and expanded or multi-line displayed forms show every line.
-Collapsed sections are separated by a line containing `...`.
+When multiple collapsed sections are shown, they are separated by a line containing `...`.
 Successful reads return line-numbered content directly, without markdown fences, file-name preambles, or repeated usage tips.
 
 For defmethod forms:
@@ -224,11 +224,6 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
                         (str path)
                         (str (file-content/mime-type path)))})))
 
-(defn format-clojure-view
-  "Formats Clojure file view."
-  [content _path _pattern-info]
-  [content])
-
 ;; Formatter helper functions for different content types
 
 (defn format-raw-file
@@ -242,8 +237,15 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
 
 (defn format-text-collapsed-view
   "Formats text file collapsed view."
-  [content _path _pattern-info]
-  [content])
+  [content pattern-info]
+  (let [{:keys [match-count total-lines blocks-count]} pattern-info]
+    (if (pos? (or match-count 0))
+      (let [header (str "Showing " match-count " match(es)"
+                        (when blocks-count
+                          (str " across " blocks-count " block(s)"))
+                        " in " (or total-lines 0) " total lines:\n\n")]
+        [(str header content)])
+      [content])))
 
 (defmethod tool-system/format-results :unified-read-file [{:keys [max-lines]} result]
   (if (:error result)
@@ -251,14 +253,11 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
      :error true}
     (case (:mode result)
       :clojure
-      {:result (format-clojure-view (:content result)
-                                    (:path result)
-                                    (:pattern-info result))
+      {:result [(:content result)]
        :error false}
 
       :text-collapsed
       {:result (format-text-collapsed-view (:content result)
-                                           (:path result)
                                            (:pattern-info result))
        :error false}
 

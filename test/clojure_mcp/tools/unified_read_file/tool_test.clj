@@ -121,6 +121,36 @@
           formatted-str (first (unified-read-file-tool/format-raw-file result 2000))]
       (is (not (re-find #"\s1\t" formatted-str))))))
 
+(deftest text-collapsed-view-signals-excerpt-test
+  (testing "text collapsed view includes concise excerpt metadata"
+    (let [test-file (io/file *test-dir* "notes.txt")
+          _ (spit test-file "alpha\nbeta\nneedle\ngamma\ndelta")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          validated (tool-system/validate-inputs tool-instance {:path (.getAbsolutePath test-file)
+                                                                :collapsed true
+                                                                :content_pattern "needle"})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)
+          formatted-str (first (:result formatted))]
+      (is (not (:error formatted)))
+      (is (str/starts-with? formatted-str "Showing 1 match(es) across 1 block(s) in 5 total lines:\n\n"))
+      (is (str/includes? formatted-str "   3 > needle"))
+      (is (not (str/includes? formatted-str "```")))
+      (is (not (str/includes? formatted-str (.getAbsolutePath test-file))))))
+
+  (testing "text collapsed view skips excerpt metadata when there are no matches"
+    (let [test-file (io/file *test-dir* "no-match-notes.txt")
+          _ (spit test-file "alpha\nbeta\ngamma")
+          tool-instance (unified-read-file-tool/create-unified-read-file-tool *nrepl-client-atom*)
+          validated (tool-system/validate-inputs tool-instance {:path (.getAbsolutePath test-file)
+                                                                :collapsed true
+                                                                :content_pattern "needle"})
+          result (tool-system/execute-tool tool-instance validated)
+          formatted (tool-system/format-results tool-instance result)
+          formatted-str (first (:result formatted))]
+      (is (not (:error formatted)))
+      (is (= "No matches found for pattern: needle" formatted-str)))))
+
 (deftest collapsed-clojure-line-number-format-test
   (testing "expanded collapsed-view forms number every source line"
     (let [test-file (io/file *test-dir* "numbered.clj")
