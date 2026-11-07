@@ -279,6 +279,23 @@
       true
       (boolean value))))
 
+(defn get-cljs-build
+  "Returns the project's default shadow-cljs build id for the cljs_* tools,
+   or nil when not configured."
+  [nrepl-client-map]
+  (get-config nrepl-client-map :cljs-build))
+
+(defn get-start-repl-hints
+  "Returns the configured commands that start this project's REPL, as a
+   vector of strings. A single string becomes a one-element vector; unset
+   is an empty vector."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :start-repl-hint)]
+    (cond
+      (nil? value) []
+      (string? value) [value]
+      :else (vec value))))
+
 (defn clojure-env?
   "Returns true if the nREPL environment is a Clojure environment."
   [nrepl-client-map]

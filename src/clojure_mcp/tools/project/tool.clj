@@ -2,7 +2,8 @@
   "Implementation of project inspection tool using the tool-system multimethod approach."
   (:require
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.project.core :as core]))
+   [clojure-mcp.tools.project.core :as core]
+   [clojure-mcp.tools.eval.deadline :as deadline]))
 
 ;; Factory function to create the tool configuration
 (defn create-project-inspection-tool
@@ -53,8 +54,13 @@ clojure_inspect_project()")
   inputs)
 
 (defmethod tool-system/execute-tool :clojure-inspect-project [{:keys [nrepl-client-atom]} _]
-  ;; Pass the atom directly to core implementation instead of dereferencing
-  (core/inspect-project nrepl-client-atom))
+  ;; Pass the atom directly to core implementation instead of dereferencing.
+  ;; It evaluates on the nREPL with no timeout of its own, hence the deadline.
+  (deadline/call-with-deadline
+   "clojure_inspect_project"
+   (deadline/deadline-ms 120000 deadline/default-grace-ms)
+   #(core/inspect-project nrepl-client-atom)
+   (fn [msg] {:outputs [msg] :error true})))
 
 (defmethod tool-system/format-results :clojure-inspect-project [_ {:keys [outputs error]}]
   ;; Format the results according to MCP expectations
