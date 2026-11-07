@@ -2,6 +2,7 @@
   (:require
    [clojure.data.json :as json]
    [clojure-mcp.agent.langchain.schema :as schema]
+   [clojure-mcp.config :as config]
    [taoensso.timbre :as log]
    [clojure.string :as string]
    [clojure.pprint])
@@ -33,7 +34,7 @@
 
 (defn create-gemini-model [model-name]
   (-> (GoogleAiGeminiChatModel/builder)
-      (.apiKey (System/getenv "GEMINI_API_KEY"))
+      (.apiKey (config/caller-env "GEMINI_API_KEY"))
       (.maxRetries (int 3))
       (.modelName model-name)))
 
@@ -54,7 +55,7 @@
 
 (defn create-openai-model [model-name]
   (-> (OpenAiChatModel/builder)
-      (.apiKey (System/getenv "OPENAI_API_KEY"))
+      (.apiKey (config/caller-env "OPENAI_API_KEY"))
       (.maxRetries (int 3))
       (.modelName model-name)))
 
@@ -67,7 +68,7 @@
 
 (defn create-anthropic-model [model-name]
   (-> (AnthropicChatModel/builder)
-      (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
+      (.apiKey (config/caller-env "ANTHROPIC_API_KEY"))
       (.maxRetries (int 3))
       (.modelName model-name)))
 
@@ -99,21 +100,21 @@
 
 (defn reasoning-agent-model []
   (cond
-    (System/getenv "ANTHROPIC_API_KEY")
+    (config/caller-env "ANTHROPIC_API_KEY")
     (create-anthropic-reasoning-model AnthropicChatModelName/CLAUDE_SONNET_4_20250514 :medium)
-    (System/getenv "GEMINI_API_KEY")
+    (config/caller-env "GEMINI_API_KEY")
     (create-gemini-reasoning-model "gemini-2.5-flash" :medium)
-    (System/getenv "OPENAI_API_KEY")
+    (config/caller-env "OPENAI_API_KEY")
     (create-openai-reasoning-model "o4-mini" :medium)
     :else nil))
 
 (defn agent-model []
   (cond
-    (System/getenv "ANTHROPIC_API_KEY")
+    (config/caller-env "ANTHROPIC_API_KEY")
     (create-anthropic-model AnthropicChatModelName/CLAUDE_SONNET_4_20250514)
-    (System/getenv "GEMINI_API_KEY")
+    (config/caller-env "GEMINI_API_KEY")
     (create-gemini-model "gemini-2.5-flash")
-    (System/getenv "OPENAI_API_KEY")
+    (config/caller-env "OPENAI_API_KEY")
     (create-openai-model "o4-mini")
     :else nil))
 

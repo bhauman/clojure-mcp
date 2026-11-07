@@ -65,7 +65,8 @@
                       (let [builder (chain/agent-model)]
                         (when listeners
                           (.listeners builder listeners))
-                        (some-> builder (.build))))]
+                        (or (some-> builder (.build))
+                            (some-> config/*agent-model-fallback* (apply [])))))]
 
     (log/info (str "Building agent '" name "' with "
                    (count filtered-tools) " tools"
@@ -92,7 +93,9 @@
    
    Returns: Agent service map"
   [nrepl-client-atom agent-config]
-  (let [cache-key (keyword (str "agent-tool-builder-" (name (:id agent-config))))
+  (let [cache-key (cond-> (keyword (str "agent-tool-builder-" (name (:id agent-config))))
+                    ;; the daemon serves sessions with different keys from one atom
+                    config/*session-env* (vector config/*session-env*))
         cached-agent (get @nrepl-client-atom cache-key)]
     (or cached-agent
         (let [new-agent (build-agent-from-config nrepl-client-atom agent-config)]

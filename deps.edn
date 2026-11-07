@@ -49,6 +49,14 @@
    :exec-fn clojure-mcp.streamable-http-main/start
    :exec-args {:mcp-http-port 8078}}
 
+  ;; one shared JVM serving many projects over localhost HTTP; started by the
+  ;; bb shim in shim/, see README "Shared daemon"
+  :daemon
+  {:extra-deps {jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
+                org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
+                org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}}
+   :exec-fn clojure-mcp.daemon/start}
+
   :mcp-figwheel
   {:exec-fn clojure-mcp.main-examples.figwheel-main/start-mcp-server
    :exec-args {:port 7888 :figwheel-build "dev"}}
@@ -110,6 +118,10 @@
    :exec-fn clojure-mcp.test-helper/run-tests-with-exec
    :extra-deps {org.clojure/test.check {:mvn/version "1.1.1"}
                 nrepl/nrepl {:mvn/version "1.3.1"} ;; Add nrepl server for testing
+                ;; the daemon's HTTP transport, as in :mcp-http / :daemon
+                jakarta.servlet/jakarta.servlet-api {:mvn/version "6.1.0"}
+                org.eclipse.jetty/jetty-server {:mvn/version "11.0.20"}
+                org.eclipse.jetty/jetty-servlet {:mvn/version "11.0.20"}
                 io.github.cognitect-labs/test-runner
                 {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
    :main-opts ["-e" "(require 'clojure-mcp.test-helper)" "-m" "cognitect.test-runner"]}

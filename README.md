@@ -124,6 +124,26 @@ With `list_nrepl_ports`, the agent can discover both your Clojure and shadow-clj
 
 The full toolkit also has shadow-cljs tools: `cljs_eval` evaluates ClojureScript in a build's live runtime (browser or Node) with no nested REPL, `cljs_build_status` shows a build's last compile result and warnings, `cljs_project_state` lists active builds and connected runtimes, and `cljs_list_ns` lists a build's namespaces. Their `port` defaults to `.shadow-cljs/nrepl.port` and their `build` to [`:cljs-build`](CONFIG.md#cljs-build) or the only active build.
 
+### Shared daemon (one JVM for every project)
+
+Each stdio server is its own JVM, and starting one takes 15 s or more. The shared daemon serves every project and every agent session on the machine from one JVM, and agents keep connecting over plain stdio through a small [babashka](https://babashka.org) shim. The shim needs `bb` and the `clojure` CLI on `PATH`.
+
+Commit this to a project's `.mcp.json`, pinning a commit `<sha>` of this repository in both places:
+
+```json
+{"mcpServers": {"clojure-mcp": {"command": "bb", "args": [
+  "-Sdeps", "{:deps {io.github.bhauman/clojure-mcp {:git/url \"https://github.com/bhauman/clojure-mcp\" :git/sha \"<sha>\" :deps/root \"shim\"}}}",
+  "-m", "clojure-mcp.shim", "--sha", "<sha>"]}}}
+```
+
+- The shim finds the project from its working directory: the nearest ancestor holding `.git`, `deps.edn`, `bb.edn` or `shadow-cljs.edn`. Each project gets its own config (`.clojure-mcp/config.edn`), nREPL connection and scratch pad, so an agent in one project never evaluates in another's REPL.
+- The shim answers the client's `initialize` at once and starts the daemon if none is running, so a cold start does not trip the client's connect timeout. Run the same command with `--warm` to start the daemon ahead of time.
+- Each session's environment is forwarded, so `bash`, API-key lookups and `ENABLE_TOOLS`/`DISABLE_TOOLS` see the caller's environment, not the environment of whichever shell started the daemon.
+- The sub-agent tools (`dispatch_agent`, `architect`, `code_critique`, `clojure_edit_agent`) are listed when the daemon starts with an API key in its environment, or with an `:agent-model-fallback` hook (a qualified symbol passed to `clojure-mcp.daemon/start`; see `clojure-mcp.daemon.server/start!`) that offers a model for that environment. The list is fixed then: a later session's own key is used for its calls, but does not add the tools.
+- The daemon listens on `127.0.0.1` only and requires a token that only the shim reads. Its state and `daemon.log` live in `~/.cache/clojure-mcp/daemons/<sha>/`. It exits after 8 hours without requests. A different `<sha>` gets its own daemon.
+- Projects share one tool list: a tool turned off in a project's config still appears, and calling it says it is disabled. Agents a project defines under `:agents`, and its `:tools-config` description overrides, do not appear in it.
+- For a local checkout of this repository, use `--local-root <checkout>` instead of `--sha`, with `{:local/root "<checkout>/shim"}` in `-Sdeps`.
+
 ### Older CLI profiles
 
 These editing-focused profiles are still shipped. They're mainly

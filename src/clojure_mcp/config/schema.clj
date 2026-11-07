@@ -36,7 +36,8 @@
    [:fn {:error/message "Environment variable can't be empty"}
     (fn [[_ env-var]]
       (or (not *validate-env-vars*)
-          (let [val (System/getenv env-var)]
+          ;; resolved at call time: clojure-mcp.config requires this ns
+          (let [val ((requiring-resolve 'clojure-mcp.config/caller-env) env-var)]
             (and val
                  (not (string/blank? val))))))]])
 
