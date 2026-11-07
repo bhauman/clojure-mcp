@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [clojure.edn :as edn]
    [taoensso.timbre :as log]
+   [clojure-mcp.config :as config]
    [clojure-mcp.nrepl :as nrepl]
    [clojure-mcp.tools.eval.core :as eval-core])
   (:import
@@ -60,6 +61,8 @@
     (let [pb (ProcessBuilder. (into-array ["bash" "-c" command]))
           _ (when working-directory
               (.directory pb (io/file working-directory)))
+          _ (when-let [env config/*session-env*]
+              (doto (.environment pb) (.clear) (.putAll ^java.util.Map env)))
           process (.start pb)]
       (if (.waitFor process timeout-ms TimeUnit/MILLISECONDS)
         (let [;; Read stderr first with its limit

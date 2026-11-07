@@ -36,7 +36,8 @@
    [:fn {:error/message "Environment variable can't be empty"}
     (fn [[_ env-var]]
       (or (not *validate-env-vars*)
-          (let [val (System/getenv env-var)]
+          ;; resolved at call time: clojure-mcp.config requires this ns
+          (let [val ((requiring-resolve 'clojure-mcp.config/caller-env) env-var)]
             (and val
                  (not (string/blank? val))))))]])
 
@@ -269,6 +270,11 @@
    [:nrepl-env-type {:optional true} [:enum :clj :bb :basilisp :scittle]]
    [:start-nrepl-cmd {:optional true} [:sequential NonBlankString]]
    [:shadow-cljs-repl-message {:optional true} :boolean]
+   ;; Default shadow-cljs build for the cljs_* tools
+   [:cljs-build {:optional true} :keyword]
+   ;; How to start this project's REPL, shown when no nREPL is found
+   [:start-repl-hint {:optional true}
+    [:or NonBlankString [:sequential NonBlankString]]]
 
 ;; Scratch pad configuration
    [:scratch-pad-load {:optional true} :boolean]

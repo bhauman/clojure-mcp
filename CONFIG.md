@@ -114,6 +114,20 @@ Controls whether the shadow-cljs REPL mode status message is included in eval re
 
 This can also be set via the CLI: `:shadow-cljs-repl-message false`
 
+### `:cljs-build`
+Default shadow-cljs build id (a keyword) for `cljs_eval` and `cljs_list_ns` when the call names no `build`. Without it, those tools use the only active build, and fail with the list of active builds when there are several.
+
+```edn
+{:cljs-build :dev}
+```
+
+### `:start-repl-hint`
+How to start this project's REPL: a string or a vector of strings. When `clojure_eval` finds no nREPL port, its result lists the running nREPLs and these commands first, followed by any start commands detected from `repl.sh`, `bb.edn`, `deps.edn` and `project.clj`. When set, the generic `npx shadow-cljs watch <build>` suggestion is left out, because a project that names its own start command starts shadow-cljs its own way.
+
+```edn
+{:start-repl-hint "bb start:detach"}
+```
+
 ### `:dispatch-agent-context`
 Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
 

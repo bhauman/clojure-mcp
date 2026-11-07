@@ -393,3 +393,16 @@
               str/trim
               Integer/parseInt)
           (catch Exception _ nil))))))
+
+(defn read-shadow-port-file
+  "Reads shadow-cljs's .shadow-cljs/nrepl.port from the given directory.
+   Returns the port number if found and valid, nil otherwise."
+  [dir]
+  (when dir
+    (let [port-file (io/file dir ".shadow-cljs" "nrepl.port")]
+      (when (.exists port-file)
+        (try
+          (-> (slurp port-file)
+              str/trim
+              Integer/parseInt)
+          (catch Exception _ nil))))))

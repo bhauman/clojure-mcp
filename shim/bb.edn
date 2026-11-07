@@ -1,0 +1,6 @@
+{:paths ["src" "test"]
+ :tasks
+ {test {:doc "Run the shim's tests"
+        :requires ([clojure.test :as t] [clojure-mcp.shim-test])
+        :task (let [{:keys [fail error]} (t/run-tests 'clojure-mcp.shim-test)]
+                (System/exit (if (zero? (+ fail error)) 0 1)))}}}

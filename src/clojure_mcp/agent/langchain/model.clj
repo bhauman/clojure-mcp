@@ -475,7 +475,7 @@
   [var-name]
   (or (when *env-overrides*
         (get *env-overrides* var-name))
-      (System/getenv var-name)))
+      (config/caller-env var-name)))
 
 (defn- resolve-env-refs
   "Resolves [:env \"VAR_NAME\"] references to environment variable values.

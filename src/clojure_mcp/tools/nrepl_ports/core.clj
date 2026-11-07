@@ -5,7 +5,8 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [taoensso.timbre :as log]
-            [nrepl.core :as nrepl]))
+            [nrepl.core :as nrepl]
+            [clojure-mcp.nrepl :as mcp-nrepl]))
 
 (defn read-nrepl-port-file
   "Read port number from .nrepl-port file in the given directory.
@@ -129,7 +130,7 @@
 
 (defn discover-nrepl-ports
   "Discover potential nREPL ports by:
-   1. Checking .nrepl-port file in current directory
+   1. Checking .nrepl-port and .shadow-cljs/nrepl.port files in current directory
    2. Finding Java/Clojure/Babashka processes listening on TCP ports (lsof)
    3. Validating discovered ports by checking if they respond to ls-sessions
    4. Detecting environment type (clj, bb, basilisp, shadow, etc.)
@@ -141,23 +142,27 @@
    Returns vector of maps with:
    - :host - Host string (always \"localhost\")
    - :port - Port number
-   - :source - How port was discovered (:nrepl-port-file or :lsof)
+   - :source - How port was discovered (:nrepl-port-file, :shadow-port-file or :lsof)
    - :valid - Boolean indicating if port responds to nREPL ls-sessions op
    - :env-type - Environment type (:clj, :bb, :basilisp, :scittle, :shadow, :unknown, or nil if invalid)
    - :project-dir - Project directory path from nREPL server (or nil)
    - :matches-cwd - Boolean indicating if project-dir matches current working directory"
   [current-dir]
-  (let [;; Collect port candidates
+  (let [;; Collect port candidates; .nrepl-port wins when both files name one port
         port-file-port (read-nrepl-port-file current-dir)
+        shadow-file-port (mcp-nrepl/read-shadow-port-file current-dir)
         lsof-ports (get-listening-jvm-ports)
 
         ;; Combine and deduplicate
         all-ports (distinct (concat (when port-file-port [port-file-port])
+                                    (when shadow-file-port [shadow-file-port])
                                     lsof-ports))
 
         ;; Validate each port and gather info in parallel using a single connection per port
         results (pmap (fn [port]
-                        (let [source (if (= port port-file-port) :nrepl-port-file :lsof)]
+                        (let [source (cond (= port port-file-port) :nrepl-port-file
+                                           (= port shadow-file-port) :shadow-port-file
+                                           :else :lsof)]
                           (gather-port-info "localhost" port source current-dir)))
                       all-ports)]
     (vec results)))

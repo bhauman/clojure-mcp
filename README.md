@@ -31,6 +31,9 @@ the running program, and test changes as it makes them.
   your machine, so the agent can find and switch between REPLs.
 - **`paren_repair`** - a safety valve for the rare delimiter tangle
   that's hard to fix by string editing.
+- **`cljs_eval`**, **`cljs_build_status`**, **`cljs_project_state`**,
+  **`cljs_list_ns`** - evaluate in, and inspect, a shadow-cljs build's
+  live runtime (browser or Node).
 
 That's the whole recommended setup: the `:repl` profile. Your agent
 keeps its own file reading, editing, search and shell tools.
@@ -117,7 +120,29 @@ provides a shell-based nREPL client and a delimiter-repair hook instead.
 
 ### Working with Multiple REPLs
 
-With `list_nrepl_ports`, the agent can discover both your Clojure and shadow-cljs REPLs simultaneously. The tool identifies which REPLs are shadow-cljs instances, allowing the agent to evaluate on either REPL using `clojure_eval` with the appropriate `port` parameter.
+With `list_nrepl_ports`, the agent can discover both your Clojure and shadow-cljs REPLs simultaneously, including the port shadow-cljs writes to `.shadow-cljs/nrepl.port`. The tool identifies which REPLs are shadow-cljs instances, allowing the agent to evaluate on either REPL using `clojure_eval` with the appropriate `port` parameter.
+
+The full toolkit also has shadow-cljs tools: `cljs_eval` evaluates ClojureScript in a build's live runtime (browser or Node) with no nested REPL, `cljs_build_status` shows a build's last compile result and warnings, `cljs_project_state` lists active builds and connected runtimes, and `cljs_list_ns` lists a build's namespaces. Their `port` defaults to `.shadow-cljs/nrepl.port` and their `build` to [`:cljs-build`](CONFIG.md#cljs-build) or the only active build.
+
+### Shared daemon (one JVM for every project)
+
+Each stdio server is its own JVM, and starting one takes 15 s or more. The shared daemon serves every project and every agent session on the machine from one JVM, and agents keep connecting over plain stdio through a small [babashka](https://babashka.org) shim. The shim needs `bb` and the `clojure` CLI on `PATH`.
+
+Commit this to a project's `.mcp.json`, pinning a commit `<sha>` of this repository in both places:
+
+```json
+{"mcpServers": {"clojure-mcp": {"command": "bb", "args": [
+  "-Sdeps", "{:deps {io.github.bhauman/clojure-mcp {:git/url \"https://github.com/bhauman/clojure-mcp\" :git/sha \"<sha>\" :deps/root \"shim\"}}}",
+  "-m", "clojure-mcp.shim", "--sha", "<sha>"]}}}
+```
+
+- The shim finds the project from its working directory: the nearest ancestor holding `.git`, `deps.edn`, `bb.edn` or `shadow-cljs.edn`. Each project gets its own config (`.clojure-mcp/config.edn`), nREPL connection and scratch pad, so an agent in one project never evaluates in another's REPL.
+- The shim answers the client's `initialize` at once and starts the daemon if none is running, so a cold start does not trip the client's connect timeout. Run the same command with `--warm` to start the daemon ahead of time.
+- Each session's environment is forwarded, so `bash`, API-key lookups and `ENABLE_TOOLS`/`DISABLE_TOOLS` see the caller's environment, not the environment of whichever shell started the daemon.
+- The sub-agent tools (`dispatch_agent`, `architect`, `code_critique`, `clojure_edit_agent`) are listed when the daemon starts with an API key in its environment, or with an `:agent-model-fallback` hook (a qualified symbol passed to `clojure-mcp.daemon/start`; see `clojure-mcp.daemon.server/start!`) that offers a model for that environment. The list is fixed then: a later session's own key is used for its calls, but does not add the tools.
+- The daemon listens on `127.0.0.1` only and requires a token that only the shim reads. Its state and `daemon.log` live in `~/.cache/clojure-mcp/daemons/<sha>/`. It exits after 8 hours without requests. A different `<sha>` gets its own daemon.
+- Projects share one tool list: a tool turned off in a project's config still appears, and calling it says it is disabled. Agents a project defines under `:agents`, and its `:tools-config` description overrides, do not appear in it.
+- For a local checkout of this repository, use `--local-root <checkout>` instead of `--sha`, with `{:local/root "<checkout>/shim"}` in `-Sdeps`.
 
 ### Older CLI profiles
 
@@ -125,7 +150,7 @@ These editing-focused profiles are still shipped. They're mainly
 useful with models that struggle to edit Clojure.
 
 All three include the `:repl` tools (`clojure_eval`,
-`list_nrepl_ports`, `paren_repair`) plus `deps_list`, `deps_grep` and
+`list_nrepl_ports`, `paren_repair` and the `cljs_*` tools) plus `deps_list`, `deps_grep` and
 `deps_read` for searching and reading source in dependency jars.
 
 - **`:cli-assist`** - structural editors as a fallback for when the
@@ -263,7 +288,7 @@ The spawned process is cleaned up automatically when the MCP server shuts down.
 **Optional** - Load a built-in configuration profile that adjusts tool availability and descriptions. Useful for tailoring ClojureMCP to specific use cases.
 
 Available profiles:
-* `:repl` - **Recommended.** REPL-only toolset for CLI coding agents (Claude Code, Codex, Gemini CLI): `clojure_eval`, `list_nrepl_ports` and `paren_repair`, with no prompts or resources. The agent uses its own tools for all reading and editing. Uses allowlists, so tools added to ClojureMCP later stay off unless the profile lists them.
+* `:repl` - **Recommended.** REPL-only toolset for CLI coding agents (Claude Code, Codex, Gemini CLI): `clojure_eval`, `list_nrepl_ports`, `paren_repair` and the shadow-cljs tools (`cljs_eval`, `cljs_build_status`, `cljs_project_state`, `cljs_list_ns`), with no prompts or resources. The agent uses its own tools for all reading and editing. Uses allowlists, so tools added to ClojureMCP later stay off unless the profile lists them.
 * `:cli-assist`, `:cli-assist-agent`, `:cli-assist-full` - *(legacy)* Editing-focused profiles; see [doc/full-toolkit.md](doc/full-toolkit.md#editing-profiles-for-cli-agents).
 
 `:config-profile :repl`

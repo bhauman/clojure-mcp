@@ -279,6 +279,23 @@
       true
       (boolean value))))
 
+(defn get-cljs-build
+  "Returns the project's default shadow-cljs build id for the cljs_* tools,
+   or nil when not configured."
+  [nrepl-client-map]
+  (get-config nrepl-client-map :cljs-build))
+
+(defn get-start-repl-hints
+  "Returns the configured commands that start this project's REPL, as a
+   vector of strings. A single string becomes a one-element vector; unset
+   is an empty vector."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :start-repl-hint)]
+    (cond
+      (nil? value) []
+      (string? value) [value]
+      :else (vec value))))
+
 (defn clojure-env?
   "Returns true if the nREPL environment is a Clojure environment."
   [nrepl-client-map]
@@ -421,12 +438,34 @@
    When non-nil, will be checked before System/getenv."
   nil)
 
+(def ^:dynamic *session-env*
+  "The environment of the MCP client a tool call came from, bound per call by
+   the daemon (one JVM serves sessions started from different shells). nil
+   outside the daemon. Reads made on the caller's behalf go through
+   `caller-env`."
+  nil)
+
+(defn caller-env
+  "Environment variable as the calling client sees it: from *session-env* when
+   bound (absent there means unset, never the daemon's own value), else
+   System/getenv."
+  [var-name]
+  (if *session-env*
+    (get *session-env* var-name)
+    (System/getenv var-name)))
+
+(def ^:dynamic *agent-model-fallback*
+  "A no-arg fn giving the ChatModel (or nil) for a sub-agent whose config
+   names no model when the caller's env has no provider key, or nil. Bound per
+   call by the daemon from its `:agent-model-fallback` hook."
+  nil)
+
 (defn- get-env
   "Gets environment variable, checking *env-overrides* first for testing."
   [var-name]
   (or (when *env-overrides*
         (get *env-overrides* var-name))
-      (System/getenv var-name)))
+      (caller-env var-name)))
 
 (defn- parse-tools-env-var
   "Parses a comma-separated string of tool names into a vector of keywords.

@@ -18,6 +18,7 @@
 (def eval-tool-syms
   "Symbols for evaluation tool creation functions"
   ['clojure-mcp.tools.eval.tool/eval-code
+   'clojure-mcp.tools.shadow.tool/shadow-tools
    'clojure-mcp.tools.bash.tool/bash-tool])
 
 (def editing-tool-syms
@@ -116,10 +117,14 @@
 
 ;; Category-specific builders for fine-grained control
 (defn build-eval-tools
-  "Build just the evaluation tools"
+  "Build just the evaluation tools. The shadow-cljs builder returns several
+   tools, so results are flattened."
   [nrepl-client-atom]
   (let [tool-fns (resolve-tool-fns eval-tool-syms)]
-    (mapv #(% nrepl-client-atom) tool-fns)))
+    (vec (flatten (map (fn [f]
+                         (let [result (f nrepl-client-atom)]
+                           (if (vector? result) result [result])))
+                       tool-fns)))))
 
 (defn build-editing-tools
   "Build just the editing tools"
