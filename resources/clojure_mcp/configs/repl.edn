@@ -9,6 +9,9 @@
 ;;   - clojure_eval      (REPL evaluation, repairs delimiters before evaluating)
 ;;   - list_nrepl_ports  (discover running nREPL servers, incl. shadow-cljs)
 ;;   - paren_repair      (safety valve for the rare delimiter tangle)
+;;   - cljs_eval, cljs_build_status, cljs_project_state, cljs_list_ns
+;;                       (shadow-cljs runtimes; clojure_eval's description
+;;                        points ClojureScript work at them)
 ;;
 ;; Enabled prompts / resources:
 ;;   (none)
@@ -21,7 +24,8 @@
 
 Use your environment's own tools for reading and editing files. A paren_repair tool is available for a delimiter tangle that is hard to fix by string editing."
 
- :enable-tools [:clojure_eval :list_nrepl_ports :paren_repair]
+ :enable-tools [:clojure_eval :list_nrepl_ports :paren_repair
+                :cljs_eval :cljs_build_status :cljs_project_state :cljs_list_ns]
  :enable-prompts []
  :enable-resources []
 
